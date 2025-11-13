@@ -1,0 +1,156 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../**/*.blade.php';
+@source '../**/*.js';
+
+@theme {
+    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+        'Segoe UI Symbol', 'Noto Color Emoji';
+    
+    /* Color System */
+    --color-background: 0 0% 100%;
+    --color-foreground: 240 10% 3.9%;
+    
+    --color-card: 0 0% 100%;
+    --color-card-foreground: 240 10% 3.9%;
+    
+    --color-popover: 0 0% 100%;
+    --color-popover-foreground: 240 10% 3.9%;
+    
+    --color-primary: 263 70% 50%;
+    --color-primary-foreground: 0 0% 100%;
+    --color-primary-glow: 263 85% 65%;
+    
+    --color-secondary: 240 4.8% 95.9%;
+    --color-secondary-foreground: 240 5.9% 10%;
+    
+    --color-muted: 240 4.8% 95.9%;
+    --color-muted-foreground: 240 3.8% 46.1%;
+    
+    --color-accent: 16 90% 62%;
+    --color-accent-foreground: 0 0% 100%;
+    --color-accent-glow: 16 95% 70%;
+    
+    --color-success: 142 76% 36%;
+    --color-success-foreground: 0 0% 100%;
+    
+    --color-warning: 38 92% 50%;
+    --color-warning-foreground: 0 0% 100%;
+    
+    --color-destructive: 0 84.2% 60.2%;
+    --color-destructive-foreground: 0 0% 100%;
+    
+    --color-border: 240 5.9% 90%;
+    --color-input: 240 5.9% 90%;
+    --color-ring: 263 70% 50%;
+    
+    --radius: 0.75rem;
+}
+
+/* Base Styles */
+@layer base {
+    * {
+        @apply border-border;
+    }
+    
+    body {
+        @apply bg-background text-foreground;
+        font-feature-settings: "rlig" 1, "calt" 1;
+    }
+    
+    h1, h2, h3, h4, h5, h6 {
+        @apply font-bold tracking-tight;
+    }
+    
+    h1 {
+        @apply text-4xl md:text-5xl lg:text-6xl;
+    }
+    
+    h2 {
+        @apply text-3xl md:text-4xl lg:text-5xl;
+    }
+    
+    h3 {
+        @apply text-2xl md:text-3xl;
+    }
+}
+
+/* Utility Classes */
+@layer utilities {
+    .gradient-primary {
+        background: linear-gradient(135deg, hsl(263 70% 50%), hsl(263 85% 65%));
+    }
+    
+    .gradient-accent {
+        background: linear-gradient(135deg, hsl(16 90% 62%), hsl(16 95% 70%));
+    }
+    
+    .gradient-hero {
+        background: linear-gradient(135deg, hsl(263 70% 50%) 0%, hsl(220 70% 50%) 100%);
+    }
+    
+    .shadow-card {
+        box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+    }
+    
+    .shadow-card-hover {
+        box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    }
+    
+    .shadow-glow {
+        box-shadow: 0 0 40px hsl(263 70% 50% / 0.3);
+    }
+    
+    .transition-smooth {
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .bg-clip-text {
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+    @theme {
+        --color-background: 240 10% 3.9%;
+        --color-foreground: 0 0% 98%;
+        
+        --color-card: 240 10% 7%;
+        --color-card-foreground: 0 0% 98%;
+        
+        --color-popover: 240 10% 7%;
+        --color-popover-foreground: 0 0% 98%;
+        
+        --color-primary: 263 70% 60%;
+        --color-primary-foreground: 0 0% 100%;
+        --color-primary-glow: 263 85% 75%;
+        
+        --color-secondary: 240 3.7% 15.9%;
+        --color-secondary-foreground: 0 0% 98%;
+        
+        --color-muted: 240 3.7% 15.9%;
+        --color-muted-foreground: 240 5% 64.9%;
+        
+        --color-accent: 16 90% 65%;
+        --color-accent-foreground: 0 0% 100%;
+        --color-accent-glow: 16 95% 75%;
+        
+        --color-success: 142 76% 45%;
+        --color-success-foreground: 0 0% 100%;
+        
+        --color-warning: 38 92% 60%;
+        --color-warning-foreground: 0 0% 100%;
+        
+        --color-destructive: 0 62.8% 30.6%;
+        --color-destructive-foreground: 0 0% 98%;
+        
+        --color-border: 240 3.7% 15.9%;
+        --color-input: 240 3.7% 15.9%;
+        --color-ring: 263 70% 60%;
+    }
+}

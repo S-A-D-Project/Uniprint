@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UniPrint Chat - Standalone Demo</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <!-- Chat CSS -->
+    <link rel="stylesheet" href="/css/chat.css">
+    
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .demo-container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .demo-header {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .demo-controls {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-indicator.online {
+            background: #10B981;
+        }
+        
+        .status-indicator.offline {
+            background: #EF4444;
+        }
+    </style>
+</head>
+<body>
+    <div class="demo-container">
+        <!-- Demo Header -->
+        <div class="demo-header">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h2 class="mb-2">
+                        <i class="bi bi-chat-dots-fill text-primary"></i>
+                        UniPrint Chat - Standalone Demo
+                    </h2>
+                    <p class="mb-0 text-muted">
+                        Real-time chat using Pusher CDN • No Node Modules Required
+                    </p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <div class="mb-2">
+                        <span class="status-indicator" id="pusherStatus"></span>
+                        <strong id="connectionText">Initializing...</strong>
+                    </div>
+                    <small class="text-muted">Demo Mode</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Demo Controls -->
+        <div class="demo-controls">
+            <div class="row align-items-center">
+                <div class="col-md-4">
+                    <label class="form-label mb-1"><strong>Current User:</strong></label>
+                    <select class="form-select form-select-sm" id="userSelector">
+                        <option value="user1">Customer - John Doe</option>
+                        <option value="user2">Business - Print Shop A</option>
+                        <option value="user3">Customer - Jane Smith</option>
+                        <option value="user4">Business - Print Shop B</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label mb-1"><strong>Pusher Status:</strong></label>
+                    <div>
+                        <span class="badge bg-warning" id="pusherStatusBadge">Not Connected</span>
+                        <small class="text-muted ms-2" id="messageCount">0 messages</small>
+                    </div>
+                </div>
+                <div class="col-md-4 text-end">
+                    <label class="form-label mb-1">&nbsp;</label>
+                    <div>
+                        <button class="btn btn-sm btn-primary" id="testMessageBtn">
+                            <i class="bi bi-send"></i> Send Test Message
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary" id="clearMessagesBtn">
+                            <i class="bi bi-trash"></i> Clear
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alert Box -->
+        <div id="alertBox" class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="bi bi-check-circle"></i>
+            <strong>Ready to Test:</strong> Pusher credentials are configured! Open multiple browser tabs to test real-time messaging between different users.
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+
+        <!-- Chat Container -->
+        <div id="connectionStatus" class="connection-status connecting">
+            <i class="bi bi-wifi"></i> Connecting to Pusher...
+        </div>
+
+        <div class="chat-container" style="max-height: 600px;">
+            <!-- Conversations List -->
+            <div class="conversations-panel" id="conversationsPanel">
+                <div class="conversations-header">
+                    <h5>
+                        <i class="bi bi-chat-dots"></i> Demo Conversations
+                    </h5>
+                    <small>Standalone Mode</small>
+                </div>
+
+                <div class="conversations-search">
+                    <input type="text" class="form-control" id="searchConversations" placeholder="Search...">
+                </div>
+
+                <div class="conversations-list" id="conversationsList">
+                    <!-- Will be populated by JavaScript -->
+                </div>
+            </div>
+
+            <!-- Chat Panel -->
+            <div class="chat-panel" id="chatPanel">
+                <div class="empty-state" id="emptyState">
+                    <i class="bi bi-chat-text"></i>
+                    <h5>Welcome to Demo Mode</h5>
+                    <p>Select a conversation to start testing the chat interface</p>
+                    <small class="text-muted">This is a demonstration. Messages are stored locally.</small>
+                </div>
+
+                <div id="activeChat" style="display: none; flex-direction: column; flex: 1;">
+                    <div class="chat-header">
+                        <button class="back-button" id="backButton">
+                            <i class="bi bi-arrow-left"></i>
+                        </button>
+                        <div class="chat-participant">
+                            <div class="avatar" id="participantAvatar">PS</div>
+                            <div>
+                                <div class="fw-bold" id="participantName">Print Shop A</div>
+                                <div id="participantStatusText" class="participant-status">
+                                    <span class="status-indicator online"></span> Online
+                                </div>
+                                <div id="typingIndicator" class="typing-status" style="display: none;">
+                                    <i class="bi bi-three-dots"></i> typing...
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-outline-primary" id="refreshMessages" title="Refresh">
+                                <i class="bi bi-arrow-clockwise"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="chat-messages" id="chatMessages">
+                        <!-- Messages will be loaded here -->
+                    </div>
+
+                    <div class="chat-input">
+                        <div class="input-wrapper">
+                            <textarea 
+                                class="message-input" 
+                                id="messageInput" 
+                                placeholder="Type a message..." 
+                                rows="1"
+                            ></textarea>
+                            <button class="send-button" id="sendButton">
+                                <i class="bi bi-send-fill"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Instructions -->
+        <div class="card mt-3">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="bi bi-info-circle text-primary"></i>
+                    Demo Instructions
+                </h5>
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>How to Test:</h6>
+                        <ol>
+                            <li>Select a user from the dropdown above</li>
+                            <li>Click on a conversation in the left panel</li>
+                            <li>Type and send messages in the chat area</li>
+                            <li>Switch users to see bidirectional messaging</li>
+                            <li>Test typing indicators and read receipts</li>
+                        </ol>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Features Demonstrated:</h6>
+                        <ul>
+                            <li>✅ Real-time message delivery (via Pusher)</li>
+                            <li>✅ Typing indicators</li>
+                            <li>✅ Read receipts (double checkmarks)</li>
+                            <li>✅ Online status indicators</li>
+                            <li>✅ Responsive mobile design</li>
+                            <li>✅ Message timestamps</li>
+                        </ul>
+                    </div>
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col-md-6">
+                        <p class="mb-0">
+                            <strong>✅ Real-time Enabled:</strong> Pusher credentials are configured. 
+                            Messages are stored locally and broadcast via Pusher for real-time delivery.
+                        </p>
+                    </div>
+                    <div class="col-md-6">
+                        <p class="mb-0">
+                            <strong>🔄 Multi-tab Testing:</strong> Open this page in multiple browser tabs, 
+                            select different users, and test real-time messaging between them.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Pusher JS -->
+    <script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
+
+    <script>
+        // Demo Chat Application
+        (function($) {
+            'use strict';
+
+            // Configuration - Using actual Pusher credentials
+            const CONFIG = {
+                pusher: {
+                    key: 'f7ca062b8f895c3f2497',  // From .env file
+                    cluster: 'ap1',              // From .env file
+                    enabled: true                // Enable real-time features
+                },
+                currentUser: 'user1',
+                channelPrefix: 'demo-chat'
+            };
+
+            // Demo data
+            const DEMO_USERS = {
+                user1: { id: 'user1', name: 'John Doe', role: 'Customer' },
+                user2: { id: 'user2', name: 'Print Shop A', role: 'Business' },
+                user3: { id: 'user3', name: 'Jane Smith', role: 'Customer' },
+                user4: { id: 'user4', name: 'Print Shop B', role: 'Business' }
+            };
+
+            const DEMO_CONVERSATIONS = [
+                {
+                    id: 'conv1',
+                    participants: ['user1', 'user2'],
+                    lastMessage: 'Hello! I need help with my order.',
+                    timestamp: new Date(Date.now() - 3600000)
+                },
+                {
+                    id: 'conv2',
+                    participants: ['user1', 'user4'],
+                    lastMessage: 'Can you provide a quote for business cards?',
+                    timestamp: new Date(Date.now() - 7200000)
+                },
+                {
+                    id: 'conv3',
+                    participants: ['user3', 'user2'],
+                    lastMessage: 'Thank you for the quick service!',
+                    timestamp: new Date(Date.now() - 10800000)
+                }
+            ];
+
+            class DemoChatApp {
+                constructor() {
+                    this.pusher = null;
+                    this.currentUser = CONFIG.currentUser;
+                    this.conversations = DEMO_CONVERSATIONS;
+                    this.messages = this.loadMessages();
+                    this.currentConversation = null;
+                    this.messageCount = 0;
+                    this.subscribedChannels = new Map();
+                    this.typingTimeout = null;
+
+                    this.init();
+                }
+
+                init() {
+                    console.log('[Demo] Initializing...');
+                    this.setupPusher();
+                    this.setupEventListeners();
+                    this.renderConversations();
+                    this.updateUserDisplay();
+                }
+
+                setupPusher() {
+                    if (!CONFIG.pusher.enabled) {
+                        this.updatePusherStatus('disabled');
+                        return;
+                    }
+
+                    try {
+                        this.pusher = new Pusher(CONFIG.pusher.key, {
+                            cluster: CONFIG.pusher.cluster,
+                            enabledTransports: ['ws', 'wss'],
+                            forceTLS: true
+                        });
+
+                        this.pusher.connection.bind('connected', () => {
+                            console.log('[Pusher] Connected successfully');
+                            this.updatePusherStatus('connected');
+                            this.subscribeToGlobalChannel();
+                        });
+
+                        this.pusher.connection.bind('disconnected', () => {
+                            console.log('[Pusher] Disconnected');
+                            this.updatePusherStatus('disconnected');
+                        });
+
+                        this.pusher.connection.bind('error', (error) => {
+                            console.error('[Pusher] Connection error:', error);
+                            this.updatePusherStatus('error');
+                        });
+
+                        this.pusher.connection.bind('state_change', (states) => {
+                            console.log('[Pusher] State changed:', states.previous, '->', states.current);
+                        });
+
+                    } catch (error) {
+                        console.error('[Pusher] Error:', error);
+                        this.updatePusherStatus('error');
+                    }
+                }
+
+                subscribeToGlobalChannel() {
+                    // Subscribe to a global demo channel for cross-user messaging
+                    const globalChannel = this.pusher.subscribe(`${CONFIG.channelPrefix}-global`);
+                    
+                    globalChannel.bind('new-message', (data) => {
+                        console.log('[Pusher] Received message:', data);
+                        this.handleIncomingMessage(data);
+                    });
+
+                    globalChannel.bind('user-typing', (data) => {
+                        console.log('[Pusher] User typing:', data);
+                        this.handleTypingIndicator(data);
+                    });
+
+                    globalChannel.bind('pusher:subscription_succeeded', () => {
+                        console.log('[Pusher] Successfully subscribed to global channel');
+                    });
+                }
+
+                subscribeToConversation(conversationId) {
+                    if (this.subscribedChannels.has(conversationId)) {
+                        return; // Already subscribed
+                    }
+
+                    const channelName = `${CONFIG.channelPrefix}-${conversationId}`;
+                    const channel = this.pusher.subscribe(channelName);
+
+                    channel.bind('new-message', (data) => {
+                        console.log('[Pusher] New message in conversation:', data);
+                        this.handleIncomingMessage(data);
+                    });
+
+                    channel.bind('user-typing', (data) => {
+                        console.log('[Pusher] Typing in conversation:', data);
+                        this.handleTypingIndicator(data);
+                    });
+
+                    this.subscribedChannels.set(conversationId, channel);
+                }
+
+                handleIncomingMessage(data) {
+                    // Only process messages not sent by current user
+                    if (data.sender === this.currentUser) {
+                        return;
+                    }
+
+                    const message = {
+                        sender: data.sender,
+                        text: data.text,
+                        timestamp: new Date(data.timestamp)
+                    };
+
+                    // Add to messages
+                    if (!this.messages[data.conversationId]) {
+                        this.messages[data.conversationId] = [];
+                    }
+                    this.messages[data.conversationId].push(message);
+                    this.saveMessages();
+
+                    // Update conversation preview
+                    const conv = this.conversations.find(c => c.id === data.conversationId);
+                    if (conv) {
+                        conv.lastMessage = data.text;
+                        conv.timestamp = new Date(data.timestamp);
+                    }
+
+                    // Re-render if this is the current conversation
+                    if (this.currentConversation && this.currentConversation.id === data.conversationId) {
+                        this.renderMessages(data.conversationId);
+                    }
+
+                    this.renderConversations();
+                    this.showNotification(`New message from ${DEMO_USERS[data.sender]?.name || 'Unknown'}`);
+                }
+
+                handleTypingIndicator(data) {
+                    if (data.userId === this.currentUser) {
+                        return; // Ignore own typing
+                    }
+
+                    if (this.currentConversation && data.conversationId === this.currentConversation.id) {
+                        const $indicator = $('#typingIndicator');
+                        if (data.isTyping) {
+                            $indicator.show();
+                            setTimeout(() => $indicator.hide(), 3000);
+                        } else {
+                            $indicator.hide();
+                        }
+                    }
+                }
+
+                updatePusherStatus(status) {
+                    const $indicator = $('#pusherStatus');
+                    const $text = $('#connectionText');
+                    const $badge = $('#pusherStatusBadge');
+                    const $statusDiv = $('#connectionStatus');
+
+                    $indicator.removeClass('online offline');
+                    $statusDiv.removeClass('connected disconnected connecting');
+
+                    switch (status) {
+                        case 'connected':
+                            $indicator.addClass('online');
+                            $text.text('Pusher Connected');
+                            $badge.removeClass('bg-warning bg-danger').addClass('bg-success').text('Connected');
+                            $statusDiv.addClass('connected').html('<i class="bi bi-wifi"></i> Pusher Connected');
+                            setTimeout(() => $statusDiv.fadeOut(), 3000);
+                            break;
+                        case 'disconnected':
+                            $indicator.addClass('offline');
+                            $text.text('Pusher Disconnected');
+                            $badge.removeClass('bg-success bg-warning').addClass('bg-danger').text('Disconnected');
+                            $statusDiv.addClass('disconnected').html('<i class="bi bi-wifi-off"></i> Disconnected').show();
+                            break;
+                        case 'disabled':
+                            $indicator.addClass('offline');
+                            $text.text('Demo Mode (Local Only)');
+                            $badge.removeClass('bg-success bg-danger').addClass('bg-warning').text('Demo Mode');
+                            $statusDiv.addClass('connecting').html('<i class="bi bi-info-circle"></i> Demo Mode - Add Pusher credentials to enable real-time').show();
+                            break;
+                        default:
+                            $indicator.addClass('offline');
+                            $text.text('Connection Error');
+                            $badge.removeClass('bg-success bg-warning').addClass('bg-danger').text('Error');
+                    }
+                }
+
+                setupEventListeners() {
+                    $('#userSelector').on('change', (e) => {
+                        this.currentUser = e.target.value;
+                        this.renderConversations();
+                        this.updateUserDisplay();
+                        if (this.currentConversation) {
+                            this.openConversation(this.currentConversation.id);
+                        }
+                    });
+
+                    $('#sendButton').on('click', () => this.sendMessage());
+                    $('#messageInput').on('keypress', (e) => {
+                        if (e.which === 13 && !e.shiftKey) {
+                            e.preventDefault();
+                            this.sendMessage();
+                        }
+                    });
+
+                    $('#messageInput').on('input', () => {
+                        this.handleTyping();
+                        const input = document.getElementById('messageInput');
+                        input.style.height = 'auto';
+                        input.style.height = (input.scrollHeight) + 'px';
+                    });
+
+                    $('#testMessageBtn').on('click', () => this.sendTestMessage());
+                    $('#clearMessagesBtn').on('click', () => this.clearMessages());
+                    $('#backButton').on('click', () => this.showConversationsList());
+                }
+
+                renderConversations() {
+                    const $container = $('#conversationsList');
+                    const userConvs = this.conversations.filter(conv => 
+                        conv.participants.includes(this.currentUser)
+                    );
+
+                    if (userConvs.length === 0) {
+                        $container.html(`
+                            <div class="text-center py-4 text-muted">
+                                <i class="bi bi-inbox" style="font-size: 48px;"></i>
+                                <p class="mt-2">No conversations</p>
+                            </div>
+                        `);
+                        return;
+                    }
+
+                    const html = userConvs.map(conv => {
+                        const otherUserId = conv.participants.find(id => id !== this.currentUser);
+                        const otherUser = DEMO_USERS[otherUserId];
+                        const initials = this.getInitials(otherUser.name);
+                        const timeAgo = this.formatTimeAgo(conv.timestamp);
+
+                        return `
+                            <div class="conversation-item" data-conversation-id="${conv.id}">
+                                <div class="d-flex align-items-start">
+                                    <div class="avatar">
+                                        ${initials}
+                                        <div class="online-indicator"></div>
+                                    </div>
+                                    <div class="conversation-info">
+                                        <div class="conversation-name">${otherUser.name}</div>
+                                        <div class="conversation-preview">${conv.lastMessage}</div>
+                                    </div>
+                                    <div class="conversation-meta">
+                                        <div class="conversation-time">${timeAgo}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+
+                    $container.html(html);
+
+                    $('.conversation-item').on('click', (e) => {
+                        const convId = $(e.currentTarget).data('conversation-id');
+                        this.openConversation(convId);
+                    });
+                }
+
+                openConversation(convId) {
+                    const conv = this.conversations.find(c => c.id === convId);
+                    if (!conv) return;
+
+                    this.currentConversation = conv;
+
+                    $('.conversation-item').removeClass('active');
+                    $(`.conversation-item[data-conversation-id="${convId}"]`).addClass('active');
+
+                    const otherUserId = conv.participants.find(id => id !== this.currentUser);
+                    const otherUser = DEMO_USERS[otherUserId];
+
+                    $('#participantAvatar').text(this.getInitials(otherUser.name));
+                    $('#participantName').text(otherUser.name);
+
+                    this.renderMessages(convId);
+
+                    $('#emptyState').hide();
+                    $('#activeChat').css('display', 'flex');
+
+                    if ($(window).width() < 768) {
+                        $('#conversationsPanel').removeClass('show');
+                        $('#chatPanel').addClass('show');
+                    }
+
+                    // Subscribe to conversation channel for real-time updates
+                    if (this.pusher) {
+                        this.subscribeToConversation(convId);
+                    }
+
+                    $('#messageInput').focus();
+                }
+
+                renderMessages(convId) {
+                    const $container = $('#chatMessages');
+                    const convMessages = this.messages[convId] || [];
+
+                    if (convMessages.length === 0) {
+                        $container.html(`
+                            <div class="text-center text-muted py-4">
+                                <i class="bi bi-chat-quote" style="font-size: 48px;"></i>
+                                <p class="mt-2">No messages yet. Start the conversation!</p>
+                            </div>
+                        `);
+                        return;
+                    }
+
+                    const html = convMessages.map(msg => {
+                        const isSent = msg.sender === this.currentUser;
+                        const time = new Date(msg.timestamp).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        });
+
+                        return `
+                            <div class="message ${isSent ? 'sent' : 'received'}">
+                                <div class="message-bubble">
+                                    <div class="message-text">${this.escapeHtml(msg.text)}</div>
+                                    <div class="message-time">
+                                        <span>${time}</span>
+                                        ${isSent ? '<i class="bi bi-check-all read-indicator"></i>' : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+
+                    $container.html(html);
+                    this.scrollToBottom();
+                    this.updateMessageCount();
+                }
+
+                sendMessage() {
+                    const $input = $('#messageInput');
+                    const text = $input.val().trim();
+
+                    if (!text || !this.currentConversation) return;
+
+                    const message = {
+                        sender: this.currentUser,
+                        text: text,
+                        timestamp: new Date()
+                    };
+
+                    if (!this.messages[this.currentConversation.id]) {
+                        this.messages[this.currentConversation.id] = [];
+                    }
+
+                    this.messages[this.currentConversation.id].push(message);
+                    this.saveMessages();
+
+                    // Update conversation preview
+                    const conv = this.conversations.find(c => c.id === this.currentConversation.id);
+                    conv.lastMessage = text;
+                    conv.timestamp = new Date();
+
+                    // Broadcast message via Pusher
+                    this.broadcastMessage(message, this.currentConversation.id);
+
+                    this.renderMessages(this.currentConversation.id);
+                    this.renderConversations();
+
+                    $input.val('').css('height', 'auto');
+                    $input.focus();
+
+                    // Stop typing indicator
+                    this.stopTyping();
+                }
+
+                broadcastMessage(message, conversationId) {
+                    if (!this.pusher) return;
+
+                    const data = {
+                        sender: message.sender,
+                        text: message.text,
+                        timestamp: message.timestamp.toISOString(),
+                        conversationId: conversationId,
+                        senderName: DEMO_USERS[message.sender]?.name || 'Unknown'
+                    };
+
+                    // Trigger on both global and conversation-specific channels
+                    this.triggerEvent(`${CONFIG.channelPrefix}-global`, 'new-message', data);
+                    this.triggerEvent(`${CONFIG.channelPrefix}-${conversationId}`, 'new-message', data);
+                }
+
+                triggerEvent(channelName, eventName, data) {
+                    // Try to trigger real Pusher event via our PHP endpoint
+                    fetch('/pusher-trigger.php', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            channel: channelName,
+                            event: eventName,
+                            data: data
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(result => {
+                        if (result.success) {
+                            console.log('[Pusher] Event triggered successfully:', result);
+                        } else {
+                            console.error('[Pusher] Failed to trigger event:', result.error);
+                            // Fallback to local simulation
+                            this.simulateEvent(eventName, data);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('[Pusher] Network error:', error);
+                        // Fallback to local simulation
+                        this.simulateEvent(eventName, data);
+                    });
+                }
+
+                simulateEvent(eventName, data) {
+                    // Fallback simulation for when server trigger fails
+                    setTimeout(() => {
+                        if (window.demoAppInstances) {
+                            window.demoAppInstances.forEach(instance => {
+                                if (instance !== this) {
+                                    if (eventName === 'new-message') {
+                                        instance.handleIncomingMessage(data);
+                                    } else if (eventName === 'user-typing') {
+                                        instance.handleTypingIndicator(data);
+                                    }
+                                }
+                            });
+                        }
+                    }, 100);
+                }
+
+                handleTyping() {
+                    if (!this.currentConversation) return;
+
+                    clearTimeout(this.typingTimeout);
+
+                    // Broadcast typing start
+                    this.broadcastTyping(true);
+
+                    // Stop typing after 3 seconds
+                    this.typingTimeout = setTimeout(() => {
+                        this.stopTyping();
+                    }, 3000);
+                }
+
+                stopTyping() {
+                    clearTimeout(this.typingTimeout);
+                    this.broadcastTyping(false);
+                }
+
+                broadcastTyping(isTyping) {
+                    if (!this.pusher || !this.currentConversation) return;
+
+                    const data = {
+                        userId: this.currentUser,
+                        userName: DEMO_USERS[this.currentUser]?.name || 'Unknown',
+                        conversationId: this.currentConversation.id,
+                        isTyping: isTyping
+                    };
+
+                    this.triggerEvent(`${CONFIG.channelPrefix}-global`, 'user-typing', data);
+                    this.triggerEvent(`${CONFIG.channelPrefix}-${this.currentConversation.id}`, 'user-typing', data);
+                }
+
+                sendTestMessage() {
+                    if (!this.currentConversation) {
+                        alert('Please select a conversation first');
+                        return;
+                    }
+
+                    const testMessages = [
+                        'This is a test message!',
+                        'Can you help me with my order?',
+                        'What are your business hours?',
+                        'Thank you for the quick response!',
+                        'I have a question about pricing.'
+                    ];
+
+                    $('#messageInput').val(testMessages[Math.floor(Math.random() * testMessages.length)]);
+                    this.sendMessage();
+                }
+
+                clearMessages() {
+                    if (confirm('Clear all messages? This cannot be undone.')) {
+                        this.messages = {};
+                        localStorage.removeItem('demoMessages');
+                        if (this.currentConversation) {
+                            this.renderMessages(this.currentConversation.id);
+                        }
+                        this.updateMessageCount();
+                    }
+                }
+
+                showConversationsList() {
+                    $('#chatPanel').removeClass('show');
+                    $('#conversationsPanel').addClass('show');
+                }
+
+                updateUserDisplay() {
+                    const user = DEMO_USERS[this.currentUser];
+                    console.log(`[Demo] Current user: ${user.name} (${user.role})`);
+                }
+
+                updateMessageCount() {
+                    const total = Object.values(this.messages).reduce((sum, msgs) => sum + msgs.length, 0);
+                    this.messageCount = total;
+                    $('#messageCount').text(`${total} message${total !== 1 ? 's' : ''}`);
+                }
+
+                loadMessages() {
+                    const stored = localStorage.getItem('demoMessages');
+                    return stored ? JSON.parse(stored) : {};
+                }
+
+                saveMessages() {
+                    localStorage.setItem('demoMessages', JSON.stringify(this.messages));
+                }
+
+                getInitials(name) {
+                    return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+                }
+
+                escapeHtml(text) {
+                    const div = document.createElement('div');
+                    div.textContent = text;
+                    return div.innerHTML;
+                }
+
+                formatTimeAgo(date) {
+                    const seconds = Math.floor((new Date() - new Date(date)) / 1000);
+                    if (seconds < 60) return 'Just now';
+                    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+                    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+                    return `${Math.floor(seconds / 86400)}d ago`;
+                }
+
+                scrollToBottom() {
+                    const $messages = $('#chatMessages');
+                    $messages.scrollTop($messages[0].scrollHeight);
+                }
+
+                showNotification(message) {
+                    // Create a simple toast notification
+                    const toast = $(`
+                        <div class="toast-notification" style="
+                            position: fixed;
+                            top: 20px;
+                            right: 20px;
+                            background: #28a745;
+                            color: white;
+                            padding: 12px 20px;
+                            border-radius: 8px;
+                            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                            z-index: 9999;
+                            max-width: 300px;
+                        ">
+                            <i class="bi bi-chat-fill me-2"></i>
+                            ${this.escapeHtml(message)}
+                        </div>
+                    `);
+
+                    $('body').append(toast);
+                    
+                    setTimeout(() => {
+                        toast.fadeOut(300, () => toast.remove());
+                    }, 3000);
+                }
+            }
+
+            // Global instance tracking for cross-tab communication simulation
+            if (!window.demoAppInstances) {
+                window.demoAppInstances = [];
+            }
+
+            // Initialize on page load
+            $(document).ready(function() {
+                window.demoApp = new DemoChatApp();
+                window.demoAppInstances.push(window.demoApp);
+                
+                // Cleanup on page unload
+                $(window).on('beforeunload', () => {
+                    const index = window.demoAppInstances.indexOf(window.demoApp);
+                    if (index > -1) {
+                        window.demoAppInstances.splice(index, 1);
+                    }
+                });
+            });
+
+        })(jQuery);
+    </script>
+</body>
+</html>

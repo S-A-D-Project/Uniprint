@@ -1,0 +1,496 @@
+/**
+ * UniPrint Enhanced Bootstrap Integration
+ * Version: 1.0.0
+ * Combines Bootstrap 5.3.2 with custom design system
+ */
+
+/* ============================================
+   BOOTSTRAP CUSTOM VARIABLES
+   ============================================ */
+
+:root {
+  /* Primary Colors - UniPrint Brand */
+  --bs-primary: hsl(263, 70%, 50%);
+  --bs-primary-rgb: 138, 43, 226;
+  --bs-primary-text-emphasis: hsl(263, 70%, 40%);
+  --bs-primary-bg-subtle: hsl(263, 70%, 95%);
+  --bs-primary-border-subtle: hsl(263, 70%, 85%);
+
+  /* Secondary Colors */
+  --bs-secondary: hsl(240, 4.8%, 95.9%);
+  --bs-secondary-rgb: 241, 245, 249;
+  --bs-secondary-text-emphasis: hsl(240, 5.9%, 10%);
+  --bs-secondary-bg-subtle: hsl(240, 4.8%, 98%);
+  --bs-secondary-border-subtle: hsl(240, 5.9%, 90%);
+
+  /* Success Colors */
+  --bs-success: hsl(142, 76%, 36%);
+  --bs-success-rgb: 22, 163, 74;
+  --bs-success-text-emphasis: hsl(142, 76%, 30%);
+  --bs-success-bg-subtle: hsl(142, 76%, 95%);
+  --bs-success-border-subtle: hsl(142, 76%, 85%);
+
+  /* Warning Colors */
+  --bs-warning: hsl(38, 92%, 50%);
+  --bs-warning-rgb: 245, 158, 11;
+  --bs-warning-text-emphasis: hsl(38, 92%, 40%);
+  --bs-warning-bg-subtle: hsl(38, 92%, 95%);
+  --bs-warning-border-subtle: hsl(38, 92%, 85%);
+
+  /* Danger Colors */
+  --bs-danger: hsl(0, 84.2%, 60.2%);
+  --bs-danger-rgb: 239, 68, 68;
+  --bs-danger-text-emphasis: hsl(0, 84.2%, 50%);
+  --bs-danger-bg-subtle: hsl(0, 84.2%, 95%);
+  --bs-danger-border-subtle: hsl(0, 84.2%, 85%);
+
+  /* Info Colors */
+  --bs-info: hsl(217, 91%, 60%);
+  --bs-info-rgb: 59, 130, 246;
+  --bs-info-text-emphasis: hsl(217, 91%, 50%);
+  --bs-info-bg-subtle: hsl(217, 91%, 95%);
+  --bs-info-border-subtle: hsl(217, 91%, 85%);
+
+  /* Light/Dark Colors */
+  --bs-light: hsl(240, 4.8%, 95.9%);
+  --bs-light-rgb: 248, 250, 252;
+  --bs-dark: hsl(240, 10%, 3.9%);
+  --bs-dark-rgb: 15, 23, 42;
+
+  /* Body Colors */
+  --bs-body-color: hsl(240, 10%, 3.9%);
+  --bs-body-bg: hsl(0, 0%, 100%);
+
+  /* Border and Form Colors */
+  --bs-border-color: hsl(240, 5.9%, 90%);
+  --bs-border-color-translucent: rgba(0, 0, 0, 0.175);
+
+  /* Font Settings */
+  --bs-font-sans-serif: 'Inter', ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --bs-font-monospace: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+
+  /* Border Radius */
+  --bs-border-radius: 0.75rem;
+  --bs-border-radius-sm: 0.5rem;
+  --bs-border-radius-lg: 1rem;
+  --bs-border-radius-xl: 1.5rem;
+  --bs-border-radius-2xl: 2rem;
+
+  /* Box Shadows */
+  --bs-box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --bs-box-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --bs-box-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --bs-box-shadow-inset: inset 0 1px 2px rgb(0 0 0 / 0.075);
+}
+
+/* ============================================
+   ENHANCED BOOTSTRAP COMPONENTS
+   ============================================ */
+
+/* Cards */
+.card {
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--bs-border-radius);
+  box-shadow: var(--bs-box-shadow);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card:hover {
+  box-shadow: var(--bs-box-shadow-lg);
+  transform: translateY(-2px);
+}
+
+.card-header {
+  background-color: var(--bs-light);
+  border-bottom: 1px solid var(--bs-border-color);
+  padding: 1.25rem;
+  border-radius: var(--bs-border-radius) var(--bs-border-radius) 0 0;
+}
+
+.card-body {
+  padding: 1.25rem;
+}
+
+.card-footer {
+  background-color: var(--bs-light);
+  border-top: 1px solid var(--bs-border-color);
+  padding: 1rem 1.25rem;
+  border-radius: 0 0 var(--bs-border-radius) var(--bs-border-radius);
+}
+
+/* Buttons */
+.btn {
+  border-radius: var(--bs-border-radius-sm);
+  font-weight: 500;
+  padding: 0.625rem 1.25rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--bs-box-shadow);
+}
+
+.btn:active {
+  transform: translateY(0);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--bs-primary), hsl(263, 85%, 65%));
+  border-color: var(--bs-primary);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, hsl(263, 70%, 45%), hsl(263, 85%, 60%));
+  box-shadow: 0 0 20px hsl(263, 70%, 50%, 0.4);
+}
+
+.btn-outline-primary {
+  border-color: var(--bs-primary);
+  color: var(--bs-primary);
+}
+
+.btn-outline-primary:hover {
+  background-color: var(--bs-primary);
+  border-color: var(--bs-primary);
+  color: white;
+}
+
+.btn-lg {
+  padding: 0.875rem 1.75rem;
+  font-size: 1rem;
+  border-radius: var(--bs-border-radius);
+}
+
+.btn-sm {
+  padding: 0.375rem 0.875rem;
+  font-size: 0.75rem;
+  border-radius: var(--bs-border-radius-sm);
+}
+
+/* Form Controls */
+.form-control {
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--bs-border-radius-sm);
+  padding: 0.625rem 0.875rem;
+  font-size: 0.875rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background-color: var(--bs-body-bg);
+}
+
+.form-control:focus {
+  border-color: var(--bs-primary);
+  box-shadow: 0 0 0 0.2rem rgba(138, 43, 226, 0.25);
+  outline: none;
+}
+
+.form-select {
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--bs-border-radius-sm);
+  padding: 0.625rem 2.25rem 0.625rem 0.875rem;
+  font-size: 0.875rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background-color: var(--bs-body-bg);
+}
+
+.form-select:focus {
+  border-color: var(--bs-primary);
+  box-shadow: 0 0 0 0.2rem rgba(138, 43, 226, 0.25);
+  outline: none;
+}
+
+.form-label {
+  font-weight: 500;
+  color: var(--bs-dark);
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+}
+
+/* Input Groups */
+.input-group {
+  border-radius: var(--bs-border-radius-sm);
+  overflow: hidden;
+}
+
+.input-group-text {
+  background-color: var(--bs-light);
+  border: 1px solid var(--bs-border-color);
+  padding: 0.625rem 0.875rem;
+  font-size: 0.875rem;
+  color: var(--bs-dark);
+}
+
+/* Alerts */
+.alert {
+  border-radius: var(--bs-border-radius);
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+  border: 1px solid transparent;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.alert-primary {
+  background-color: var(--bs-primary-bg-subtle);
+  border-color: var(--bs-primary-border-subtle);
+  color: var(--bs-primary-text-emphasis);
+}
+
+.alert-success {
+  background-color: var(--bs-success-bg-subtle);
+  border-color: var(--bs-success-border-subtle);
+  color: var(--bs-success-text-emphasis);
+}
+
+.alert-warning {
+  background-color: var(--bs-warning-bg-subtle);
+  border-color: var(--bs-warning-border-subtle);
+  color: var(--bs-warning-text-emphasis);
+}
+
+.alert-danger {
+  background-color: var(--bs-danger-bg-subtle);
+  border-color: var(--bs-danger-border-subtle);
+  color: var(--bs-danger-text-emphasis);
+}
+
+/* Badges */
+.badge {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: var(--bs-border-radius-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+/* Tables */
+.table {
+  border-collapse: separate;
+  border-spacing: 0;
+  border-radius: var(--bs-border-radius);
+  overflow: hidden;
+  box-shadow: var(--bs-box-shadow);
+}
+
+.table thead th {
+  background-color: var(--bs-light);
+  border-bottom: 2px solid var(--bs-border-color);
+  font-weight: 600;
+  color: var(--bs-dark);
+  padding: 1rem;
+  font-size: 0.875rem;
+}
+
+.table tbody td {
+  padding: 1rem;
+  border-bottom: 1px solid var(--bs-border-color);
+  vertical-align: middle;
+}
+
+.table tbody tr:hover {
+  background-color: var(--bs-light);
+}
+
+/* Navigation */
+.navbar {
+  box-shadow: var(--bs-box-shadow-sm);
+  border-bottom: 1px solid var(--bs-border-color);
+}
+
+.nav-link {
+  font-weight: 500;
+  color: var(--bs-dark);
+  padding: 0.75rem 1rem;
+  border-radius: var(--bs-border-radius-sm);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.nav-link:hover {
+  background-color: var(--bs-light);
+  color: var(--bs-primary);
+}
+
+.nav-link.active {
+  background-color: var(--bs-primary);
+  color: white;
+}
+
+/* Modals */
+.modal-content {
+  border-radius: var(--bs-border-radius-lg);
+  border: none;
+  box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+}
+
+.modal-header {
+  border-bottom: 1px solid var(--bs-border-color);
+  padding: 1.5rem;
+}
+
+.modal-body {
+  padding: 1.5rem;
+}
+
+.modal-footer {
+  border-top: 1px solid var(--bs-border-color);
+  padding: 1.5rem;
+  gap: 0.75rem;
+}
+
+/* Dropdowns */
+.dropdown-menu {
+  border-radius: var(--bs-border-radius);
+  border: 1px solid var(--bs-border-color);
+  box-shadow: var(--bs-box-shadow-lg);
+  padding: 0.5rem;
+}
+
+.dropdown-item {
+  border-radius: var(--bs-border-radius-sm);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dropdown-item:hover {
+  background-color: var(--bs-light);
+  color: var(--bs-primary);
+}
+
+/* Progress Bars */
+.progress {
+  border-radius: var(--bs-border-radius);
+  background-color: var(--bs-light);
+  height: 0.75rem;
+}
+
+.progress-bar {
+  border-radius: var(--bs-border-radius);
+  background: linear-gradient(135deg, var(--bs-primary), hsl(263, 85%, 65%));
+}
+
+/* Pagination */
+.pagination {
+  gap: 0.25rem;
+}
+
+.page-link {
+  border-radius: var(--bs-border-radius-sm);
+  border: 1px solid var(--bs-border-color);
+  padding: 0.5rem 0.75rem;
+  color: var(--bs-dark);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.page-link:hover {
+  background-color: var(--bs-light);
+  border-color: var(--bs-primary);
+  color: var(--bs-primary);
+}
+
+.page-item.active .page-link {
+  background-color: var(--bs-primary);
+  border-color: var(--bs-primary);
+  color: white;
+}
+
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
+
+.shadow-card {
+  box-shadow: var(--bs-box-shadow);
+}
+
+.shadow-card-hover {
+  box-shadow: var(--bs-box-shadow-lg);
+}
+
+.gradient-primary {
+  background: linear-gradient(135deg, var(--bs-primary), hsl(263, 85%, 65%));
+}
+
+.gradient-success {
+  background: linear-gradient(135deg, var(--bs-success), hsl(142, 76%, 50%));
+}
+
+.gradient-warning {
+  background: linear-gradient(135deg, var(--bs-warning), hsl(38, 92%, 65%));
+}
+
+.transition-smooth {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--bs-box-shadow-lg);
+}
+
+/* ============================================
+   RESPONSIVE UTILITIES
+   ============================================ */
+
+@media (max-width: 576px) {
+  .card {
+    margin-bottom: 1rem;
+  }
+  
+  .btn {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .table-responsive {
+    border-radius: var(--bs-border-radius);
+  }
+}
+
+@media (max-width: 768px) {
+  .modal-dialog {
+    margin: 1rem;
+  }
+  
+  .navbar-nav {
+    gap: 0.5rem;
+  }
+}
+
+/* ============================================
+   DARK MODE SUPPORT
+   ============================================ */
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bs-body-color: hsl(0, 0%, 98%);
+    --bs-body-bg: hsl(240, 10%, 3.9%);
+    --bs-border-color: hsl(240, 3.7%, 15.9%);
+    --bs-light: hsl(240, 3.7%, 15.9%);
+    --bs-dark: hsl(0, 0%, 98%);
+  }
+  
+  .card {
+    background-color: hsl(240, 10%, 7%);
+    border-color: hsl(240, 3.7%, 15.9%);
+  }
+  
+  .table thead th {
+    background-color: hsl(240, 3.7%, 15.9%);
+    color: hsl(0, 0%, 98%);
+  }
+  
+  .table tbody tr:hover {
+    background-color: hsl(240, 3.7%, 15.9%);
+  }
+}
