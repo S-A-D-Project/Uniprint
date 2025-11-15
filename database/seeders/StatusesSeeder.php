@@ -54,8 +54,7 @@ class StatusesSeeder extends Seeder
                 ['status_name' => $status['status_name']],
                 [
                     'status_id' => $status['status_id'],
-                    'description' => $status['description'],
-                    'updated_at' => now()
+                    'description' => $status['description']
                 ]
             );
         }
