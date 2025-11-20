@@ -22,7 +22,7 @@ $breadcrumbs = [
 
 @section('content')
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-    @forelse($products as $service)
+    @forelse($services as $service)
     <x-admin.card :hover="true">
         <div class="flex justify-between items-start mb-4">
             <div class="flex-1">
@@ -67,9 +67,9 @@ $breadcrumbs = [
     @endforelse
 </div>
 
-@if($products->hasPages())
+@if($services->hasPages())
 <div class="mt-6 flex justify-center">
-    {{ $products->links() }}
+    {{ $services->links() }}
 </div>
 @endif
 @endsection

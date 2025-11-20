@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Auth;
 
 use App\Models\DesignAsset;
 use App\Models\Enterprise;
+use App\Models\Service;
 use App\Models\Product;
 use App\Models\CustomerOrder;
 use App\Models\OrderItem;
@@ -89,11 +90,11 @@ class CustomerController extends Controller
             abort(404);
         }
 
-        // Get order items with product info
+        // Get order items with service info
         $orderItems = DB::table('order_items')
-            ->join('products', 'order_items.product_id', '=', 'products.product_id')
+            ->join('services', 'order_items.service_id', '=', 'services.service_id')
             ->where('order_items.purchase_order_id', $id)
-            ->select('order_items.*', 'products.product_name')
+            ->select('order_items.*', 'services.service_name')
             ->get();
 
         // Get customizations for each item
@@ -258,44 +259,55 @@ class CustomerController extends Controller
         return redirect()->back()->with('success', 'Notification marked as read');
     }
 
-    public function enterpriseProducts($id)
+    public function enterpriseServices($id)
     {
         $enterprise = Enterprise::where('enterprise_id', $id)
             ->where('is_active', true)
             ->firstOrFail();
 
-        $products = Product::where('enterprise_id', $id)
+        $services = Service::where('enterprise_id', $id)
             ->where('is_available', true)
             ->with('customizationGroups.customizationOptions')
             ->paginate(12);
 
-        return view('customer.products', compact('enterprise', 'products'));
+        return view('customer.services', compact('enterprise', 'services'));
     }
 
-    public function productDetails($id)
+    public function serviceDetails($id)
     {
-        $product = Product::where('product_id', $id)
+        $service = Service::where('service_id', $id)
             ->where('is_available', true)
             ->with(['enterprise', 'customizationGroups.customizationOptions'])
             ->firstOrFail();
 
-        return view('customer.product-details', compact('product'));
+        return view('customer.service-details', compact('service'));
+    }
+
+    // Backward compatibility
+    public function enterpriseProducts($id)
+    {
+        return $this->enterpriseServices($id);
+    }
+
+    public function productDetails($id)
+    {
+        return $this->serviceDetails($id);
     }
 
     public function placeOrder(Request $request)
     {
         $request->validate([
-            'product_id' => 'required|exists:products,product_id',
+            'service_id' => 'required|exists:services,service_id',
             'quantity' => 'required|integer|min:1',
             'customizations' => 'nullable|array',
             'notes' => 'nullable|string',
         ]);
 
         $user = Auth::user();
-        $product = Product::findOrFail($request->product_id);
+        $service = Service::findOrFail($request->service_id);
 
         // Calculate total
-        $subtotal = $product->base_price * $request->quantity;
+        $subtotal = $service->base_price * $request->quantity;
 
         if ($request->customizations) {
             foreach ($request->customizations as $optionId) {
@@ -309,7 +321,7 @@ class CustomerController extends Controller
         // Create order
         $order = CustomerOrder::create([
             'customer_account_id' => $user->user_id,
-            'enterprise_id' => $product->enterprise_id,
+            'enterprise_id' => $service->enterprise_id,
             'total_order_amount' => $subtotal,
             'current_status' => 'Pending',
         ]);
@@ -317,7 +329,7 @@ class CustomerController extends Controller
         // Create order item
         $orderItem = OrderItem::create([
             'order_id' => $order->order_id,
-            'product_id' => $product->product_id,
+            'service_id' => $service->service_id,
             'quantity' => $request->quantity,
             'item_subtotal' => $subtotal,
             'notes_to_enterprise' => $request->notes,

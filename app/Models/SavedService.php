@@ -16,7 +16,7 @@ class SavedService extends Model
 
     protected $fillable = [
         'user_id',
-        'product_id',
+        'service_id',
         'quantity',
         'customizations',
         'special_instructions',
@@ -28,7 +28,7 @@ class SavedService extends Model
     protected $casts = [
         'saved_service_id' => 'string',
         'user_id' => 'string',
-        'product_id' => 'string',
+        'service_id' => 'string',
         'customizations' => 'array',
         'unit_price' => 'decimal:2',
         'total_price' => 'decimal:2',
@@ -55,9 +55,15 @@ class SavedService extends Model
         return $this->belongsTo(User::class, 'user_id', 'user_id');
     }
 
+    public function service()
+    {
+        return $this->belongsTo(Service::class, 'service_id', 'service_id');
+    }
+
+    // Backward compatibility
     public function product()
     {
-        return $this->belongsTo(Product::class, 'product_id', 'product_id');
+        return $this->service();
     }
 
     public function customizationOptions()
@@ -102,12 +108,12 @@ class SavedService extends Model
     /**
      * Save a service for user
      */
-    public static function saveService($userId, $productId, $quantity = 1, $customizations = [], $specialInstructions = null)
+    public static function saveService($userId, $serviceId, $quantity = 1, $customizations = [], $specialInstructions = null)
     {
-        $product = Product::findOrFail($productId);
+        $service = Service::findOrFail($serviceId);
         
         // Calculate price including customizations
-        $unitPrice = $product->base_price;
+        $unitPrice = $service->base_price;
         $customizationCost = 0;
         
         if (!empty($customizations)) {
@@ -122,7 +128,7 @@ class SavedService extends Model
         // Use JSON comparison that works with PostgreSQL
         $customizationsJson = json_encode($customizations);
         $existingService = static::where('user_id', $userId)
-            ->where('product_id', $productId)
+            ->where('service_id', $serviceId)
             ->whereRaw('customizations::text = ?', [$customizationsJson])
             ->where('special_instructions', $specialInstructions)
             ->first();
@@ -142,7 +148,7 @@ class SavedService extends Model
             // Create new saved service
             $savedService = static::create([
                 'user_id' => $userId,
-                'product_id' => $productId,
+                'service_id' => $serviceId,
                 'quantity' => $quantity,
                 'customizations' => $customizations,
                 'special_instructions' => $specialInstructions,
@@ -232,7 +238,7 @@ class SavedService extends Model
     public static function getUserServices($userId)
     {
         return static::where('user_id', $userId)
-            ->with(['product.enterprise', 'customizationOptions'])
+            ->with(['service.enterprise', 'customizationOptions'])
             ->orderBy('saved_at', 'desc')
             ->get();
     }

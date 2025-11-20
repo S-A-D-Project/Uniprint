@@ -26,13 +26,13 @@ class HomeController extends Controller
         // Get basic statistics
         $stats = [
             'total_enterprises' => DB::table('enterprises')->count(),
-            'total_products' => DB::table('products')->count(),
-            'categories' => DB::table('products')->distinct()->count('category'),
+            'total_services' => DB::table('services')->count(),
+            'categories' => DB::table('services')->distinct()->count('category'),
         ];
 
         // Get featured enterprises (align with real columns: name, address)
         $enterprises = DB::table('enterprises')
-            ->leftJoin('products', 'enterprises.enterprise_id', '=', 'products.enterprise_id')
+            ->leftJoin('services', 'enterprises.enterprise_id', '=', 'services.enterprise_id')
             ->select(
                 'enterprises.enterprise_id',
                 DB::raw('enterprises.name as enterprise_name'),
@@ -41,7 +41,7 @@ class HomeController extends Controller
                 'enterprises.is_active',
                 'enterprises.created_at',
                 'enterprises.updated_at',
-                DB::raw('COUNT(products.product_id) as products_count')
+                DB::raw('COUNT(services.service_id) as services_count')
             )
             ->where('enterprises.is_active', true)
             ->groupBy(
@@ -53,7 +53,7 @@ class HomeController extends Controller
                 'enterprises.created_at',
                 'enterprises.updated_at'
             )
-            ->orderBy('products_count', 'desc')
+            ->orderBy('services_count', 'desc')
             ->limit(6)
             ->get();
 
@@ -140,7 +140,7 @@ class HomeController extends Controller
      */
     public function enterprises()
     {
-        $enterprises = \App\Models\Enterprise::with('products')
+        $enterprises = \App\Models\Enterprise::with('services')
             ->orderBy('name')
             ->get();
         
@@ -159,7 +159,7 @@ class HomeController extends Controller
     public function browseEnterprises(Request $request)
     {
         $query = Enterprise::where('is_active', true)
-            ->withCount('products');
+            ->withCount('services');
 
         // Filter by category
         if ($request->filled('category')) {
@@ -177,8 +177,8 @@ class HomeController extends Controller
             case 'name':
                 $query->orderBy('name');
                 break;
-            case 'products':
-                $query->orderBy('products_count', 'desc');
+            case 'services':
+                $query->orderBy('services_count', 'desc');
                 break;
             default:
                 $query->orderBy('name');
@@ -204,30 +204,36 @@ class HomeController extends Controller
     {
         $enterprise = \App\Models\Enterprise::where('enterprise_id', $id)->firstOrFail();
         
-        $products = \App\Models\Product::where('enterprise_id', $id)
+        $services = \App\Models\Service::where('enterprise_id', $id)
             ->where('is_active', true)
             ->with('customizationOptions')
             ->get();
 
-        return view('public.enterprises.show', compact('enterprise', 'products'));
+        return view('public.enterprises.show', compact('enterprise', 'services'));
     }
 
     /**
-     * Show product details
+     * Show service details
      * 
      * @param string $id
      * @return \Illuminate\View\View
      */
-    public function showProduct($id)
+    public function showService($id)
     {
-        $product = \App\Models\Product::where('product_id', $id)
+        $service = \App\Models\Service::where('service_id', $id)
             ->where('is_active', true)
             ->with(['enterprise', 'customizationOptions'])
             ->firstOrFail();
 
         // Group customization options by type
-        $customizationGroups = $product->customizationOptions->groupBy('option_type');
+        $customizationGroups = $service->customizationOptions->groupBy('option_type');
 
-        return view('public.products.show', compact('product', 'customizationGroups'));
+        return view('public.services.show', compact('service', 'customizationGroups'));
+    }
+
+    // Backward compatibility
+    public function showProduct($id)
+    {
+        return $this->showService($id);
     }
 }

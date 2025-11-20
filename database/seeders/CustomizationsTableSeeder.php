@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\Product;
+use App\Models\Service;
 use App\Models\CustomizationGroup;
 use App\Models\CustomizationOption;
 use Illuminate\Database\Seeder;
@@ -15,13 +15,13 @@ class CustomizationsTableSeeder extends Seeder
         CustomizationOption::query()->delete();
         CustomizationGroup::query()->delete();
 
-        $products = Product::all();
+        $services = Service::all();
 
         // Business Cards customizations
-        $businessCard = $products->where('product_name', 'Business Cards')->first();
+        $businessCard = $services->where('service_name', 'Business Cards')->first();
         if ($businessCard) {
             $paperType = CustomizationGroup::create([
-                'product_id' => $businessCard->product_id,
+                'service_id' => $businessCard->service_id,
                 'group_name' => 'Paper Type',
                 'group_type' => 'Single Select',
                 'is_required' => true,
@@ -47,7 +47,7 @@ class CustomizationsTableSeeder extends Seeder
             ]);
 
             $finish = CustomizationGroup::create([
-                'product_id' => $businessCard->product_id,
+                'service_id' => $businessCard->service_id,
                 'group_name' => 'Finish',
                 'group_type' => 'Single Select',
                 'is_required' => true,
@@ -73,7 +73,7 @@ class CustomizationsTableSeeder extends Seeder
             ]);
 
             $quantity = CustomizationGroup::create([
-                'product_id' => $businessCard->product_id,
+                'service_id' => $businessCard->service_id,
                 'group_name' => 'Quantity',
                 'group_type' => 'Single Select',
                 'is_required' => true,
@@ -100,10 +100,10 @@ class CustomizationsTableSeeder extends Seeder
         }
 
         // Custom T-Shirt customizations
-        $tshirt = $products->where('product_name', 'Custom T-Shirt')->first();
+        $tshirt = $services->where('service_name', 'Custom T-Shirt')->first();
         if ($tshirt) {
             $size = CustomizationGroup::create([
-                'product_id' => $tshirt->product_id,
+                'service_id' => $tshirt->service_id,
                 'group_name' => 'Size',
                 'group_type' => 'Single Select',
                 'is_required' => true,
@@ -119,7 +119,7 @@ class CustomizationsTableSeeder extends Seeder
             }
 
             $color = CustomizationGroup::create([
-                'product_id' => $tshirt->product_id,
+                'service_id' => $tshirt->service_id,
                 'group_name' => 'Color',
                 'group_type' => 'Single Select',
                 'is_required' => true,
@@ -136,7 +136,7 @@ class CustomizationsTableSeeder extends Seeder
             }
 
             $printLocation = CustomizationGroup::create([
-                'product_id' => $tshirt->product_id,
+                'service_id' => $tshirt->service_id,
                 'group_name' => 'Print Location',
                 'group_type' => 'Multi Select',
                 'is_required' => true,
@@ -163,10 +163,10 @@ class CustomizationsTableSeeder extends Seeder
         }
 
         // Large Format Poster customizations
-        $poster = $products->where('product_name', 'Large Format Poster')->first();
+        $poster = $services->where('service_name', 'Large Format Poster')->first();
         if ($poster) {
             $posterSize = CustomizationGroup::create([
-                'product_id' => $poster->product_id,
+                'service_id' => $poster->service_id,
                 'group_name' => 'Size',
                 'group_type' => 'Single Select',
                 'is_required' => true,
@@ -192,7 +192,7 @@ class CustomizationsTableSeeder extends Seeder
             ]);
 
             $paperQuality = CustomizationGroup::create([
-                'product_id' => $poster->product_id,
+                'service_id' => $poster->service_id,
                 'group_name' => 'Paper Quality',
                 'group_type' => 'Single Select',
                 'is_required' => true,
@@ -219,10 +219,10 @@ class CustomizationsTableSeeder extends Seeder
         }
 
         // Vinyl Banner customizations
-        $banner = $products->where('product_name', 'Vinyl Banner')->first();
+        $banner = $services->where('service_name', 'Vinyl Banner')->first();
         if ($banner) {
             $bannerSize = CustomizationGroup::create([
-                'product_id' => $banner->product_id,
+                'service_id' => $banner->service_id,
                 'group_name' => 'Size',
                 'group_type' => 'Single Select',
                 'is_required' => true,
@@ -248,7 +248,7 @@ class CustomizationsTableSeeder extends Seeder
             ]);
 
             $grommets = CustomizationGroup::create([
-                'product_id' => $banner->product_id,
+                'service_id' => $banner->service_id,
                 'group_name' => 'Grommets',
                 'group_type' => 'Single Select',
                 'is_required' => false,

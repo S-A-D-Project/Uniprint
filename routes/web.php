@@ -31,7 +31,9 @@ RateLimiter::for('login', function (Request $request) {
 Route::get('/', [HomeController::class, 'index'])->name('home');
 Route::get('/enterprises', [HomeController::class, 'enterprises'])->name('enterprises.index');
 Route::get('/enterprises/{id}', [HomeController::class, 'showEnterprise'])->whereUuid('id')->name('enterprises.show');
-Route::get('/products/{id}', [HomeController::class, 'showProduct'])->whereUuid('id')->name('products.show');
+Route::get('/services/{id}', [HomeController::class, 'showService'])->whereUuid('id')->name('services.show');
+// Backward compatibility
+Route::get('/products/{id}', [HomeController::class, 'showService'])->whereUuid('id')->name('products.show');
 
 // Authentication routes
 Route::middleware(['throttle:auth'])->group(function () {
@@ -80,7 +82,8 @@ Route::prefix('admin')->middleware([\App\Http\Middleware\CheckAuth::class, \App\
     Route::get('/users', [AdminController::class, 'users'])->name('users');
     Route::get('/enterprises', [AdminController::class, 'enterprises'])->name('enterprises');
     Route::get('/orders', [AdminController::class, 'orders'])->name('orders');
-    Route::get('/products', [AdminController::class, 'products'])->name('products');
+    Route::get('/services', [AdminController::class, 'services'])->name('services');
+    Route::get('/products', [AdminController::class, 'services'])->name('products'); // Backward compatibility
     Route::get('/reports', [AdminController::class, 'reports'])->name('reports');
     
     // Real-time API endpoints
@@ -106,19 +109,33 @@ Route::prefix('business')->middleware([\App\Http\Middleware\CheckAuth::class, \A
     Route::get('/orders/{id}', [BusinessController::class, 'orderDetails'])->whereUuid('id')->name('orders.details');
     Route::post('/orders/{id}/status', [BusinessController::class, 'updateOrderStatus'])->whereUuid('id')->name('orders.update-status');
     
-    // Product Management
-    Route::get('/products', [BusinessController::class, 'products'])->name('products.index');
-    Route::get('/products/create', [BusinessController::class, 'createProduct'])->name('products.create');
-    Route::post('/products', [BusinessController::class, 'storeProduct'])->name('products.store');
-    Route::get('/products/{id}/edit', [BusinessController::class, 'editProduct'])->whereUuid('id')->name('products.edit');
-    Route::put('/products/{id}', [BusinessController::class, 'updateProduct'])->whereUuid('id')->name('products.update');
-    Route::delete('/products/{id}', [BusinessController::class, 'deleteProduct'])->whereUuid('id')->name('products.delete');
+    // Service Management
+    Route::get('/services', [BusinessController::class, 'services'])->name('services.index');
+    Route::get('/services/create', [BusinessController::class, 'createService'])->name('services.create');
+    Route::post('/services', [BusinessController::class, 'storeService'])->name('services.store');
+    Route::get('/services/{id}/edit', [BusinessController::class, 'editService'])->whereUuid('id')->name('services.edit');
+    Route::put('/services/{id}', [BusinessController::class, 'updateService'])->whereUuid('id')->name('services.update');
+    Route::delete('/services/{id}', [BusinessController::class, 'deleteService'])->whereUuid('id')->name('services.delete');
+    
+    // Backward compatibility routes
+    Route::get('/products', [BusinessController::class, 'services'])->name('products.index');
+    Route::get('/products/create', [BusinessController::class, 'createService'])->name('products.create');
+    Route::post('/products', [BusinessController::class, 'storeService'])->name('products.store');
+    Route::get('/products/{id}/edit', [BusinessController::class, 'editService'])->whereUuid('id')->name('products.edit');
+    Route::put('/products/{id}', [BusinessController::class, 'updateService'])->whereUuid('id')->name('products.update');
+    Route::delete('/products/{id}', [BusinessController::class, 'deleteService'])->whereUuid('id')->name('products.delete');
     
     // Customization Management
-    Route::get('/products/{productId}/customizations', [BusinessController::class, 'customizations'])->whereUuid('productId')->name('customizations.index');
-    Route::post('/products/{productId}/customizations', [BusinessController::class, 'storeCustomization'])->whereUuid('productId')->name('customizations.store');
-    Route::put('/products/{productId}/customizations/{optionId}', [BusinessController::class, 'updateCustomization'])->whereUuid('productId')->whereUuid('optionId')->name('customizations.update');
-    Route::delete('/products/{productId}/customizations/{optionId}', [BusinessController::class, 'deleteCustomization'])->whereUuid('productId')->whereUuid('optionId')->name('customizations.delete');
+    Route::get('/services/{serviceId}/customizations', [BusinessController::class, 'customizations'])->whereUuid('serviceId')->name('customizations.index');
+    Route::post('/services/{serviceId}/customizations', [BusinessController::class, 'storeCustomization'])->whereUuid('serviceId')->name('customizations.store');
+    Route::put('/services/{serviceId}/customizations/{optionId}', [BusinessController::class, 'updateCustomization'])->whereUuid('serviceId')->whereUuid('optionId')->name('customizations.update');
+    Route::delete('/services/{serviceId}/customizations/{optionId}', [BusinessController::class, 'deleteCustomization'])->whereUuid('serviceId')->whereUuid('optionId')->name('customizations.delete');
+    
+    // Backward compatibility routes
+    Route::get('/products/{productId}/customizations', [BusinessController::class, 'customizations'])->whereUuid('productId')->name('products.customizations.index');
+    Route::post('/products/{productId}/customizations', [BusinessController::class, 'storeCustomization'])->whereUuid('productId')->name('products.customizations.store');
+    Route::put('/products/{productId}/customizations/{optionId}', [BusinessController::class, 'updateCustomization'])->whereUuid('productId')->whereUuid('optionId')->name('products.customizations.update');
+    Route::delete('/products/{productId}/customizations/{optionId}', [BusinessController::class, 'deleteCustomization'])->whereUuid('productId')->whereUuid('optionId')->name('products.customizations.delete');
     
     // Pricing Rules Management
     Route::get('/pricing-rules', [BusinessController::class, 'pricingRules'])->name('pricing.index');
@@ -167,8 +184,12 @@ Route::prefix('customer')->middleware([\App\Http\Middleware\CheckAuth::class, \A
     Route::get('/marketplace', [ServiceMarketplaceController::class, 'index'])->name('marketplace');
     
     Route::get('/enterprises', [CustomerController::class, 'enterprises'])->name('enterprises');
-    Route::get('/enterprises/{id}/products', [CustomerController::class, 'enterpriseProducts'])->whereUuid('id')->name('enterprise.products');
-    Route::get('/products/{id}', [CustomerController::class, 'productDetails'])->whereUuid('id')->name('product.details');
+    Route::get('/enterprises/{id}/services', [CustomerController::class, 'enterpriseServices'])->whereUuid('id')->name('enterprise.services');
+    Route::get('/services/{id}', [CustomerController::class, 'serviceDetails'])->whereUuid('id')->name('service.details');
+    
+    // Backward compatibility
+    Route::get('/enterprises/{id}/products', [CustomerController::class, 'enterpriseServices'])->whereUuid('id')->name('enterprise.products');
+    Route::get('/products/{id}', [CustomerController::class, 'serviceDetails'])->whereUuid('id')->name('product.details');
     Route::post('/order', [CustomerController::class, 'placeOrder'])->name('order.place');
     Route::get('/orders', [CustomerController::class, 'orders'])->name('orders');
     Route::get('/orders/{id}', [CustomerController::class, 'orderDetails'])->whereUuid('id')->name('order.details');
@@ -186,18 +207,27 @@ Route::prefix('customer')->middleware([\App\Http\Middleware\CheckAuth::class, \A
 
 // Debug routes (remove in production)
 Route::get('/debug/enterprises', function() {
-    $enterprises = \App\Models\Enterprise::with('products')->get();
+    $enterprises = \App\Models\Enterprise::with('services')->get();
     return response()->json([
         'count' => $enterprises->count(),
         'enterprises' => $enterprises->toArray()
     ]);
 });
 
-Route::get('/debug/products', function() {
-    $products = \App\Models\Product::with(['enterprise', 'customizationOptions'])->get();
+Route::get('/debug/services', function() {
+    $services = \App\Models\Service::with(['enterprise', 'customizationOptions'])->get();
     return response()->json([
-        'count' => $products->count(),
-        'products' => $products->toArray()
+        'count' => $services->count(),
+        'services' => $services->toArray()
+    ]);
+});
+
+// Backward compatibility
+Route::get('/debug/products', function() {
+    $services = \App\Models\Service::with(['enterprise', 'customizationOptions'])->get();
+    return response()->json([
+        'count' => $services->count(),
+        'products' => $services->toArray()
     ]);
 });
 

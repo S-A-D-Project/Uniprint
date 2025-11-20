@@ -249,13 +249,6 @@ DB_USERNAME=root
 DB_PASSWORD=your_password
 ```
 
-#### SQLite (Development Only)
-
-```env
-DB_CONNECTION=sqlite
-DB_DATABASE=/absolute/path/to/database.sqlite
-```
-
 ### Web Server Configuration
 
 See [docs/WEB_SERVER_CONFIG.md](docs/WEB_SERVER_CONFIG.md) for Apache and Nginx configuration examples.

@@ -67,14 +67,25 @@ class SafePropertyHelper
     }
 
     /**
-     * Safely get product name
+     * Safely get service name
+     *
+     * @param object|null $service The service object
+     * @return string The service name or default
+     */
+    public static function getServiceName($service): string
+    {
+        return static::safeGet($service, 'service_name', 'Unknown Service');
+    }
+
+    /**
+     * Safely get product name (backward compatibility alias)
      *
      * @param object|null $product The product object
      * @return string The product name or default
      */
     public static function getProductName($product): string
     {
-        return static::safeGet($product, 'product_name', 'Unknown Product');
+        return static::getServiceName($product);
     }
 
     /**

@@ -162,8 +162,8 @@ $breadcrumbs = [
                         </td>
                         <td class="p-4">
                             <div class="text-center">
-                                <div class="text-2xl font-bold text-primary">{{ $enterprise->products_count ?? 0 }}</div>
-                                <div class="text-xs text-muted-foreground">Products</div>
+                                <div class="text-2xl font-bold text-primary">{{ $enterprise->services_count ?? 0 }}</div>
+                                <div class="text-xs text-muted-foreground">Services</div>
                             </div>
                         </td>
                         <td class="p-4">

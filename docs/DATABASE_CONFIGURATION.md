@@ -7,7 +7,6 @@ This guide covers database setup and configuration for UniPrint across different
 - [Supported Databases](#supported-databases)
 - [PostgreSQL Setup](#postgresql-setup)
 - [MySQL Setup](#mysql-setup)
-- [SQLite Setup](#sqlite-setup)
 - [Environment Configuration](#environment-configuration)
 - [Migration and Seeding](#migration-and-seeding)
 - [Database Testing](#database-testing)
@@ -24,7 +23,6 @@ UniPrint supports the following database systems:
 |----------|-------------|------------------|-------|
 | PostgreSQL 14+ | ✅ Yes | ✅ Yes | Best performance, UUID support |
 | MySQL 8.0+ | ⚠️ Supported | ✅ Yes | Widely available |
-| SQLite 3.x | ❌ Dev Only | ❌ No | Development/testing only |
 
 ---
 
@@ -211,37 +209,6 @@ FLUSH PRIVILEGES;
 Restart MySQL:
 ```bash
 sudo systemctl restart mysql
-```
-
----
-
-## SQLite Setup
-
-**⚠️ Warning: SQLite is for development only. Do not use in production!**
-
-### Configuration
-
-Edit `.env`:
-```env
-DB_CONNECTION=sqlite
-DB_DATABASE=/absolute/path/to/database.sqlite
-```
-
-### Create Database File
-
-```bash
-# Linux/macOS
-touch database/database.sqlite
-
-# Windows
-type nul > database\database.sqlite
-```
-
-### Permissions
-
-```bash
-chmod 664 database/database.sqlite
-chmod 775 database
 ```
 
 ---

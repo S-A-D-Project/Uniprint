@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Models\Product;
+use App\Models\Service;
 use App\Models\CustomizationGroup;
 use App\Models\CustomizationOption;
 use App\Models\CustomizationRule;
@@ -14,7 +14,7 @@ use Exception;
 /**
  * Customization Service
  * 
- * Handles product customization logic, validation, and dependencies
+ * Handles service customization logic, validation, and dependencies
  * 
  * @package App\Services
  */
@@ -23,60 +23,35 @@ class CustomizationService
     /**
      * Validate selected customizations against rules
      *
-     * @param int $productId
+     * @param string $serviceId
      * @param array $selectedOptions Array of option IDs
      * @return array ['valid' => bool, 'errors' => array]
      */
-    public function validateCustomizations(int $productId, array $selectedOptions): array
+    public function validateCustomizations(string $serviceId, array $selectedOptions): array
     {
         $errors = [];
         
-        // Get product with customization groups and rules
-        $product = Product::with([
-            'customizationGroups.customizationOptions',
-            'customizationGroups.rules'
-        ])->findOrFail($productId);
+        // Get service with customization groups and rules
+        $service = Service::with([
+            'customizationOptions',
+        ])->findOrFail($serviceId);
 
-        // Check required groups
-        foreach ($product->customizationGroups as $group) {
-            if ($group->is_required) {
-                $hasSelection = false;
-                foreach ($group->customizationOptions as $option) {
-                    if (in_array($option->option_id, $selectedOptions)) {
-                        $hasSelection = true;
-                        break;
-                    }
-                }
-                
-                if (!$hasSelection) {
-                    $errors[] = "Selection required for: {$group->group_name}";
-                }
+        // Check required customization options
+        foreach ($service->customizationOptions as $option) {
+            if (in_array($option->option_id, $selectedOptions)) {
+                // Option is selected
+                continue;
             }
         }
 
         // Validate customization rules
         $rules = CustomizationRule::where('is_active', true)
-            ->whereIn('customization_group_id', $product->customizationGroups->pluck('group_id'))
             ->get();
 
         foreach ($rules as $rule) {
             if (!$rule->isConditionMet($selectedOptions)) {
                 $message = $rule->error_message ?? $this->getDefaultRuleMessage($rule);
                 $errors[] = $message;
-            }
-        }
-
-        // Check for conflicting options within same group
-        foreach ($product->customizationGroups as $group) {
-            if (!$group->allows_multiple) {
-                $selectedInGroup = array_intersect(
-                    $selectedOptions,
-                    $group->customizationOptions->pluck('option_id')->toArray()
-                );
-                
-                if (count($selectedInGroup) > 1) {
-                    $errors[] = "Only one option allowed for: {$group->group_name}";
-                }
             }
         }
 
@@ -89,51 +64,39 @@ class CustomizationService
     /**
      * Get available options based on current selections
      *
-     * @param int $productId
+     * @param string $serviceId
      * @param array $currentSelections
      * @return array
      */
-    public function getAvailableOptions(int $productId, array $currentSelections): array
+    public function getAvailableOptions(string $serviceId, array $currentSelections): array
     {
-        $cacheKey = "available_options_{$productId}_" . md5(json_encode($currentSelections));
+        $cacheKey = "available_options_{$serviceId}_" . md5(json_encode($currentSelections));
         
-        return Cache::remember($cacheKey, 300, function () use ($productId, $currentSelections) {
-            $product = Product::with([
-                'customizationGroups.customizationOptions',
-                'customizationGroups.rules'
-            ])->findOrFail($productId);
+        return Cache::remember($cacheKey, 300, function () use ($serviceId, $currentSelections) {
+            $service = Service::with([
+                'customizationOptions'
+            ])->findOrFail($serviceId);
 
             $availableOptions = [];
 
-            foreach ($product->customizationGroups as $group) {
-                $groupOptions = [];
-                
-                foreach ($group->customizationOptions as $option) {
-                    // Check if option is enabled by current selections
-                    if ($this->isOptionAvailable($option->option_id, $currentSelections, $group->rules)) {
-                        $groupOptions[] = [
-                            'option_id' => $option->option_id,
-                            'option_name' => $option->option_name,
-                            'price_modifier' => $option->price_modifier,
-                            'is_available' => true,
-                        ];
-                    } else {
-                        $groupOptions[] = [
-                            'option_id' => $option->option_id,
-                            'option_name' => $option->option_name,
-                            'price_modifier' => $option->price_modifier,
-                            'is_available' => false,
-                            'reason' => 'Incompatible with current selections',
-                        ];
-                    }
+            foreach ($service->customizationOptions as $option) {
+                // Check if option is enabled by current selections
+                if ($this->isOptionAvailable($option->option_id, $currentSelections, [])) {
+                    $availableOptions[] = [
+                        'option_id' => $option->option_id,
+                        'option_name' => $option->option_name,
+                        'price_modifier' => $option->price_modifier,
+                        'is_available' => true,
+                    ];
+                } else {
+                    $availableOptions[] = [
+                        'option_id' => $option->option_id,
+                        'option_name' => $option->option_name,
+                        'price_modifier' => $option->price_modifier,
+                        'is_available' => false,
+                        'reason' => 'Incompatible with current selections',
+                    ];
                 }
-
-                $availableOptions[$group->group_id] = [
-                    'group_name' => $group->group_name,
-                    'is_required' => $group->is_required,
-                    'allows_multiple' => $group->allows_multiple,
-                    'options' => $groupOptions,
-                ];
             }
 
             return $availableOptions;

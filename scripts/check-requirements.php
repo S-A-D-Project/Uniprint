@@ -95,7 +95,6 @@ class RequirementsChecker
         $database = [
             'pdo_pgsql' => 'PostgreSQL support',
             'pdo_mysql' => 'MySQL support',
-            'pdo_sqlite' => 'SQLite support',
         ];
 
         echo "📦 Required PHP Extensions:\n";
@@ -122,7 +121,7 @@ class RequirementsChecker
         }
 
         if (!$hasDatabase) {
-            $this->errors[] = "❌ No database extension found. Install at least one: pdo_pgsql, pdo_mysql, or pdo_sqlite";
+            $this->errors[] = "❌ No database extension found. Install at least one: pdo_pgsql or pdo_mysql";
         }
 
         echo "\n📦 Optional PHP Extensions:\n";

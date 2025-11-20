@@ -2,7 +2,7 @@
 
 @section('title', 'Services - ' . $enterprise->name)
 @section('page-title', 'Service Management')
-@section('page-subtitle', 'Manage your services')
+@section('page-subtitle', 'Manage your services and offerings')
 
 @section('header-actions')
 <a href="{{ route('business.services.create') }}" 
@@ -16,7 +16,7 @@
 
     <!-- Services Grid -->
     <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-        @forelse($products as $service)
+        @forelse($services as $service)
             <div class="bg-card border border-border rounded-xl shadow-card hover:shadow-card-hover transition-smooth overflow-hidden">
                 <div class="h-48 gradient-accent flex items-center justify-center">
                     <i data-lucide="package" class="h-24 w-24 text-white"></i>
@@ -87,9 +87,9 @@
         @endforelse
     </div>
     
-    @if($products->hasPages())
+    @if($services->hasPages())
         <div class="mt-6">
-            {{ $products->links() }}
+            {{ $services->links() }}
         </div>
     @endif
 </div>

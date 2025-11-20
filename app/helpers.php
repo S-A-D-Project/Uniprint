@@ -45,16 +45,30 @@ if (!function_exists('enterprise_name')) {
     }
 }
 
+if (!function_exists('service_name')) {
+    /**
+     * Safely get service name
+     *
+     * @param object|null $service
+     * @return string
+     */
+    function service_name($service): string
+    {
+        return SafePropertyHelper::getServiceName($service);
+    }
+}
+
+// Backward compatibility
 if (!function_exists('product_name')) {
     /**
-     * Safely get product name
+     * Safely get product name (alias for service_name)
      *
      * @param object|null $product
      * @return string
      */
     function product_name($product): string
     {
-        return SafePropertyHelper::getProductName($product);
+        return SafePropertyHelper::getServiceName($product);
     }
 }
 

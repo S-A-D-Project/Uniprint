@@ -14,7 +14,7 @@ class CustomizationOption extends Model
     public $incrementing = false;
 
     protected $fillable = [
-        'product_id',
+        'service_id',
         'option_name',
         'option_type',
         'price_modifier',
@@ -24,15 +24,21 @@ class CustomizationOption extends Model
     {
         return [
             'option_id' => 'string',
-            'product_id' => 'string',
+            'service_id' => 'string',
             'price_modifier' => 'decimal:2',
         ];
     }
 
     // Relationships
+    public function service()
+    {
+        return $this->belongsTo(Service::class, 'service_id', 'service_id');
+    }
+
+    // Backward compatibility alias
     public function product()
     {
-        return $this->belongsTo(Product::class, 'product_id', 'product_id');
+        return $this->service();
     }
 
     public function orderItemCustomizations()

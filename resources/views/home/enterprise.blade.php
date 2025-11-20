@@ -38,7 +38,7 @@
                         @endif
                         
                         <div class="col-auto">
-                            <i class="bi bi-box-seam me-1"></i>{{ $enterprise->products_count }} Products
+                            <i class="bi bi-box-seam me-1"></i>{{ $enterprise->services_count }} Services
                         </div>
                     </div>
                 </div>
@@ -94,10 +94,10 @@
             @endforeach
         </div>
         
-        @if($enterprise->products_count > 6)
+        @if($enterprise->services_count > 6)
         <div class="text-center mt-4">
             <p class="text-muted">
-                Showing {{ $products->count() }} of {{ $enterprise->products_count }} products
+                Showing {{ $products->count() }} of {{ $enterprise->services_count }} services
             </p>
             @auth
                 @if(auth()->user()->role_type === 'customer')

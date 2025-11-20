@@ -69,15 +69,15 @@ class BusinessController extends Controller
                 ->where('statuses.status_name', 'In Progress')
                 ->distinct()
                 ->count('customer_orders.purchase_order_id'),
-            'total_products' => DB::table('products')
+            'total_services' => DB::table('services')
                 ->where('enterprise_id', $enterprise->enterprise_id)->count(),
             'total_revenue' => DB::table('transactions')
                 ->join('customer_orders', 'transactions.purchase_order_id', '=', 'customer_orders.purchase_order_id')
                 ->where('customer_orders.enterprise_id', $enterprise->enterprise_id)
                 ->sum('transactions.amount'),
             'active_customizations' => DB::table('customization_options')
-                ->join('products', 'customization_options.product_id', '=', 'products.product_id')
-                ->where('products.enterprise_id', $enterprise->enterprise_id)
+                ->join('services', 'customization_options.service_id', '=', 'services.service_id')
+                ->where('services.enterprise_id', $enterprise->enterprise_id)
                 ->count(),
             'pricing_rules' => DB::table('pricing_rules')
                 ->where('enterprise_id', $enterprise->enterprise_id)
@@ -137,9 +137,9 @@ class BusinessController extends Controller
 
         // Get order items
         $orderItems = DB::table('order_items')
-            ->join('products', 'order_items.product_id', '=', 'products.product_id')
+            ->join('services', 'order_items.service_id', '=', 'services.service_id')
             ->where('order_items.purchase_order_id', $id)
-            ->select('order_items.*', 'products.product_name')
+            ->select('order_items.*', 'services.service_name')
             ->get();
 
         // Get customizations for each item
@@ -239,49 +239,49 @@ class BusinessController extends Controller
     }
 
     // =====================================================
-    // PRODUCT MANAGEMENT
+    // SERVICE MANAGEMENT
     // =====================================================
 
-    public function products()
+    public function services()
     {
         $userName = session('user_name');
         $enterprise = $this->getUserEnterprise();
 
-        $products = DB::table('products')
-            ->leftJoin(DB::raw('(SELECT product_id, COUNT(*) as order_count FROM order_items GROUP BY product_id) as orders'), 'products.product_id', '=', 'orders.product_id')
-            ->leftJoin(DB::raw('(SELECT product_id, COUNT(*) as customization_count FROM customization_options GROUP BY product_id) as customs'), 'products.product_id', '=', 'customs.product_id')
-            ->where('products.enterprise_id', $enterprise->enterprise_id)
-            ->select('products.*', DB::raw('COALESCE(orders.order_count, 0) as order_count'), DB::raw('COALESCE(customs.customization_count, 0) as customization_count'))
-            ->orderBy('products.created_at', 'desc')
+        $services = DB::table('services')
+            ->leftJoin(DB::raw('(SELECT service_id, COUNT(*) as order_count FROM order_items GROUP BY service_id) as orders'), 'services.service_id', '=', 'orders.service_id')
+            ->leftJoin(DB::raw('(SELECT service_id, COUNT(*) as customization_count FROM customization_options GROUP BY service_id) as customs'), 'services.service_id', '=', 'customs.service_id')
+            ->where('services.enterprise_id', $enterprise->enterprise_id)
+            ->select('services.*', DB::raw('COALESCE(orders.order_count, 0) as order_count'), DB::raw('COALESCE(customs.customization_count, 0) as customization_count'))
+            ->orderBy('services.created_at', 'desc')
             ->paginate(20);
 
-        return view('business.products.index', compact('products', 'enterprise', 'userName'));
+        return view('business.services.index', compact('services', 'enterprise', 'userName'));
     }
 
-    public function createProduct()
+    public function createService()
     {
         $userName = session('user_name');
         $enterprise = $this->getUserEnterprise();
 
-        return view('business.products.create', compact('enterprise', 'userName'));
+        return view('business.services.create', compact('enterprise', 'userName'));
     }
 
-    public function storeProduct(Request $request)
+    public function storeService(Request $request)
     {
         $request->validate([
-            'product_name' => 'required|string|max:255',
+            'service_name' => 'required|string|max:255',
             'description' => 'nullable|string|max:2000',
             'base_price' => 'required|numeric|min:0',
             'is_active' => 'boolean',
         ]);
 
         $enterprise = $this->getUserEnterprise();
-        $productId = Str::uuid();
+        $serviceId = Str::uuid();
 
-        DB::table('products')->insert([
-            'product_id' => $productId,
+        DB::table('services')->insert([
+            'service_id' => $serviceId,
             'enterprise_id' => $enterprise->enterprise_id,
-            'product_name' => $request->product_name,
+            'service_name' => $request->service_name,
             'description' => $request->description,
             'base_price' => $request->base_price,
             'is_active' => $request->has('is_active'),
@@ -290,32 +290,32 @@ class BusinessController extends Controller
         ]);
 
         // Log audit
-        $this->logAudit('create', 'product', $productId, "Created product: {$request->product_name}", null, $request->all());
+        $this->logAudit('create', 'service', $serviceId, "Created service: {$request->service_name}", null, $request->all());
 
-        return redirect()->route('business.products.index')->with('success', 'Product created successfully');
+        return redirect()->route('business.services.index')->with('success', 'Service created successfully');
     }
 
-    public function editProduct($id)
+    public function editService($id)
     {
         $userName = session('user_name');
         $enterprise = $this->getUserEnterprise();
 
-        $product = DB::table('products')
-            ->where('product_id', $id)
+        $service = DB::table('services')
+            ->where('service_id', $id)
             ->where('enterprise_id', $enterprise->enterprise_id)
             ->first();
 
-        if (!$product) {
+        if (!$service) {
             abort(404);
         }
 
-        return view('business.products.edit', compact('product', 'enterprise', 'userName'));
+        return view('business.services.edit', compact('service', 'enterprise', 'userName'));
     }
 
-    public function updateProduct(Request $request, $id)
+    public function updateService(Request $request, $id)
     {
         $request->validate([
-            'product_name' => 'required|string|max:255',
+            'service_name' => 'required|string|max:255',
             'description' => 'nullable|string|max:2000',
             'base_price' => 'required|numeric|min:0',
             'is_active' => 'boolean',
@@ -323,16 +323,16 @@ class BusinessController extends Controller
 
         $enterprise = $this->getUserEnterprise();
 
-        $oldProduct = DB::table('products')->where('product_id', $id)->where('enterprise_id', $enterprise->enterprise_id)->first();
+        $oldService = DB::table('services')->where('service_id', $id)->where('enterprise_id', $enterprise->enterprise_id)->first();
         
-        if (!$oldProduct) {
+        if (!$oldService) {
             abort(404);
         }
 
-        DB::table('products')
-            ->where('product_id', $id)
+        DB::table('services')
+            ->where('service_id', $id)
             ->update([
-                'product_name' => $request->product_name,
+                'service_name' => $request->service_name,
                 'description' => $request->description,
                 'base_price' => $request->base_price,
                 'is_active' => $request->has('is_active'),
@@ -340,60 +340,91 @@ class BusinessController extends Controller
             ]);
 
         // Log audit
-        $this->logAudit('update', 'product', $id, "Updated product: {$request->product_name}", 
-            (array)$oldProduct, 
+        $this->logAudit('update', 'service', $id, "Updated service: {$request->service_name}", 
+            (array)$oldService, 
             $request->all()
         );
 
-        return redirect()->route('business.products.index')->with('success', 'Product updated successfully');
+        return redirect()->route('business.services.index')->with('success', 'Service updated successfully');
+    }
+
+    public function deleteService($id)
+    {
+        $enterprise = $this->getUserEnterprise();
+
+        $service = DB::table('services')->where('service_id', $id)->where('enterprise_id', $enterprise->enterprise_id)->first();
+        
+        if (!$service) {
+            abort(404);
+        }
+
+        DB::table('services')->where('service_id', $id)->delete();
+
+        // Log audit
+        $this->logAudit('delete', 'service', $id, "Deleted service: {$service->service_name}", (array)$service, null);
+
+        return redirect()->route('business.services.index')->with('success', 'Service deleted successfully');
+    }
+
+    // Backward compatibility aliases
+    public function products()
+    {
+        return $this->services();
+    }
+
+    public function createProduct()
+    {
+        return $this->createService();
+    }
+
+    public function storeProduct(Request $request)
+    {
+        return $this->storeService($request);
+    }
+
+    public function editProduct($id)
+    {
+        return $this->editService($id);
+    }
+
+    public function updateProduct(Request $request, $id)
+    {
+        return $this->updateService($request, $id);
     }
 
     public function deleteProduct($id)
     {
-        $enterprise = $this->getUserEnterprise();
-
-        $product = DB::table('products')->where('product_id', $id)->where('enterprise_id', $enterprise->enterprise_id)->first();
-        
-        if (!$product) {
-            abort(404);
-        }
-
-        DB::table('products')->where('product_id', $id)->delete();
-
-        // Log audit
-        $this->logAudit('delete', 'product', $id, "Deleted product: {$product->product_name}", (array)$product, null);
-
-        return redirect()->route('business.products.index')->with('success', 'Product deleted successfully');
+        return $this->deleteService($id);
     }
 
     // =====================================================
     // CUSTOMIZATION MANAGEMENT
     // =====================================================
 
-    public function customizations($productId)
+    public function customizations($serviceId)
     {
         $userName = session('user_name');
         $enterprise = $this->getUserEnterprise();
 
-        $product = DB::table('products')
-            ->where('product_id', $productId)
+        $service = DB::table('services')
+            ->where('service_id', $serviceId)
             ->where('enterprise_id', $enterprise->enterprise_id)
             ->first();
 
-        if (!$product) {
+        if (!$service) {
             abort(404);
         }
 
         $customizations = DB::table('customization_options')
-            ->where('product_id', $productId)
+            ->where('service_id', $serviceId)
             ->orderBy('option_type')
             ->orderBy('option_name')
             ->get();
 
-        return view('business.customizations.index', compact('product', 'customizations', 'enterprise', 'userName'));
+        return view('business.customizations.index', compact('service', 'customizations', 'enterprise', 'userName'));
     }
 
-    public function storeCustomization(Request $request, $productId)
+    public function storeCustomization(Request $request, $serviceId)
     {
         $request->validate([
             'option_name' => 'required|string|max:200',
@@ -403,13 +434,13 @@ class BusinessController extends Controller
 
         $enterprise = $this->getUserEnterprise();
 
-        // Verify product belongs to enterprise
-        $product = DB::table('products')
-            ->where('product_id', $productId)
+        // Verify service belongs to enterprise
+        $service = DB::table('services')
+            ->where('service_id', $serviceId)
             ->where('enterprise_id', $enterprise->enterprise_id)
             ->first();
 
-        if (!$product) {
+        if (!$service) {
             abort(404);
         }
 
@@ -417,7 +448,7 @@ class BusinessController extends Controller
 
         DB::table('customization_options')->insert([
             'option_id' => $optionId,
-            'product_id' => $productId,
+            'service_id' => $serviceId,
             'option_name' => $request->option_name,
             'option_type' => $request->option_type,
             'price_modifier' => $request->price_modifier,
@@ -426,12 +457,12 @@ class BusinessController extends Controller
         ]);
 
         // Log audit
-        $this->logAudit('create', 'customization', $optionId, "Created customization option: {$request->option_name} for product {$product->product_name}", null, $request->all());
+        $this->logAudit('create', 'customization', $optionId, "Created customization option: {$request->option_name} for service {$service->service_name}", null, $request->all());
 
         return redirect()->back()->with('success', 'Customization option created successfully');
     }
 
-    public function updateCustomization(Request $request, $productId, $optionId)
+    public function updateCustomization(Request $request, $serviceId, $optionId)
     {
         $request->validate([
             'option_name' => 'required|string|max:200',
@@ -441,13 +472,13 @@ class BusinessController extends Controller
 
         $enterprise = $this->getUserEnterprise();
 
-        // Verify product belongs to enterprise
-        $product = DB::table('products')
-            ->where('product_id', $productId)
+        // Verify service belongs to enterprise
+        $service = DB::table('services')
+            ->where('service_id', $serviceId)
             ->where('enterprise_id', $enterprise->enterprise_id)
             ->first();
 
-        if (!$product) {
+        if (!$service) {
             abort(404);
         }
 
@@ -468,17 +499,17 @@ class BusinessController extends Controller
         return redirect()->back()->with('success', 'Customization option updated successfully');
     }
 
-    public function deleteCustomization($productId, $optionId)
+    public function deleteCustomization($serviceId, $optionId)
     {
         $enterprise = $this->getUserEnterprise();
 
-        // Verify product belongs to enterprise
-        $product = DB::table('products')
-            ->where('product_id', $productId)
+        // Verify service belongs to enterprise
+        $service = DB::table('services')
+            ->where('service_id', $serviceId)
             ->where('enterprise_id', $enterprise->enterprise_id)
             ->first();
 
-        if (!$product) {
+        if (!$service) {
             abort(404);
         }
 

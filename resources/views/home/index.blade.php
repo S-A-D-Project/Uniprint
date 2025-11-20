@@ -253,11 +253,11 @@
                     
                     <p class="text-muted-foreground mb-4 flex items-center">
                         <i data-lucide="package" class="h-4 w-4 mr-2"></i>
-                        {{ $enterprise->products_count }} Products Available
+                        {{ $enterprise->services_count }} Services Available
                     </p>
                     
                     <a href="{{ route('enterprises.show', $enterprise->enterprise_id) }}" class="btn btn-outline btn-md w-full">
-                        View Products
+                        View Services
                         <i data-lucide="arrow-right" class="ml-2 h-4 w-4"></i>
                     </a>
                 </div>

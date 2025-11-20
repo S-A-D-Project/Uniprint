@@ -30,22 +30,22 @@ class ServiceMarketplaceApiController extends Controller
             // Check if reviews table exists
             $reviewsTableExists = Schema::hasTable('reviews');
             
-            // Build query for services (using products as base)
-            $query = DB::table('products as p')
-                ->join('enterprises as e', 'p.enterprise_id', '=', 'e.enterprise_id');
+            // Build query for services
+            $query = DB::table('services as s')
+                ->join('enterprises as e', 's.enterprise_id', '=', 'e.enterprise_id');
             
             if ($reviewsTableExists) {
-                $query->leftJoin('reviews as r', 'p.product_id', '=', 'r.product_id');
+                $query->leftJoin('reviews as r', 's.service_id', '=', 'r.service_id');
             }
             
-            $query->where('p.is_active', true);
+            $query->where('s.is_active', true);
             
             $selectFields = [
-                'p.product_id as service_id',
-                'p.product_name as title',
-                'p.description',
-                'p.base_price as price',
-                'p.base_price as original_price', // Can be modified for discounts
+                's.service_id',
+                's.service_name as title',
+                's.description',
+                's.base_price as price',
+                's.base_price as original_price', // Can be modified for discounts
                 'e.name as provider_name',
                 'e.address as location',
                 DB::raw("'printing' as service_type"),
@@ -56,7 +56,7 @@ class ServiceMarketplaceApiController extends Controller
             if ($reviewsTableExists) {
                 $selectFields[] = DB::raw('COALESCE(AVG(r.rating), 0) as rating');
                 $selectFields[] = DB::raw('COUNT(r.review_id) as review_count');
-                $query->groupBy('p.product_id', 'p.product_name', 'p.description', 'p.base_price', 'e.name', 'e.address');
+                $query->groupBy('s.service_id', 's.service_name', 's.description', 's.base_price', 'e.name', 'e.address');
             } else {
                 $selectFields[] = DB::raw('0 as rating');
                 $selectFields[] = DB::raw('0 as review_count');
@@ -143,16 +143,16 @@ class ServiceMarketplaceApiController extends Controller
             // Cache suggestions for performance
             $cacheKey = "search_suggestions_" . md5($query);
             $suggestions = Cache::remember($cacheKey, 300, function() use ($query) {
-                return DB::table('products as p')
-                    ->join('enterprises as e', 'p.enterprise_id', '=', 'e.enterprise_id')
-                    ->where('p.is_active', true)
-                    ->where('p.product_name', 'ILIKE', "%{$query}%")
+                return DB::table('services as s')
+                    ->join('enterprises as e', 's.enterprise_id', '=', 'e.enterprise_id')
+                    ->where('s.is_active', true)
+                    ->where('s.service_name', 'ILIKE', "%{$query}%")
                     ->select(
-                        'p.product_name as term',
+                        's.service_name as term',
                         DB::raw("'Printing Services' as category"),
                         DB::raw('(
-                            SELECT COUNT(*) FROM products 
-                            WHERE product_name ILIKE "%' . $query . '%"
+                            SELECT COUNT(*) FROM services 
+                            WHERE service_name ILIKE "%' . $query . '%"
                         ) as count')
                     )
                     ->distinct()
@@ -193,21 +193,21 @@ class ServiceMarketplaceApiController extends Controller
             // Check if reviews table exists
             $reviewsTableExists = Schema::hasTable('reviews');
             
-            $query = DB::table('products as p')
-                ->join('enterprises as e', 'p.enterprise_id', '=', 'e.enterprise_id');
+            $query = DB::table('services as s')
+                ->join('enterprises as e', 's.enterprise_id', '=', 'e.enterprise_id');
             
             if ($reviewsTableExists) {
-                $query->leftJoin('reviews as r', 'p.product_id', '=', 'r.product_id');
+                $query->leftJoin('reviews as r', 's.service_id', '=', 'r.service_id');
             }
             
-            $query->where('p.product_id', $serviceId)
-                ->where('p.is_active', true);
+            $query->where('s.service_id', $serviceId)
+                ->where('s.is_active', true);
             
             $selectFields = [
-                'p.product_id as service_id',
-                'p.product_name as title',
-                'p.description',
-                'p.base_price as price',
+                's.service_id',
+                's.service_name as title',
+                's.description',
+                's.base_price as price',
                 'e.name as provider_name',
                 'e.address as location',
                 'e.contact_number as phone',
@@ -218,7 +218,7 @@ class ServiceMarketplaceApiController extends Controller
             if ($reviewsTableExists) {
                 $selectFields[] = DB::raw('COALESCE(AVG(r.rating), 0) as rating');
                 $selectFields[] = DB::raw('COUNT(r.review_id) as review_count');
-                $query->groupBy('p.product_id', 'p.product_name', 'p.description', 'p.base_price', 'e.name', 'e.address', 'e.contact_number');
+                $query->groupBy('s.service_id', 's.service_name', 's.description', 's.base_price', 'e.name', 'e.address', 'e.contact_number');
             } else {
                 $selectFields[] = DB::raw('0 as rating');
                 $selectFields[] = DB::raw('0 as review_count');
@@ -233,16 +233,16 @@ class ServiceMarketplaceApiController extends Controller
             }
 
             // Get related services
-            $relatedServices = DB::table('products as p')
-                ->join('enterprises as e', 'p.enterprise_id', '=', 'e.enterprise_id')
-                ->where('p.is_active', true)
-                ->where('p.product_id', '!=', $serviceId)
-                ->where('p.enterprise_id', '=', DB::raw("(SELECT enterprise_id FROM products WHERE product_id = '{$serviceId}')"))
+            $relatedServices = DB::table('services as s')
+                ->join('enterprises as e', 's.enterprise_id', '=', 'e.enterprise_id')
+                ->where('s.is_active', true)
+                ->where('s.service_id', '!=', $serviceId)
+                ->where('s.enterprise_id', '=', DB::raw("(SELECT enterprise_id FROM services WHERE service_id = '{$serviceId}')"))
                 ->limit(4)
                 ->select([
-                    'p.product_id as service_id',
-                    'p.product_name as title',
-                    'p.base_price as price',
+                    's.service_id',
+                    's.service_name as title',
+                    's.base_price as price',
                     'e.name as provider_name',
                     DB::raw("'/placeholder-service.jpg' as image_url")
                 ])
@@ -310,8 +310,8 @@ class ServiceMarketplaceApiController extends Controller
             }
 
             // Check if service exists
-            $service = DB::table('products')
-                ->where('product_id', $serviceId)
+            $service = DB::table('services')
+                ->where('service_id', $serviceId)
                 ->where('is_active', true)
                 ->first();
 
@@ -322,14 +322,14 @@ class ServiceMarketplaceApiController extends Controller
             // Toggle in saved services
             $existing = DB::table('saved_services')
                 ->where('user_id', $userId)
-                ->where('product_id', $serviceId)
+                ->where('service_id', $serviceId)
                 ->first();
 
             if ($existing) {
                 // Remove from favorites
                 DB::table('saved_services')
                     ->where('user_id', $userId)
-                    ->where('product_id', $serviceId)
+                    ->where('service_id', $serviceId)
                     ->delete();
                 
                 $isFavorited = false;
@@ -338,7 +338,7 @@ class ServiceMarketplaceApiController extends Controller
                 DB::table('saved_services')->insert([
                     'saved_service_id' => DB::raw('gen_random_uuid()'),
                     'user_id' => $userId,
-                    'product_id' => $serviceId,
+                    'service_id' => $serviceId,
                     'quantity' => 1,
                     'unit_price' => $service->base_price,
                     'total_price' => $service->base_price,
@@ -404,7 +404,7 @@ class ServiceMarketplaceApiController extends Controller
             // Get actual counts
             foreach ($categories as &$category) {
                 if ($category['id'] === 'all') {
-                    $category['count'] = DB::table('products')->where('is_active', true)->count();
+                    $category['count'] = DB::table('services')->where('is_active', true)->count();
                 } else {
                     // For demo, assign some counts - in real implementation, this would be based on actual categorization
                     $category['count'] = rand(5, 50);
@@ -437,13 +437,13 @@ class ServiceMarketplaceApiController extends Controller
             // For demo, we'll apply some basic filtering
             switch($category) {
                 case 'printing':
-                    $query->where('p.product_name', 'ILIKE', '%print%');
+                    $query->where('s.service_name', 'ILIKE', '%print%');
                     break;
                 case 'design':
-                    $query->where('p.product_name', 'ILIKE', '%design%');
+                    $query->where('s.service_name', 'ILIKE', '%design%');
                     break;
                 case 'business':
-                    $query->where('p.product_name', 'ILIKE', '%business%');
+                    $query->where('s.service_name', 'ILIKE', '%business%');
                     break;
             }
         }
@@ -452,8 +452,8 @@ class ServiceMarketplaceApiController extends Controller
         $search = $request->get('search', '');
         if (!empty($search)) {
             $query->where(function($q) use ($search) {
-                $q->where('p.product_name', 'ILIKE', "%{$search}%")
-                  ->orWhere('p.description', 'ILIKE', "%{$search}%")
+                $q->where('s.service_name', 'ILIKE', "%{$search}%")
+                  ->orWhere('s.description', 'ILIKE', "%{$search}%")
                   ->orWhere('e.name', 'ILIKE', "%{$search}%");
             });
         }
@@ -469,16 +469,16 @@ class ServiceMarketplaceApiController extends Controller
         if (!empty($priceRange)) {
             switch($priceRange) {
                 case '0-500':
-                    $query->where('p.base_price', '<', 500);
+                    $query->where('s.base_price', '<', 500);
                     break;
                 case '500-2000':
-                    $query->whereBetween('p.base_price', [500, 2000]);
+                    $query->whereBetween('s.base_price', [500, 2000]);
                     break;
                 case '2000-5000':
-                    $query->whereBetween('p.base_price', [2000, 5000]);
+                    $query->whereBetween('s.base_price', [2000, 5000]);
                     break;
                 case '5000+':
-                    $query->where('p.base_price', '>', 5000);
+                    $query->where('s.base_price', '>', 5000);
                     break;
             }
         }
@@ -503,7 +503,7 @@ class ServiceMarketplaceApiController extends Controller
                     $query->whereNotNull('e.address');
                     break;
                 case 'delivery':
-                    $query->where('p.product_name', 'ILIKE', '%delivery%');
+                    $query->where('s.service_name', 'ILIKE', '%delivery%');
                     break;
             }
         }
@@ -521,28 +521,28 @@ class ServiceMarketplaceApiController extends Controller
                 if ($reviewsTableExists) {
                     $query->orderBy('review_count', 'desc');
                 } else {
-                    $query->orderBy('p.created_at', 'desc');
+                    $query->orderBy('s.created_at', 'desc');
                 }
                 break;
             case 'price-low':
-                $query->orderBy('p.base_price', 'asc');
+                $query->orderBy('s.base_price', 'asc');
                 break;
             case 'price-high':
-                $query->orderBy('p.base_price', 'desc');
+                $query->orderBy('s.base_price', 'desc');
                 break;
             case 'rating':
                 if ($reviewsTableExists) {
                     $query->orderByRaw('COALESCE(AVG(r.rating), 0) DESC');
                 } else {
-                    $query->orderBy('p.created_at', 'desc');
+                    $query->orderBy('s.created_at', 'desc');
                 }
                 break;
             case 'newest':
-                $query->orderBy('p.created_at', 'desc');
+                $query->orderBy('s.created_at', 'desc');
                 break;
             case 'relevance':
             default:
-                $query->orderBy('p.base_price', 'asc');
+                $query->orderBy('s.base_price', 'asc');
                 break;
         }
     }

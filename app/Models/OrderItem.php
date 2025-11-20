@@ -13,7 +13,7 @@ class OrderItem extends Model
 
     protected $fillable = [
         'order_id',
-        'product_id',
+        'service_id',
         'quantity',
         'item_subtotal',
         'notes_to_enterprise',
@@ -33,9 +33,15 @@ class OrderItem extends Model
         return $this->belongsTo(CustomerOrder::class, 'order_id', 'order_id');
     }
 
+    public function service()
+    {
+        return $this->belongsTo(Service::class, 'service_id', 'service_id');
+    }
+
+    // Backward compatibility alias
     public function product()
     {
-        return $this->belongsTo(Product::class, 'product_id', 'product_id');
+        return $this->service();
     }
 
     public function customizations()

@@ -33,27 +33,27 @@ class CheckoutController extends Controller
         $cartItems = [];
         $subtotal = 0;
         
-        foreach ($savedServices as $service) {
-            $product = DB::table('products')
-                ->join('enterprises', 'products.enterprise_id', '=', 'enterprises.enterprise_id')
-                ->where('products.product_id', $service->product_id)
-                ->select('products.*', 'enterprises.name as enterprise_name', 'enterprises.enterprise_id')
+        foreach ($savedServices as $savedService) {
+            $serviceData = DB::table('services')
+                ->join('enterprises', 'services.enterprise_id', '=', 'enterprises.enterprise_id')
+                ->where('services.service_id', $savedService->service_id)
+                ->select('services.*', 'enterprises.name as enterprise_name', 'enterprises.enterprise_id')
                 ->first();
             
-            if (!$product) continue;
+            if (!$serviceData) continue;
             
-            $enterpriseId = $product->enterprise_id;
-            $itemPrice = $service->unit_price;
-            $itemTotal = $service->total_price;
+            $enterpriseId = $serviceData->enterprise_id;
+            $itemPrice = $savedService->unit_price;
+            $itemTotal = $savedService->total_price;
             $subtotal += $itemTotal;
             
             // Get customizations
             $customizations = [];
-            if ($service->customizations) {
+            if ($savedService->customizations) {
                 // Check if customizations is already an array (due to model casting)
-                $customizationIds = is_array($service->customizations) 
-                    ? $service->customizations 
-                    : json_decode($service->customizations, true);
+                $customizationIds = is_array($savedService->customizations) 
+                    ? $savedService->customizations 
+                    : json_decode($savedService->customizations, true);
                     
                 if (is_array($customizationIds)) {
                     foreach ($customizationIds as $optionId) {
@@ -68,14 +68,14 @@ class CheckoutController extends Controller
             }
             
             $cartItems[] = [
-                'key' => $service->saved_service_id,
-                'product' => $product,
-                'product_id' => $service->product_id,
-                'quantity' => $service->quantity,
+                'key' => $savedService->saved_service_id,
+                'service' => $serviceData,
+                'service_id' => $savedService->service_id,
+                'quantity' => $savedService->quantity,
                 'unit_price' => $itemPrice,
                 'total' => $itemTotal,
                 'customizations' => $customizations,
-                'special_instructions' => $service->special_instructions,
+                'special_instructions' => $savedService->special_instructions,
             ];
         }
         
@@ -123,14 +123,14 @@ class CheckoutController extends Controller
             // Process saved services and create order
             $ordersByEnterprise = [];
             
-            foreach ($savedServices as $service) {
-                $product = DB::table('products')->where('product_id', $service->product_id)->first();
-                if (!$product) continue;
+            foreach ($savedServices as $savedService) {
+                $serviceData = DB::table('services')->where('service_id', $savedService->service_id)->first();
+                if (!$serviceData) continue;
                 
-                if (!isset($ordersByEnterprise[$product->enterprise_id])) {
-                    $ordersByEnterprise[$product->enterprise_id] = [];
+                if (!isset($ordersByEnterprise[$serviceData->enterprise_id])) {
+                    $ordersByEnterprise[$serviceData->enterprise_id] = [];
                 }
-                $ordersByEnterprise[$product->enterprise_id][] = $service;
+                $ordersByEnterprise[$serviceData->enterprise_id][] = $savedService;
             }
             
             $createdOrders = [];
@@ -144,18 +144,18 @@ class CheckoutController extends Controller
                 $subtotal = 0;
                 $orderItems = [];
                 
-                foreach ($items as $service) {
-                    $product = DB::table('products')->where('product_id', $service->product_id)->first();
-                    $itemPrice = $service->unit_price;
-                    $itemTotal = $service->total_price;
+                foreach ($items as $savedService) {
+                    $serviceData = DB::table('services')->where('service_id', $savedService->service_id)->first();
+                    $itemPrice = $savedService->unit_price;
+                    $itemTotal = $savedService->total_price;
                     
                     // Get customizations
                     $customizationsData = [];
-                    if ($service->customizations) {
+                    if ($savedService->customizations) {
                         // Check if customizations is already an array (due to model casting)
-                        $customizationIds = is_array($service->customizations) 
-                            ? $service->customizations 
-                            : json_decode($service->customizations, true);
+                        $customizationIds = is_array($savedService->customizations) 
+                            ? $savedService->customizations 
+                            : json_decode($savedService->customizations, true);
                             
                         if (is_array($customizationIds)) {
                             foreach ($customizationIds as $optionId) {
@@ -173,9 +173,9 @@ class CheckoutController extends Controller
                         'item' => [
                             'item_id' => Str::uuid(),
                             'purchase_order_id' => $orderId,
-                            'product_id' => $service->product_id,
-                            'item_description' => $product->product_name,
-                            'quantity' => $service->quantity,
+                            'service_id' => $savedService->service_id,
+                            'item_description' => $serviceData->service_name,
+                            'quantity' => $savedService->quantity,
                             'unit_price' => $itemPrice,
                             'total_cost' => $itemTotal,
                             'created_at' => now(),

@@ -53,9 +53,15 @@ class Enterprise extends Model
         return $this->hasMany(Staff::class, 'enterprise_id', 'enterprise_id');
     }
 
+    public function services()
+    {
+        return $this->hasMany(Service::class, 'enterprise_id', 'enterprise_id');
+    }
+
+    // Backward compatibility alias
     public function products()
     {
-        return $this->hasMany(Product::class, 'enterprise_id', 'enterprise_id');
+        return $this->services();
     }
 
     public function customerOrders()

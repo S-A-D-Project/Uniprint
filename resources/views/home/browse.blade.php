@@ -77,7 +77,7 @@
                     
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <span class="text-muted">
-                            <i class="bi bi-box-seam me-1"></i>{{ $enterprise->products_count }} products
+                            <i class="bi bi-box-seam me-1"></i>{{ $enterprise->services_count }} services
                         </span>
                     </div>
                     

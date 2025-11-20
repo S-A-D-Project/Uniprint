@@ -21,7 +21,7 @@ class AdminController extends Controller
                 'total_customers' => DB::table('users')->where('role_type', 'customer')->count() ?? 0,
                 'total_business_users' => DB::table('users')->where('role_type', 'business_user')->count() ?? 0,
                 'total_enterprises' => DB::table('enterprises')->count() ?? 0,
-                'total_products' => DB::table('products')->count() ?? 0,
+                'total_services' => DB::table('services')->count() ?? 0,
                 'total_orders' => DB::table('customer_orders')->count() ?? 0,
                 'pending_orders' => DB::table('customer_orders')
                     ->leftJoin('order_status_history', 'customer_orders.purchase_order_id', '=', 'order_status_history.purchase_order_id')
@@ -40,7 +40,7 @@ class AdminController extends Controller
                 'total_customers' => 0,
                 'total_business_users' => 0,
                 'total_enterprises' => 0,
-                'total_products' => 0,
+                'total_services' => 0,
                 'total_orders' => 0,
                 'pending_orders' => 0,
                 'total_revenue' => 0,
@@ -149,13 +149,13 @@ class AdminController extends Controller
             // Get enterprises with comprehensive data
             $enterprises = DB::table('enterprises')
                 ->leftJoin('vat_types', 'enterprises.vat_type_id', '=', 'vat_types.vat_type_id')
-                ->leftJoin(DB::raw('(SELECT enterprise_id, COUNT(*) as products_count FROM products GROUP BY enterprise_id) as product_counts'), 'enterprises.enterprise_id', '=', 'product_counts.enterprise_id')
+                ->leftJoin(DB::raw('(SELECT enterprise_id, COUNT(*) as services_count FROM services GROUP BY enterprise_id) as service_counts'), 'enterprises.enterprise_id', '=', 'service_counts.enterprise_id')
                 ->leftJoin(DB::raw('(SELECT enterprise_id, COUNT(*) as orders_count, SUM(COALESCE(total_order_amount, 0)) as total_revenue FROM customer_orders GROUP BY enterprise_id) as order_stats'), 'enterprises.enterprise_id', '=', 'order_stats.enterprise_id')
                 ->leftJoin(DB::raw('(SELECT enterprise_id, COUNT(*) as staff_count FROM staff GROUP BY enterprise_id) as staff_counts'), 'enterprises.enterprise_id', '=', 'staff_counts.enterprise_id')
                 ->select(
                     'enterprises.*', 
                     'vat_types.type_name as vat_type',
-                    DB::raw('COALESCE(product_counts.products_count, 0) as products_count'),
+                    DB::raw('COALESCE(service_counts.services_count, 0) as services_count'),
                     DB::raw('COALESCE(order_stats.orders_count, 0) as orders_count'),
                     DB::raw('COALESCE(order_stats.total_revenue, 0) as total_revenue'),
                     DB::raw('COALESCE(staff_counts.staff_count, 0) as staff_count')
@@ -167,14 +167,14 @@ class AdminController extends Controller
             $stats = [
                 'total_enterprises' => DB::table('enterprises')->count(),
                 'active_enterprises' => DB::table('enterprises')->count(), // All are active for now
-                'total_products' => DB::table('products')->count(),
+                'total_services' => DB::table('services')->count(),
                 'total_orders' => DB::table('customer_orders')->count(),
                 'total_revenue' => DB::table('customer_orders')->sum('total_order_amount') ?? 0,
-                'avg_products_per_enterprise' => DB::table('enterprises')
-                    ->leftJoin('products', 'enterprises.enterprise_id', '=', 'products.enterprise_id')
-                    ->selectRaw('AVG(COALESCE(product_count, 0)) as avg_products')
-                    ->from(DB::raw('(SELECT enterprises.enterprise_id, COUNT(products.product_id) as product_count FROM enterprises LEFT JOIN products ON enterprises.enterprise_id = products.enterprise_id GROUP BY enterprises.enterprise_id) as subquery'))
-                    ->value('avg_products') ?? 0
+                'avg_services_per_enterprise' => DB::table('enterprises')
+                    ->leftJoin('services', 'enterprises.enterprise_id', '=', 'services.enterprise_id')
+                    ->selectRaw('AVG(COALESCE(service_count, 0)) as avg_services')
+                    ->from(DB::raw('(SELECT enterprises.enterprise_id, COUNT(services.service_id) as service_count FROM enterprises LEFT JOIN services ON enterprises.enterprise_id = services.enterprise_id GROUP BY enterprises.enterprise_id) as subquery'))
+                    ->value('avg_services') ?? 0
             ];
 
             // Get recent activity
@@ -192,10 +192,10 @@ class AdminController extends Controller
             $stats = [
                 'total_enterprises' => 0,
                 'active_enterprises' => 0,
-                'total_products' => 0,
+                'total_services' => 0,
                 'total_orders' => 0,
                 'total_revenue' => 0,
-                'avg_products_per_enterprise' => 0
+                'avg_services_per_enterprise' => 0
             ];
             $recent_orders = collect();
         }
@@ -229,25 +229,31 @@ class AdminController extends Controller
         return view('admin.orders', compact('orders'));
     }
 
-    public function products()
+    public function services()
     {
         try {
-            $products = DB::table('products')
-                ->join('enterprises', 'products.enterprise_id', '=', 'enterprises.enterprise_id')
+            $services = DB::table('services')
+                ->join('enterprises', 'services.enterprise_id', '=', 'enterprises.enterprise_id')
                 ->select(
-                    'products.*', 
+                    'services.*', 
                     'enterprises.name as enterprise_name',
-                    DB::raw('COALESCE(products.base_price, 0) as base_price'),
-                    DB::raw('COALESCE(products.is_available, true) as is_available'),
-                    DB::raw('COALESCE(products.description_text, \'\') as description_text')
+                    DB::raw('COALESCE(services.base_price, 0) as base_price'),
+                    DB::raw('COALESCE(services.is_available, true) as is_available'),
+                    DB::raw('COALESCE(services.description_text, \'\') as description_text')
                 )
                 ->paginate(20);
         } catch (\Exception $e) {
-            Log::error('Admin Products Query Error: ' . $e->getMessage());
-            $products = new \Illuminate\Pagination\LengthAwarePaginator([], 0, 20);
+            Log::error('Admin Services Query Error: ' . $e->getMessage());
+            $services = new \Illuminate\Pagination\LengthAwarePaginator([], 0, 20);
         }
         
-        return view('admin.products', compact('products'));
+        return view('admin.services', compact('services'));
+    }
+
+    // Backward compatibility
+    public function products()
+    {
+        return $this->services();
     }
 
     public function reports()
@@ -310,7 +316,7 @@ class AdminController extends Controller
                 'total_customers' => DB::table('users')->where('role_type', 'customer')->count() ?? 0,
                 'total_business_users' => DB::table('users')->where('role_type', 'business_user')->count() ?? 0,
                 'total_enterprises' => DB::table('enterprises')->count() ?? 0,
-                'total_products' => DB::table('products')->count() ?? 0,
+                'total_services' => DB::table('services')->count() ?? 0,
                 'total_orders' => DB::table('customer_orders')->count() ?? 0,
                 'pending_orders' => DB::table('customer_orders')
                     ->leftJoin('order_status_history', 'customer_orders.purchase_order_id', '=', 'order_status_history.purchase_order_id')
@@ -347,10 +353,10 @@ class AdminController extends Controller
             $stats = [
                 'total_enterprises' => DB::table('enterprises')->count(),
                 'active_enterprises' => DB::table('enterprises')->count(),
-                'total_products' => DB::table('products')->count(),
+                'total_services' => DB::table('services')->count(),
                 'total_orders' => DB::table('customer_orders')->count(),
                 'total_revenue' => DB::table('customer_orders')->sum('total_order_amount') ?? 0,
-                'avg_products_per_enterprise' => round(DB::table('products')->count() / max(DB::table('enterprises')->count(), 1), 1),
+                'avg_services_per_enterprise' => round(DB::table('services')->count() / max(DB::table('enterprises')->count(), 1), 1),
                 'last_updated' => now()->format('H:i:s')
             ];
 

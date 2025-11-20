@@ -2,10 +2,10 @@
 
 namespace App\Providers;
 
-use App\Models\Product;
+use App\Models\Service;
 use App\Models\CustomerOrder;
 use App\Models\Enterprise;
-use App\Policies\ProductPolicy;
+use App\Policies\ServicePolicy;
 use App\Policies\OrderPolicy;
 use App\Policies\EnterprisePolicy;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
@@ -19,7 +19,7 @@ class AuthServiceProvider extends ServiceProvider
      * @var array<class-string, class-string>
      */
     protected $policies = [
-        Product::class => ProductPolicy::class,
+        Service::class => ServicePolicy::class,
         CustomerOrder::class => OrderPolicy::class,
         Enterprise::class => EnterprisePolicy::class,
     ];
@@ -47,7 +47,7 @@ class AuthServiceProvider extends ServiceProvider
             return in_array($user->role_type, ['admin', 'business_user']);
         });
 
-        Gate::define('manage-products', function ($user) {
+        Gate::define('manage-services', function ($user) {
             return in_array($user->role_type, ['admin', 'business_user']);
         });
 

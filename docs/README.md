@@ -10,7 +10,7 @@ Welcome to the UniPrint documentation! This directory contains comprehensive gui
 - **[Installation Guide](../INSTALLATION.md)** - Detailed platform-specific installation
 
 ### Configuration
-- **[Database Configuration](DATABASE_CONFIGURATION.md)** - PostgreSQL, MySQL, and SQLite setup
+- **[Database Configuration](DATABASE_CONFIGURATION.md)** - PostgreSQL and MySQL setup
 - **[Environment Configuration](../README.md#configuration)** - .env file setup
 
 ### Deployment
@@ -71,9 +71,8 @@ php artisan optimize:clear
 ### Database
 1. [PostgreSQL Setup](DATABASE_CONFIGURATION.md#postgresql-setup)
 2. [MySQL Setup](DATABASE_CONFIGURATION.md#mysql-setup)
-3. [SQLite Setup](DATABASE_CONFIGURATION.md#sqlite-setup)
-4. [Migration & Seeding](DATABASE_CONFIGURATION.md#migration-and-seeding)
-5. [Backup & Restore](DATABASE_CONFIGURATION.md#backup-and-restore)
+3. [Migration & Seeding](DATABASE_CONFIGURATION.md#migration-and-seeding)
+4. [Backup & Restore](DATABASE_CONFIGURATION.md#backup-and-restore)
 
 ### Deployment
 1. [Pre-Deployment Checklist](../DEPLOYMENT_CHECKLIST.md#pre-deployment)
@@ -160,7 +159,7 @@ npm run build
 A: PHP 8.2+, Composer 2.0+, Node.js 18+, PostgreSQL 14+ or MySQL 8.0+, 512MB RAM, 500MB disk space.
 
 **Q: Which database should I use?**
-A: PostgreSQL 14+ is recommended for production. MySQL 8.0+ is also fully supported. SQLite is for development only.
+A: PostgreSQL 14+ is recommended for production. MySQL 8.0+ is also fully supported.
 
 **Q: Do I need Laravel Herd?**
 A: No! UniPrint is fully portable and doesn't require Laravel Herd or any platform-specific tools.

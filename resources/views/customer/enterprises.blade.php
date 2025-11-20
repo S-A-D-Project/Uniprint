@@ -57,7 +57,7 @@
 
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <span class="badge bg-light text-dark">
-                        <i class="bi bi-box me-1"></i>{{ $enterprise->products_count }} Products
+                        <i class="bi bi-box me-1"></i>{{ $enterprise->services_count }} Services
                     </span>
                     <span class="badge bg-success">Active</span>
                 </div>
