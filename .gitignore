@@ -1,0 +1,86 @@
+# Laravel specific
+/vendor/
+/node_modules/
+/public/build
+/public/hot
+/public/storage
+/storage/*.key
+/storage/pail
+/.env.backup
+/.env.production
+.phpunit.result.cache
+Homestead.json
+Homestead.yaml
+auth.json
+npm-debug.log
+yarn-error.log
+
+# IDE specific
+/.idea
+/.vscode
+/.fleet
+/.nova
+/.zed
+.phpactor.json
+*.swp
+*.swo
+*~
+
+# OS specific
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+/storage/logs/*.log
+
+# Build artifacts
+/public/css/
+/public/js/
+/public/mix-manifest.json
+
+# Testing
+/.phpunit.cache
+/coverage/
+.phpunit.result.cache
+
+# Temporary files
+*.tmp
+*.temp
+*.cache
+
+# Database
+*.sqlite
+*.sqlite-journal
+/database/*.sqlite
+
+# Backup files
+*.bak
+*.backup
+
+# Compiled files
+*.compiled
+
+# Package files (keep package.json and composer.json)
+package-lock.json
+composer.lock
+
+# Environment-specific
+.env.local
+.env.*.local
+
+# Deployment
+/deploy.php
+/.deployer/
+
+# Documentation build
+/docs/_build/
+
+# Keep empty directories
+!storage/app/.gitkeep
+!storage/framework/.gitkeep
+!storage/framework/cache/.gitkeep
+!storage/framework/sessions/.gitkeep
+!storage/framework/views/.gitkeep
+!storage/logs/.gitkeep
