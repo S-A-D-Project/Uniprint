@@ -57,10 +57,14 @@ class SavedServiceController extends Controller
             $userId = session('user_id');
             
             if (!$userId) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Please login to save services'
-                ], 401);
+                if ($request->expectsJson()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Please login to save services'
+                    ], 401);
+                }
+
+                return redirect()->route('login')->with('error', 'Please login to save services');
             }
             
             // Save service
@@ -74,20 +78,28 @@ class SavedServiceController extends Controller
             
             // Get updated count
             $count = SavedService::getServicesCount($userId);
-            
-            return response()->json([
-                'success' => true,
-                'message' => 'Service saved successfully!',
-                'saved_service_id' => $savedService->saved_service_id,
-                'count' => $count,
-                'total_amount' => SavedService::getTotalAmount($userId)
-            ]);
+
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Service saved successfully!',
+                    'saved_service_id' => $savedService->saved_service_id,
+                    'count' => $count,
+                    'total_amount' => SavedService::getTotalAmount($userId)
+                ]);
+            }
+
+            return redirect()->back()->with('success', 'Service saved successfully!');
             
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to save service: ' . $e->getMessage()
-            ], 500);
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to save service: ' . $e->getMessage()
+                ], 500);
+            }
+
+            return redirect()->back()->with('error', 'Failed to save service. Please try again.');
         }
     }
     

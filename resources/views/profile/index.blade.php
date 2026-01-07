@@ -4,6 +4,8 @@
 
 @section('content')
 
+ <div class="container py-10">
+
 <!-- Page Header -->
 <div class="mb-8">
     <div class="flex items-center gap-3 mb-2">
@@ -124,155 +126,217 @@
             </form>
         </div>
 
+        <!-- Connected Accounts -->
+        <div class="bg-white rounded-lg shadow-sm p-6 mb-6">
+            <div class="flex items-center gap-2 mb-6">
+                <i data-lucide="link" class="h-5 w-5 text-primary"></i>
+                <h3 class="text-lg font-semibold text-gray-900">Connected Accounts</h3>
+            </div>
+
+            @php
+                $providers = $linkedProviders ?? collect();
+                $facebookConnected = $providers->contains('facebook');
+            @endphp
+
+            <div class="space-y-4">
+                <div class="flex items-center justify-between border border-gray-200 rounded-lg p-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                            <i data-lucide="facebook" class="h-5 w-5 text-blue-600"></i>
+                        </div>
+                        <div>
+                            <div class="font-semibold text-gray-900">Facebook</div>
+                            <div class="text-sm text-gray-600">
+                                {{ $facebookConnected ? 'Connected' : 'Not connected' }}
+                            </div>
+                        </div>
+                    </div>
+
+                    @if($facebookConnected)
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-success/10 text-success">
+                            Connected
+                        </span>
+                    @else
+                        <a href="{{ route('profile.connect-facebook') }}"
+                           class="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
+                            <i data-lucide="link" class="h-4 w-4"></i>
+                            Connect
+                        </a>
+                    @endif
+                </div>
+            </div>
+        </div>
+
         <!-- Security Settings -->
-        <div class="card mb-4">
-            <div class="card-header bg-white">
-                <h5 class="mb-0">
-                    <i class="bi bi-shield-lock text-primary me-2"></i>
-                    Security Settings
-                </h5>
+        <div class="bg-white rounded-lg shadow-sm p-6 mb-6">
+            <div class="flex items-center gap-2 mb-6">
+                <i data-lucide="shield" class="h-5 w-5 text-primary"></i>
+                <h3 class="text-lg font-semibold text-gray-900">Security Settings</h3>
             </div>
-            <div class="card-body">
-                <form id="password-form">
-                    <div class="row g-3">
-                        <div class="col-md-4">
-                            <label for="current_password" class="form-label">Current Password *</label>
-                            <input type="password" class="form-control" id="current_password" name="current_password" required>
-                        </div>
-                        <div class="col-md-4">
-                            <label for="new_password" class="form-label">New Password *</label>
-                            <input type="password" class="form-control" id="new_password" name="new_password" 
-                                   minlength="8" required>
-                            <div class="form-text">Minimum 8 characters</div>
-                        </div>
-                        <div class="col-md-4">
-                            <label for="new_password_confirmation" class="form-label">Confirm Password *</label>
-                            <input type="password" class="form-control" id="new_password_confirmation" 
-                                   name="new_password_confirmation" minlength="8" required>
-                        </div>
+            <form id="password-form" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label for="current_password" class="block text-sm font-medium text-gray-700 mb-2">Current Password *</label>
+                        <input type="password" id="current_password" name="current_password" required
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors">
                     </div>
-                    <div class="mt-3">
-                        <button type="submit" class="btn btn-warning" id="update-password-btn">
-                            <i class="bi bi-shield-check me-2"></i>Update Password
-                        </button>
+                    <div>
+                        <label for="new_password" class="block text-sm font-medium text-gray-700 mb-2">New Password *</label>
+                        <input type="password" id="new_password" name="new_password" minlength="8" required
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors">
+                        <p class="text-xs text-gray-500 mt-1">Minimum 8 characters</p>
                     </div>
-                </form>
-            </div>
+                    <div>
+                        <label for="new_password_confirmation" class="block text-sm font-medium text-gray-700 mb-2">Confirm Password *</label>
+                        <input type="password" id="new_password_confirmation" name="new_password_confirmation" minlength="8" required
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors">
+                    </div>
+                </div>
+                <div class="pt-2">
+                    <button type="submit" id="update-password-btn"
+                            class="inline-flex items-center gap-2 px-6 py-3 bg-warning text-warning-foreground font-medium rounded-lg hover:opacity-90 transition-colors">
+                        <i data-lucide="shield-check" class="h-4 w-4"></i>
+                        Update Password
+                    </button>
+                </div>
+            </form>
         </div>
 
         <!-- Recent Orders -->
-        <div class="card">
-            <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">
-                    <i class="bi bi-clock-history text-primary me-2"></i>
-                    Recent Orders
-                </h5>
-                <a href="{{ route('customer.orders') }}" class="btn btn-sm btn-outline-primary">View All</a>
-            </div>
-            <div class="card-body">
-                @if($recentOrders->count() > 0)
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
-                                <tr>
-                                    <th>Order #</th>
-                                    <th>Enterprise</th>
-                                    <th>Total</th>
-                                    <th>Status</th>
-                                    <th>Date</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach($recentOrders as $order)
-                                <tr>
-                                    <td><strong>#{{ $order->order_no ?? substr($order->purchase_order_id, 0, 8) }}</strong></td>
-                                    <td>{{ $order->enterprise_name }}</td>
-                                    <td class="text-primary">₱{{ number_format($order->total, 2) }}</td>
-                                    <td>
-                                        <span class="badge bg-info">{{ $order->status_name ?? 'Pending' }}</span>
-                                    </td>
-                                    <td>{{ \Carbon\Carbon::parse($order->created_at)->format('M d, Y') }}</td>
-                                </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                @else
-                    <div class="text-center py-4">
-                        <i class="bi bi-cart-x text-muted" style="font-size: 2rem;"></i>
-                        <p class="text-muted mt-2">No orders yet</p>
-                        <a href="{{ route('customer.enterprises') }}" class="btn btn-primary btn-sm">
-                            Start Shopping
-                        </a>
-                    </div>
-                @endif
-            </div>
-        </div>
-    </div>
-</div>
-@else
-<div class="text-center py-5">
-    <i class="bi bi-person-x text-muted" style="font-size: 4rem;"></i>
-    <h4 class="mt-3 mb-2">Profile Not Found</h4>
-    <p class="text-muted mb-4">Please login to view your profile</p>
-    <a href="{{ route('login') }}" class="btn btn-primary">
-        <i class="bi bi-box-arrow-in-right me-2"></i>Login
-    </a>
-</div>
-@endif
-
-<!-- Delete Account Modal -->
-<div class="modal fade" id="deleteAccountModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title text-danger">
-                    <i class="bi bi-exclamation-triangle me-2"></i>Delete Account
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="alert alert-danger">
-                    <strong>Warning:</strong> This action cannot be undone. Deleting your account will:
+        <div class="bg-white rounded-lg shadow-sm p-6 mb-6">
+            <div class="flex items-center justify-between gap-3 mb-6">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="clock" class="h-5 w-5 text-primary"></i>
+                    <h3 class="text-lg font-semibold text-gray-900">Recent Orders</h3>
                 </div>
-                <ul>
+                <a href="{{ route('customer.orders') }}"
+                   class="inline-flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg hover:bg-muted/40 transition-colors">
+                    <i data-lucide="arrow-right" class="h-4 w-4"></i>
+                    View All
+                </a>
+            </div>
+
+            @if($recentOrders->count() > 0)
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-sm">
+                        <thead class="text-left text-gray-600 border-b border-gray-200">
+                            <tr>
+                                <th class="py-3 pr-4">Order #</th>
+                                <th class="py-3 pr-4">Enterprise</th>
+                                <th class="py-3 pr-4">Total</th>
+                                <th class="py-3 pr-4">Status</th>
+                                <th class="py-3">Date</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            @foreach($recentOrders as $order)
+                                <tr class="hover:bg-muted/30 transition-colors">
+                                    <td class="py-3 pr-4 font-semibold text-gray-900">#{{ $order->order_no ?? substr($order->purchase_order_id, 0, 8) }}</td>
+                                    <td class="py-3 pr-4 text-gray-700">{{ $order->enterprise_name }}</td>
+                                    <td class="py-3 pr-4 font-semibold text-primary">₱{{ number_format($order->total, 2) }}</td>
+                                    <td class="py-3 pr-4">
+                                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-secondary text-secondary-foreground">
+                                            {{ $order->status_name ?? 'Pending' }}
+                                        </span>
+                                    </td>
+                                    <td class="py-3 text-gray-600">{{ \Carbon\Carbon::parse($order->created_at)->format('M d, Y') }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @else
+                <div class="text-center py-8">
+                    <div class="mx-auto w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                        <i data-lucide="shopping-cart" class="h-6 w-6 text-muted-foreground"></i>
+                    </div>
+                    <p class="text-gray-600 mt-3">No orders yet</p>
+                    <a href="{{ route('customer.enterprises') }}"
+                       class="inline-flex items-center gap-2 mt-4 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
+                        <i data-lucide="sparkles" class="h-4 w-4"></i>
+                        Start Shopping
+                    </a>
+                </div>
+            @endif
+        </div>
+
+        <!-- Delete Account -->
+        <div class="bg-white rounded-lg shadow-sm p-6">
+            <div class="flex items-center gap-2 mb-4">
+                <i data-lucide="triangle-alert" class="h-5 w-5 text-destructive"></i>
+                <h3 class="text-lg font-semibold text-gray-900">Delete Account</h3>
+            </div>
+            <div class="p-4 rounded-lg border border-destructive/20 bg-destructive/5">
+                <p class="text-sm text-gray-700">
+                    <span class="font-semibold text-destructive">Warning:</span>
+                    This action cannot be undone.
+                </p>
+                <ul class="list-disc pl-5 mt-3 space-y-1 text-sm text-gray-700">
                     <li>Permanently delete your profile information</li>
                     <li>Remove access to your order history</li>
                     <li>Delete all saved designs and files</li>
                     <li>Cancel any pending orders</li>
                 </ul>
-                <form id="delete-account-form">
-                    <div class="mb-3">
-                        <label for="delete_password" class="form-label">Enter your password to confirm</label>
-                        <input type="password" class="form-control" id="delete_password" name="password" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="delete_confirmation" class="form-label">Type "DELETE" to confirm</label>
-                        <input type="text" class="form-control" id="delete_confirmation" name="confirmation" required>
-                    </div>
-                </form>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-danger" id="confirm-delete-btn">
-                    <i class="bi bi-trash me-2"></i>Delete Account
-                </button>
-            </div>
+            <form id="delete-account-form" class="mt-4 space-y-4">
+                <div>
+                    <label for="delete_password" class="block text-sm font-medium text-gray-700 mb-2">Enter your password to confirm</label>
+                    <input type="password" id="delete_password" name="password" required
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-destructive focus:border-transparent transition-colors">
+                </div>
+                <div>
+                    <label for="delete_confirmation" class="block text-sm font-medium text-gray-700 mb-2">Type "DELETE" to confirm</label>
+                    <input type="text" id="delete_confirmation" name="confirmation" required
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-destructive focus:border-transparent transition-colors">
+                </div>
+                <div class="pt-2">
+                    <button type="button" id="confirm-delete-btn"
+                            class="inline-flex items-center gap-2 px-6 py-3 bg-destructive text-destructive-foreground font-medium rounded-lg hover:opacity-90 transition-colors">
+                        <i data-lucide="trash" class="h-4 w-4"></i>
+                        Delete Account
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
+@else
+ <div class="max-w-lg mx-auto py-16">
+     <div class="bg-white rounded-lg shadow-sm p-8 text-center">
+         <div class="mx-auto w-14 h-14 rounded-full bg-muted flex items-center justify-center">
+             <i data-lucide="user-x" class="h-7 w-7 text-muted-foreground"></i>
+         </div>
+         <h2 class="text-xl font-bold text-gray-900 mt-4">Couldn’t load your account settings</h2>
+         <p class="text-gray-600 mt-2">Please refresh the page. If this keeps happening, your session may have expired.</p>
+         <div class="mt-6 flex items-center justify-center gap-3">
+             <a href="{{ route('profile.index') }}"
+                class="inline-flex items-center gap-2 px-5 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
+                 <i data-lucide="refresh-cw" class="h-4 w-4"></i>
+                 Refresh
+             </a>
+             <a href="{{ route('home') }}"
+                class="inline-flex items-center gap-2 px-5 py-3 border border-gray-200 rounded-lg hover:bg-muted/40 transition-colors">
+                 <i data-lucide="home" class="h-4 w-4"></i>
+                 Home
+             </a>
+         </div>
+     </div>
+ </div>
+@endif
+ </div>
 @endsection
 
 @push('scripts')
 <script>
 // Update profile
-document.getElementById('profile-form').addEventListener('submit', async function(e) {
+const profileForm = document.getElementById('profile-form');
+if (profileForm) profileForm.addEventListener('submit', async function(e) {
     e.preventDefault();
     
     const btn = document.getElementById('save-profile-btn');
-    const originalText = btn.innerHTML;
+    const originalText = btn ? btn.innerHTML : '';
     btn.disabled = true;
-    btn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Saving...';
+    btn.innerHTML = 'Saving...';
     
     try {
         const formData = new FormData(this);
@@ -282,6 +346,7 @@ document.getElementById('profile-form').addEventListener('submit', async functio
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Accept': 'application/json',
                 'X-CSRF-TOKEN': '{{ csrf_token() }}'
             },
             body: JSON.stringify(data)
@@ -304,13 +369,14 @@ document.getElementById('profile-form').addEventListener('submit', async functio
 });
 
 // Update password
-document.getElementById('password-form').addEventListener('submit', async function(e) {
+const passwordForm = document.getElementById('password-form');
+if (passwordForm) passwordForm.addEventListener('submit', async function(e) {
     e.preventDefault();
     
     const btn = document.getElementById('update-password-btn');
-    const originalText = btn.innerHTML;
+    const originalText = btn ? btn.innerHTML : '';
     btn.disabled = true;
-    btn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Updating...';
+    btn.innerHTML = 'Updating...';
     
     try {
         const formData = new FormData(this);
@@ -320,6 +386,7 @@ document.getElementById('password-form').addEventListener('submit', async functi
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Accept': 'application/json',
                 'X-CSRF-TOKEN': '{{ csrf_token() }}'
             },
             body: JSON.stringify(data)
@@ -343,7 +410,8 @@ document.getElementById('password-form').addEventListener('submit', async functi
 });
 
 // Upload profile picture
-document.getElementById('profile-picture-input').addEventListener('change', async function(e) {
+const profilePictureInput = document.getElementById('profile-picture-input');
+if (profilePictureInput) profilePictureInput.addEventListener('change', async function(e) {
     const file = e.target.files[0];
     if (!file) return;
     
@@ -359,6 +427,7 @@ document.getElementById('profile-picture-input').addEventListener('change', asyn
         const response = await fetch('{{ route("profile.upload-picture") }}', {
             method: 'POST',
             headers: {
+                'Accept': 'application/json',
                 'X-CSRF-TOKEN': '{{ csrf_token() }}'
             },
             body: formData
@@ -380,7 +449,8 @@ document.getElementById('profile-picture-input').addEventListener('change', asyn
 });
 
 // Delete account
-document.getElementById('confirm-delete-btn').addEventListener('click', async function() {
+const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
+if (confirmDeleteBtn) confirmDeleteBtn.addEventListener('click', async function() {
     const password = document.getElementById('delete_password').value;
     const confirmation = document.getElementById('delete_confirmation').value;
     
@@ -391,13 +461,14 @@ document.getElementById('confirm-delete-btn').addEventListener('click', async fu
     
     const btn = this;
     btn.disabled = true;
-    btn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Deleting...';
+    btn.innerHTML = 'Deleting...';
     
     try {
         const response = await fetch('{{ route("profile.delete") }}', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Accept': 'application/json',
                 'X-CSRF-TOKEN': '{{ csrf_token() }}'
             },
             body: JSON.stringify({ password, confirmation })
@@ -418,34 +489,51 @@ document.getElementById('confirm-delete-btn').addEventListener('click', async fu
         showToast('Network error. Please try again.', 'error');
     } finally {
         btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-trash me-2"></i>Delete Account';
+        btn.innerHTML = 'Delete Account';
     }
 });
 
 // Toast notification helper
 function showToast(message, type = 'info') {
-    const toastHtml = `
-        <div class="toast align-items-center text-white bg-${type === 'error' ? 'danger' : type === 'warning' ? 'warning' : 'success'} border-0" role="alert">
-            <div class="d-flex">
-                <div class="toast-body">
-                    ${message}
-                </div>
-                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-            </div>
+    const colors = {
+        success: { bg: 'bg-success', text: 'text-success-foreground' },
+        warning: { bg: 'bg-warning', text: 'text-warning-foreground' },
+        error: { bg: 'bg-destructive', text: 'text-destructive-foreground' },
+        info: { bg: 'bg-secondary', text: 'text-secondary-foreground' },
+    };
+
+    const c = colors[type] || colors.info;
+
+    const wrap = document.createElement('div');
+    wrap.className = `fixed bottom-4 right-4 z-50 max-w-sm w-[calc(100vw-2rem)] p-4 rounded-lg shadow-card-hover ${c.bg} ${c.text}`;
+
+    wrap.innerHTML = `
+        <div class="flex items-start gap-3">
+            <div class="flex-1 text-sm">${escapeHtml(message)}</div>
+            <button type="button" class="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-white/10 transition" aria-label="Close">
+                <i data-lucide="x" class="h-4 w-4"></i>
+            </button>
         </div>
     `;
-    
-    const toastContainer = document.createElement('div');
-    toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
-    toastContainer.innerHTML = toastHtml;
-    document.body.appendChild(toastContainer);
-    
-    const toast = new bootstrap.Toast(toastContainer.querySelector('.toast'));
-    toast.show();
-    
+
+    const btn = wrap.querySelector('button');
+    btn.addEventListener('click', () => wrap.remove());
+
+    document.body.appendChild(wrap);
+    try { lucide.createIcons(); } catch (_) {}
+
     setTimeout(() => {
-        document.body.removeChild(toastContainer);
+        wrap.remove();
     }, 5000);
+}
+
+function escapeHtml(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
 }
 </script>
 @endpush

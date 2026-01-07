@@ -125,7 +125,7 @@ use Illuminate\Support\Facades\DB;
                                             <div class="flex-1">
                                                 <span class="font-medium text-gray-900">{{ $item->quantity }}x {{ $item->product_name ?? 'Unknown Product' }}</span>
                                             </div>
-                                            <span class="font-medium text-gray-900">₱{{ number_format($item->item_subtotal ?? $item->quantity * ($item->item_price ?? 0), 2) }}</span>
+                                            <span class="font-medium text-gray-900">₱{{ number_format($item->total_cost ?? ($item->quantity * ($item->unit_price ?? 0)), 2) }}</span>
                                         </div>
                                         
                                         @php

@@ -36,8 +36,6 @@ desktop.ini
 /storage/logs/*.log
 
 # Build artifacts
-/public/css/
-/public/js/
 /public/mix-manifest.json
 
 # Testing

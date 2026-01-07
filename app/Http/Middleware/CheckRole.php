@@ -14,6 +14,9 @@ class CheckRole
         $userId = session('user_id');
 
         if (!$userId) {
+            if ($request->is('admin') || $request->is('admin/*')) {
+                return redirect()->route('admin.login');
+            }
             return redirect()->route('login');
         }
 

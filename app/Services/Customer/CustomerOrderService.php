@@ -184,7 +184,7 @@ class CustomerOrderService
                 'enterprise_id' => $orderData['enterprise_id'],
                 'purpose' => $orderData['purpose'],
                 'order_no' => $orderNo,
-                'date_requested' => Carbon::now(),
+                'date_requested' => Carbon::now()->toDateString(),
                 'delivery_date' => $orderData['delivery_date'],
                 'shipping_fee' => $shippingFee,
                 'discount' => $discount,
@@ -266,12 +266,12 @@ class CustomerOrderService
 
             // Add status history
             DB::table('order_status_history')->insert([
-                'history_id' => \Illuminate\Support\Str::uuid()->toString(),
+                'approval_id' => \Illuminate\Support\Str::uuid()->toString(),
                 'purchase_order_id' => $orderId,
                 'status_id' => $cancelledStatusId,
                 'timestamp' => Carbon::now(),
                 'user_id' => $userId,
-                'notes' => $reason ?: 'Cancelled by customer',
+                'remarks' => $reason ?: 'Cancelled by customer',
                 'created_at' => Carbon::now(),
                 'updated_at' => Carbon::now(),
             ]);
@@ -321,7 +321,7 @@ class CustomerOrderService
                 ->where('order_item_customizations.order_item_id', $item->item_id)
                 ->select(
                     'customization_options.option_name',
-                    'customization_options.option_value',
+                    'customization_options.option_type',
                     'order_item_customizations.price_snapshot'
                 )
                 ->get();
@@ -378,7 +378,7 @@ class CustomerOrderService
     {
         return DB::table('transactions')
             ->where('purchase_order_id', $orderId)
-            ->orderBy('transaction_timestamp', 'desc')
+            ->orderBy('transaction_date', 'desc')
             ->get();
     }
 

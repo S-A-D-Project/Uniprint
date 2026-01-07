@@ -9,7 +9,7 @@
                 <span class="text-xl font-bold gradient-primary bg-clip-text text-transparent">
                     UniPrint
                 </span>
-                <p class="text-xs text-muted-foreground">Smart Printing Services</p>
+                <p class="text-xs text-foreground/70">Smart Printing Services</p>
             </div>
         </a>
 

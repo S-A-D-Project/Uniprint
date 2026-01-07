@@ -20,6 +20,33 @@ class ChatController extends Controller
         $this->pusherService = $pusherService;
     }
 
+    private function getUserRoleType(string $userId): ?string
+    {
+        $roleRow = DB::table('roles')
+            ->join('role_types', 'roles.role_type_id', '=', 'role_types.role_type_id')
+            ->where('roles.user_id', $userId)
+            ->select('role_types.user_role_type')
+            ->first();
+
+        return $roleRow?->user_role_type;
+    }
+
+    private function getUsersByRoleType(string $roleType, array $excludeUserIds = [])
+    {
+        $query = DB::table('users')
+            ->join('roles', 'users.user_id', '=', 'roles.user_id')
+            ->join('role_types', 'roles.role_type_id', '=', 'role_types.role_type_id')
+            ->where('role_types.user_role_type', $roleType)
+            ->select('users.user_id', 'users.name', 'users.email', 'users.created_at')
+            ->orderBy('users.name');
+
+        if (!empty($excludeUserIds)) {
+            $query->whereNotIn('users.user_id', $excludeUserIds);
+        }
+
+        return $query->get();
+    }
+
     /**
      * Display chat interface
      */
@@ -36,13 +63,9 @@ class ChatController extends Controller
         
         // Get available businesses if user is a customer
         $availableBusinesses = collect();
-        if ($user->role_type === 'customer') {
+        if ($this->getUserRoleType($user->user_id) === 'customer') {
             $existingBusinessIds = $conversations->pluck('business_id')->toArray();
-            $availableBusinesses = User::where('role_type', 'business_user')
-                ->whereNotIn('user_id', $existingBusinessIds)
-                ->select('user_id', 'name', 'email')
-                ->orderBy('name')
-                ->get();
+            $availableBusinesses = $this->getUsersByRoleType('business_user', $existingBusinessIds);
         }
         
         return view('chat.index', compact('conversations', 'availableBusinesses'));
@@ -90,7 +113,7 @@ class ChatController extends Controller
         $businessId = $request->business_id;
         
         // Only customers can initiate conversations
-        if ($currentUser->role_type !== 'customer') {
+        if ($this->getUserRoleType($currentUser->user_id) !== 'customer') {
             return response()->json([
                 'error' => 'Only customers can initiate conversations',
                 'message' => 'Chat conversations must be started by customers.'
@@ -99,7 +122,7 @@ class ChatController extends Controller
 
         // Verify the target user is a business
         $business = User::findOrFail($businessId);
-        if ($business->role_type !== 'business_user') {
+        if ($this->getUserRoleType($business->user_id) !== 'business_user') {
             return response()->json([
                 'error' => 'Invalid business user',
                 'message' => 'You can only start conversations with business representatives.'
@@ -139,7 +162,7 @@ class ChatController extends Controller
             ->findOrFail($conversationId);
 
         // Check if user is participant
-        $userId = Auth::id();
+        $userId = Auth::user()->user_id;
         if ($conversation->customer_id !== $userId && $conversation->business_id !== $userId) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
@@ -169,7 +192,7 @@ class ChatController extends Controller
         $conversation = Conversation::findOrFail($conversationId);
 
         // Check if user is participant
-        $userId = Auth::id();
+        $userId = Auth::user()->user_id;
         if ($conversation->customer_id !== $userId && $conversation->business_id !== $userId) {
             return response()->json(['error' => 'Unauthorized access to conversation'], 403);
         }
@@ -197,20 +220,18 @@ class ChatController extends Controller
      */
     public function sendMessage(Request $request)
     {
-        $request->validate([
-            'conversation_id' => 'required|string',
-            'message_text' => 'required|string|max:1000',
-            'message_type' => 'nullable|in:text,image,file,system',
-            'sender_id' => 'required|string',
-            'sender_name' => 'required|string',
-            'message_id' => 'required|string',
-            'timestamp' => 'required|string'
-        ]);
-
-        $user = Auth::user();
-        
         // Check if this is the direct chat (no database)
-        if ($request->conversation_id === 'sarah-business-direct-chat') {
+        if ($request->input('conversation_id') === 'sarah-business-direct-chat') {
+            $request->validate([
+                'conversation_id' => 'required|string',
+                'message_text' => 'required|string|max:1000',
+                'message_type' => 'nullable|in:text,image,file,system',
+                'sender_id' => 'required|string',
+                'sender_name' => 'required|string',
+                'message_id' => 'required|string',
+                'timestamp' => 'required|string'
+            ]);
+
             try {
                 // Broadcast message via Pusher for direct chat
                 $messageData = [
@@ -248,9 +269,15 @@ class ChatController extends Controller
             }
         }
 
+        $request->validate([
+            'conversation_id' => 'required|uuid|exists:conversations,conversation_id',
+            'message_text' => 'required|string|max:1000',
+            'message_type' => 'nullable|in:text,image,file,system',
+        ]);
+
         // Original database-backed conversation logic
         $conversation = Conversation::findOrFail($request->conversation_id);
-        $userId = Auth::id();
+        $userId = Auth::user()->user_id;
 
         // Check if user is participant
         if ($conversation->customer_id !== $userId && $conversation->business_id !== $userId) {
@@ -292,7 +319,7 @@ class ChatController extends Controller
         ]);
 
         $conversation = Conversation::findOrFail($request->conversation_id);
-        $userId = Auth::id();
+        $userId = Auth::user()->user_id;
 
         // Check if user is participant
         if ($conversation->customer_id !== $userId && $conversation->business_id !== $userId) {
@@ -338,7 +365,7 @@ class ChatController extends Controller
             'status' => 'required|in:online,away,offline'
         ]);
 
-        $userId = Auth::id();
+        $userId = Auth::user()->user_id;
         
         OnlineUser::updateOrCreate(
             ['user_id' => $userId],
@@ -395,7 +422,7 @@ class ChatController extends Controller
             'is_typing' => 'required|boolean'
         ]);
 
-        $userId = Auth::id();
+        $userId = Auth::user()->user_id;
         $userName = Auth::user()->name;
 
         // Broadcast typing indicator via Pusher
@@ -418,6 +445,7 @@ class ChatController extends Controller
     {
         $user = Auth::user();
         $userId = $user->user_id;
+        $currentRole = $this->getUserRoleType($userId);
         
         $conversations = Conversation::where('customer_id', $userId)
             ->orWhere('business_id', $userId)
@@ -431,21 +459,21 @@ class ChatController extends Controller
                     'participant' => [
                         'user_id' => $otherParticipant->user_id,
                         'name' => $otherParticipant->name,
-                        'role' => $otherParticipant->role_type,
+                        'role' => $this->getUserRoleType($otherParticipant->user_id),
                     ],
                     'last_message' => $conversation->lastMessage,
                     'unread_count' => $conversation->unreadCount($userId),
                     'last_message_at' => $conversation->last_message_at,
                     'initiated_by' => $conversation->initiated_by ?? 'customer',
-                    'can_initiate' => $user->role_type === 'customer'
+                    'can_initiate' => $this->getUserRoleType($userId) === 'customer'
                 ];
             });
 
         return response()->json([
             'success' => true,
             'conversations' => $conversations,
-            'user_role' => $user->role_type,
-            'can_initiate_chat' => $user->role_type === 'customer'
+            'user_role' => $currentRole,
+            'can_initiate_chat' => $currentRole === 'customer'
         ]);
     }
 
@@ -457,7 +485,7 @@ class ChatController extends Controller
         $currentUser = Auth::user();
         
         // Only customers can view available businesses
-        if ($currentUser->role_type !== 'customer') {
+        if ($this->getUserRoleType($currentUser->user_id) !== 'customer') {
             return response()->json([
                 'error' => 'Access denied',
                 'message' => 'Only customers can view available businesses.'
@@ -469,11 +497,7 @@ class ChatController extends Controller
             ->pluck('business_id')
             ->toArray();
 
-        $availableBusinesses = User::where('role_type', 'business_user')
-            ->whereNotIn('user_id', $existingBusinessIds)
-            ->select('user_id', 'name', 'email', 'created_at')
-            ->orderBy('name')
-            ->get();
+        $availableBusinesses = $this->getUsersByRoleType('business_user', $existingBusinessIds);
 
         return response()->json([
             'success' => true,
@@ -516,7 +540,7 @@ class ChatController extends Controller
             // Authorize the channel with user data
             $userData = [
                 'name' => $user->name,
-                'role_type' => $user->role_type,
+                'role_type' => $this->getUserRoleType($user->user_id),
             ];
             
             $auth = $this->pusherService->authorizeChannel($socketId, $channelName, $user->user_id, $userData);
@@ -543,7 +567,7 @@ class ChatController extends Controller
                 'conversation_id' => 'nullable|uuid|exists:conversations,conversation_id'
             ]);
 
-            $userId = Auth::id();
+            $userId = Auth::user()->user_id;
             
             // Update user status to offline
             OnlineUser::where('user_id', $userId)

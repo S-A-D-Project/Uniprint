@@ -15,6 +15,9 @@ class CheckAuth
         $userId = session('user_id');
 
         if (!$userId) {
+            if ($request->is('admin') || $request->is('admin/*')) {
+                return redirect()->route('admin.login')->with('error', 'Please login to continue');
+            }
             return redirect()->route('login')->with('error', 'Please login to continue');
         }
 

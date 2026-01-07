@@ -49,10 +49,17 @@ $breadcrumbs = [
         </div>
 
         <div class="flex items-center gap-2 mt-4 pt-4 border-t border-border">
-            <x-admin.button size="sm" variant="outline" icon="eye" class="flex-1">
+            <x-admin.button size="sm" variant="outline" icon="eye" class="flex-1" href="{{ route('admin.services.details', $service->service_id) }}">
                 View Details
             </x-admin.button>
-            <x-admin.button size="sm" variant="ghost" icon="edit-2" />
+            <form method="POST" action="{{ route('admin.services.toggle-active', $service->service_id) }}">
+                @csrf
+                @if(($service->is_available ?? true))
+                    <x-admin.button size="sm" variant="ghost" icon="x-circle" type="submit" />
+                @else
+                    <x-admin.button size="sm" variant="ghost" icon="check-circle" type="submit" />
+                @endif
+            </form>
         </div>
     </x-admin.card>
     @empty

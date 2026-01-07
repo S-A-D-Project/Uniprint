@@ -1,4 +1,4 @@
-@extends('layouts.enhanced-layout')
+@extends('layouts.business')
 
 @section('title', 'Create Service')
 @section('page-title', 'Create New Service')
@@ -18,7 +18,7 @@
         <span>Orders</span>
     </a>
     <a href="{{ route('business.pricing.index') }}" class="nav-link">
-        <i data-lucide="dollar-sign" class="h-5 w-5"></i>
+        <i data-lucide="peso-sign" class="h-5 w-5"></i>
         <span>Pricing</span>
     </a>
 @endsection
@@ -73,7 +73,7 @@
                         </div>
                         <div class="col-md-4 mb-3">
                             <label for="base_price" class="form-label fw-semibold">
-                                <i data-lucide="dollar-sign" class="h-4 w-4 me-1"></i>
+                                <i data-lucide="peso-sign" class="h-4 w-4 me-1"></i>
                                 Base Price (₱) *
                             </label>
                             <div class="input-group">

@@ -75,6 +75,7 @@
     
     <!-- UniPrint Design System - Complete CSS -->
     <link rel="stylesheet" href="{{ asset('css/design-system.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/chat.css') }}">
     
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>

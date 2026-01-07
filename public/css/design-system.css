@@ -1,0 +1,15 @@
+:root{--up-background:hsl(0 0% 100%);--up-foreground:hsl(240 10% 3.9%);--up-muted-foreground:hsl(240 3.8% 46.1%);--up-border:hsl(240 5.9% 90%);--up-primary:hsl(263 70% 50%);--up-primary-glow:hsl(263 85% 65%);--up-accent:hsl(16 90% 62%);--up-accent-glow:hsl(16 95% 70%)}
+
+.gradient-primary{background:linear-gradient(135deg,var(--up-primary),var(--up-primary-glow))}
+.gradient-accent{background:linear-gradient(135deg,var(--up-accent),var(--up-accent-glow))}
+.gradient-hero{background:linear-gradient(135deg,var(--up-primary) 0%,hsl(220 70% 50%) 100%)}
+
+.shadow-card{box-shadow:0 1px 3px 0 rgb(0 0 0 / .1),0 1px 2px -1px rgb(0 0 0 / .1)}
+.shadow-card-hover{box-shadow:0 10px 15px -3px rgb(0 0 0 / .1),0 4px 6px -4px rgb(0 0 0 / .1)}
+.shadow-glow{box-shadow:0 0 40px hsl(263 70% 50% / .3)}
+
+.transition-smooth{transition:all .3s cubic-bezier(.4,0,.2,1)}
+
+.bg-clip-text{-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+
+html{color-scheme:light}

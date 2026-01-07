@@ -6,11 +6,44 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use App\Models\SavedService;
 
 class CheckoutController extends Controller
 {
+    public function fromService(Request $request)
+    {
+        $request->validate([
+            'service_id' => 'required|uuid',
+            'quantity' => 'required|integer|min:1|max:100',
+            'customizations' => 'nullable|array',
+            'customizations.*' => 'uuid',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        $userId = session('user_id');
+
+        if (!$userId) {
+            return redirect()->route('login')->with('error', 'Please login to checkout');
+        }
+
+        try {
+            SavedService::saveService(
+                $userId,
+                $request->service_id,
+                $request->quantity,
+                $request->customizations ?? [],
+                $request->notes
+            );
+
+            return redirect()->route('checkout.index');
+        } catch (\Exception $e) {
+            Log::error('Checkout fromService Error: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Failed to start checkout. Please try again.');
+        }
+    }
+
     /**
      * Show checkout page
      */
@@ -191,6 +224,7 @@ class CheckoutController extends Controller
                 
                 // Calculate pickup date based on rush option
                 $pickupDate = $this->calculatePickupDate($rushOption);
+                $deliveryDate = $pickupDate ? $pickupDate->toDateString() : now()->toDateString();
                 
                 $tax = ($subtotal + $rushFee) * 0.12;
                 $total = $subtotal + $rushFee + $tax;
@@ -200,9 +234,11 @@ class CheckoutController extends Controller
                     'purchase_order_id' => $orderId,
                     'customer_id' => $userId,
                     'enterprise_id' => $enterpriseId,
+                    'status_id' => $pendingStatus?->status_id,
                     'order_no' => $orderNo,
                     'purpose' => $request->notes ?? 'Online order via UniPrint',
-                    'date_requested' => now(),
+                    'date_requested' => now()->toDateString(),
+                    'delivery_date' => $deliveryDate,
                     'pickup_date' => $pickupDate,
                     'shipping_fee' => 0, // No shipping for pickup
                     'rush_fee' => $rushFee,
@@ -252,17 +288,30 @@ class CheckoutController extends Controller
                 ]);
                 
                 // Create payment record
-                DB::table('payments')->insert([
-                    'payment_id' => Str::uuid(),
-                    'purchase_order_id' => $orderId,
-                    'payment_method' => $request->payment_method,
-                    'amount_paid' => 0,
-                    'amount_due' => $total,
-                    'payment_date_time' => now(),
-                    'is_verified' => false,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
+                try {
+                    if (Schema::hasTable('payments')) {
+                        DB::table('payments')->insert([
+                            'payment_id' => Str::uuid(),
+                            'purchase_order_id' => $orderId,
+                            'payment_method' => $request->payment_method,
+                            'amount_paid' => 0,
+                            'amount_due' => $total,
+                            'payment_date_time' => now(),
+                            'is_verified' => false,
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+                    } else {
+                        Log::warning('payments table missing; skipping payment insert during checkout', [
+                            'purchase_order_id' => $orderId,
+                        ]);
+                    }
+                } catch (\Exception $e) {
+                    Log::warning('Failed to insert payment record; continuing checkout', [
+                        'purchase_order_id' => $orderId,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
                 
                 $createdOrders[] = [
                     'order_no' => $orderNo,

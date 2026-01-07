@@ -21,7 +21,7 @@ class AuthController extends Controller
 
     public function showAdminLogin()
     {
-        if (Auth::check()) {
+        if (Auth::check() || session('user_id')) {
             return $this->redirectToDashboard();
         }
         return view('auth.admin-login');
@@ -34,6 +34,8 @@ class AuthController extends Controller
                 'username' => 'required|string|max:100|regex:/^[a-zA-Z0-9_\-\.]+$/',
                 'password' => 'required|string|min:8|max:255',
             ]);
+
+            $intendedRoleType = $request->input('role_type');
 
             // Try to find by username first, then by email
             $loginRecord = DB::table('login')
@@ -60,6 +62,19 @@ class AuthController extends Controller
                 ->first();
 
             if ($user) {
+                if ($intendedRoleType === 'admin') {
+                    $role = DB::table('roles')
+                        ->join('role_types', 'roles.role_type_id', '=', 'role_types.role_type_id')
+                        ->where('roles.user_id', $user->user_id)
+                        ->first();
+
+                    if (($role?->user_role_type ?? null) !== 'admin') {
+                        return back()->withErrors([
+                            'username' => 'The provided credentials do not match our records.',
+                        ])->withInput($request->only('username'));
+                    }
+                }
+
                 // Secure session management
                 $request->session()->regenerate();
                 $request->session()->put([
@@ -122,7 +137,16 @@ class AuthController extends Controller
             'email' => 'required|email|unique:users,email|max:255',
             'username' => 'required|string|unique:login,username|max:100',
             'password' => 'required|string|min:6|confirmed',
+            'role_type' => 'nullable|string',
         ]);
+
+        $desiredRoleType = $request->input('role_type', 'customer');
+        if ($desiredRoleType === 'business') {
+            $desiredRoleType = 'business_user';
+        }
+        if (!in_array($desiredRoleType, ['customer', 'business_user'], true)) {
+            $desiredRoleType = 'customer';
+        }
 
         // Create user record
         $userId = Str::uuid();
@@ -146,20 +170,26 @@ class AuthController extends Controller
             'updated_at' => now(),
         ]);
 
-        // Assign customer role
-        $customerRoleType = DB::table('role_types')
-            ->where('user_role_type', 'customer')
+        $roleType = DB::table('role_types')
+            ->where('user_role_type', $desiredRoleType)
             ->first();
 
-        if ($customerRoleType) {
-            DB::table('roles')->insert([
-                'role_id' => Str::uuid(),
-                'user_id' => $userId,
-                'role_type_id' => $customerRoleType->role_type_id,
-                'created_at' => now(),
-                'updated_at' => now(),
+        $roleTypeId = $roleType?->role_type_id;
+        if (!$roleTypeId) {
+            $roleTypeId = (string) Str::uuid();
+            DB::table('role_types')->insert([
+                'role_type_id' => $roleTypeId,
+                'user_role_type' => $desiredRoleType,
             ]);
         }
+
+        DB::table('roles')->insert([
+            'role_id' => Str::uuid(),
+            'user_id' => $userId,
+            'role_type_id' => $roleTypeId,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
 
         // Log in the user
         session([
@@ -168,7 +198,7 @@ class AuthController extends Controller
             'user_email' => $request->email,
         ]);
 
-        return redirect()->route('customer.dashboard');
+        return $this->redirectToDashboard();
     }
 
     private function redirectToDashboard()
@@ -190,6 +220,10 @@ class AuthController extends Controller
                 case 'admin':
                     return redirect()->route('admin.dashboard');
                 case 'business_user':
+                    $hasEnterprise = DB::table('staff')->where('user_id', $userId)->exists();
+                    if (!$hasEnterprise) {
+                        return redirect()->route('business.onboarding');
+                    }
                     return redirect()->route('business.dashboard');
                 case 'customer':
                     return redirect()->route('customer.dashboard');

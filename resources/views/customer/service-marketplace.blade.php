@@ -122,7 +122,7 @@
 
                     <!-- Price Range Filter -->
                     <div class="flex items-center gap-2">
-                        <i data-lucide="dollar-sign" class="h-4 w-4 text-gray-500"></i>
+                        <i data-lucide="peso-sign" class="h-4 w-4 text-gray-500"></i>
                         <select id="price-range-filter" class="text-sm border border-gray-300 rounded-lg px-3 py-1 focus:ring-2 focus:ring-orange-500 focus:border-orange-500">
                             <option value="">Any Price</option>
                             <option value="0-500">Under ₱500</option>

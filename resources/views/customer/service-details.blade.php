@@ -47,7 +47,7 @@
                     <h2 class="text-primary mb-0">₱{{ number_format($service->base_price, 2) }}</h2>
                 </div>
 
-                <p class="text-muted">{{ $service->description_text ?? 'No description available' }}</p>
+                <p class="text-muted">{{ $service->description ?? 'No description available' }}</p>
             </div>
         </div>
 
@@ -57,7 +57,7 @@
                 <h5 class="mb-0"><i class="bi bi-cart-plus me-2"></i>Place Order</h5>
             </div>
             <div class="card-body">
-                <form action="{{ route('customer.order.place') }}" method="POST" id="orderForm">
+                <form action="{{ route('checkout.from-service') }}" method="POST" id="orderForm">
                     @csrf
                     <input type="hidden" name="service_id" value="{{ $service->service_id }}">
 
@@ -67,50 +67,25 @@
                                value="1" min="1" required>
                     </div>
 
-                    @foreach($product->customizationGroups as $group)
-                    <div class="mb-4">
-                        <label class="form-label">
-                            {{ $group->group_name }} 
-                            @if($group->is_required)
-                                <span class="text-danger">*</span>
-                            @endif
-                        </label>
-
-                        @if($group->group_type == 'Single Select')
-                            <select name="customizations[]" class="form-select" {{ $group->is_required ? 'required' : '' }}>
-                                @if(!$group->is_required)
-                                    <option value="">-- None --</option>
-                                @endif
-                                @foreach($group->customizationOptions as $option)
-                                    <option value="{{ $option->option_id }}">
-                                        {{ $option->option_name }}
-                                        @if($option->price_modifier > 0)
-                                            (+₱{{ number_format($option->price_modifier, 2) }})
-                                        @endif
-                                    </option>
+                    @if(isset($customizationGroups) && $customizationGroups->count() > 0)
+                        @foreach($customizationGroups as $type => $options)
+                            <div class="mb-4">
+                                <label class="form-label">{{ $type }}</label>
+                                @foreach($options as $option)
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="customizations[]"
+                                               value="{{ $option->option_id }}" id="option_{{ $option->option_id }}">
+                                        <label class="form-check-label" for="option_{{ $option->option_id }}">
+                                            {{ $option->option_name }}
+                                            @if($option->price_modifier != 0)
+                                                <span class="text-muted">({{ $option->price_modifier > 0 ? '+' : '' }}₱{{ number_format($option->price_modifier, 2) }})</span>
+                                            @endif
+                                        </label>
+                                    </div>
                                 @endforeach
-                            </select>
-
-                        @elseif($group->group_type == 'Multi Select')
-                            @foreach($group->customizationOptions as $option)
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" name="customizations[]" 
-                                       value="{{ $option->option_id }}" id="option_{{ $option->option_id }}">
-                                <label class="form-check-label" for="option_{{ $option->option_id }}">
-                                    {{ $option->option_name }}
-                                    @if($option->price_modifier > 0)
-                                        <span class="text-muted">(+₱{{ number_format($option->price_modifier, 2) }})</span>
-                                    @endif
-                                </label>
                             </div>
-                            @endforeach
-
-                        @else
-                            <input type="text" class="form-control" name="custom_text_{{ $group->group_id }}" 
-                                   placeholder="Enter your custom text" {{ $group->is_required ? 'required' : '' }}>
-                        @endif
-                    </div>
-                    @endforeach
+                        @endforeach
+                    @endif
 
                     <div class="mb-4">
                         <label for="notes" class="form-label">Special Instructions (Optional)</label>
@@ -133,20 +108,20 @@
                 <h5 class="mb-0"><i class="bi bi-building me-2"></i>Shop Details</h5>
             </div>
             <div class="card-body">
-                <h6 class="mb-2">{{ $product->enterprise->name ?? $product->enterprise_name ?? 'Unknown Enterprise' }}</h6>
-                @if(!empty($product->enterprise->category ?? null))
-                <span class="badge bg-info mb-3">{{ $product->enterprise->category }}</span>
+                <h6 class="mb-2">{{ $service->enterprise->name ?? $service->enterprise_name ?? 'Unknown Enterprise' }}</h6>
+                @if(!empty($service->enterprise->category ?? null))
+                <span class="badge bg-info mb-3">{{ $service->enterprise->category }}</span>
                 @endif
 
-                @if(!empty($product->enterprise->address ?? null))
+                @if(!empty($service->enterprise->address ?? null))
                 <p class="text-muted small mb-2">
-                    <i class="bi bi-geo-alt me-1"></i>{{ $product->enterprise->address }}
+                    <i class="bi bi-geo-alt me-1"></i>{{ $service->enterprise->address }}
                 </p>
                 @endif
 
-                @if(!empty($product->enterprise->contact_email ?? null))
+                @if(!empty($service->enterprise->email ?? null))
                 <p class="text-muted small mb-0">
-                    <i class="bi bi-envelope me-1"></i>{{ $product->enterprise->contact_email }}
+                    <i class="bi bi-envelope me-1"></i>{{ $service->enterprise->email }}
                 </p>
                 @endif
             </div>
@@ -160,10 +135,10 @@
             <div class="card-body">
                 <div class="d-flex justify-content-between mb-2">
                     <span>Base Price:</span>
-                    <strong>₱{{ number_format($product->base_price, 2) }}</strong>
+                    <strong>₱{{ number_format($service->base_price, 2) }}</strong>
                 </div>
 
-                @if($product->customizationGroups->count() > 0)
+                @if(isset($customizationGroups) && $customizationGroups->count() > 0)
                 <hr>
                 <small class="text-muted">
                     <i class="bi bi-info-circle me-1"></i>

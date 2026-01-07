@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use App\Models\Conversation;
 
 class CheckChatAccess
@@ -55,9 +56,14 @@ class CheckChatAccess
             $request->merge(['verified_conversation' => $conversation]);
         }
         
-        // Check role-specific permissions
-        $roleType = $user->role_type;
-        
+        $roleRow = DB::table('roles')
+            ->join('role_types', 'roles.role_type_id', '=', 'role_types.role_type_id')
+            ->where('roles.user_id', $user->user_id)
+            ->select('role_types.user_role_type')
+            ->first();
+
+        $roleType = $roleRow?->user_role_type;
+
         // Only customers and business users can access chat
         if (!in_array($roleType, ['customer', 'business_user'])) {
             return response()->json([

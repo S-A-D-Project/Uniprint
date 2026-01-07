@@ -389,8 +389,13 @@ class PricingEngine
         $grandTotal = 0;
 
         foreach ($items as $item) {
+            $serviceId = $item['service_id'] ?? ($item['product_id'] ?? null);
+            if (!$serviceId) {
+                throw new \InvalidArgumentException('Missing service_id');
+            }
+
             $result = $this->calculatePrice(
-                $item['product_id'],
+                $serviceId,
                 $item['customizations'] ?? [],
                 $item['quantity'] ?? 1,
                 $enterpriseId

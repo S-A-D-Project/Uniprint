@@ -16,6 +16,21 @@ use App\Models\OrderStatusHistory;
 
 class CustomerController extends Controller
 {
+    public function enterprises()
+    {
+        $userName = session('user_name');
+
+        $enterprises = Enterprise::query()
+            ->where('is_active', true)
+            ->withCount(['services' => function ($q) {
+                $q->where('is_active', true);
+            }])
+            ->orderBy('name')
+            ->paginate(12);
+
+        return view('customer.enterprises', compact('enterprises', 'userName'));
+    }
+
     public function dashboard()
     {
         $userId = session('user_id');
@@ -61,10 +76,20 @@ class CustomerController extends Controller
         $userId = session('user_id');
         $userName = session('user_name');
 
+        $latestStatusTimes = DB::table('order_status_history')
+            ->select('purchase_order_id', DB::raw('MAX(timestamp) as latest_time'))
+            ->groupBy('purchase_order_id');
+
         $orders = DB::table('customer_orders')
             ->join('enterprises', 'customer_orders.enterprise_id', '=', 'enterprises.enterprise_id')
-            ->leftJoin(DB::raw('(SELECT purchase_order_id, status_id, MAX(timestamp) as latest_time FROM order_status_history GROUP BY purchase_order_id, status_id ORDER BY latest_time DESC LIMIT 1) as latest_status'), 'customer_orders.purchase_order_id', '=', 'latest_status.purchase_order_id')
-            ->leftJoin('statuses', 'latest_status.status_id', '=', 'statuses.status_id')
+            ->leftJoinSub($latestStatusTimes, 'latest_status_times', function ($join) {
+                $join->on('customer_orders.purchase_order_id', '=', 'latest_status_times.purchase_order_id');
+            })
+            ->leftJoin('order_status_history as osh', function ($join) {
+                $join->on('customer_orders.purchase_order_id', '=', 'osh.purchase_order_id')
+                    ->on('osh.timestamp', '=', 'latest_status_times.latest_time');
+            })
+            ->leftJoin('statuses', 'osh.status_id', '=', 'statuses.status_id')
             ->where('customer_orders.customer_id', $userId)
             ->select('customer_orders.*', 'enterprises.name as enterprise_name', 'statuses.status_name')
             ->orderBy('customer_orders.created_at', 'desc')
@@ -108,7 +133,7 @@ class CustomerController extends Controller
         // Get status history
         $statusHistory = DB::table('order_status_history')
             ->join('statuses', 'order_status_history.status_id', '=', 'statuses.status_id')
-            ->join('users', 'order_status_history.user_id', '=', 'users.user_id')
+            ->leftJoin('users', 'order_status_history.user_id', '=', 'users.user_id')
             ->where('order_status_history.purchase_order_id', $id)
             ->select('order_status_history.*', 'statuses.status_name', 'statuses.description', 'users.name as user_name')
             ->orderBy('order_status_history.timestamp', 'desc')
@@ -175,10 +200,15 @@ class CustomerController extends Controller
         ]);
 
         // Notify business
+        $businessUserId = DB::table('staff')
+            ->where('enterprise_id', $order->enterprise_id)
+            ->whereNotNull('user_id')
+            ->value('user_id');
+
         DB::table('order_notifications')->insert([
             'notification_id' => \Illuminate\Support\Str::uuid(),
             'purchase_order_id' => $orderId,
-            'recipient_id' => $order->enterprise_id, // Note: This should be business user ID
+            'recipient_id' => $businessUserId ?: $userId,
             'notification_type' => 'file_upload',
             'title' => 'New Design File Uploaded',
             'message' => "Customer uploaded a new design file for order #{$order->order_no}",
@@ -265,8 +295,8 @@ class CustomerController extends Controller
             ->firstOrFail();
 
         $services = Service::where('enterprise_id', $id)
-            ->where('is_available', true)
-            ->with('customizationGroups.customizationOptions')
+            ->where('is_active', true)
+            ->with('customizationOptions')
             ->paginate(12);
 
         return view('customer.services', compact('enterprise', 'services'));
@@ -275,76 +305,40 @@ class CustomerController extends Controller
     public function serviceDetails($id)
     {
         $service = Service::where('service_id', $id)
-            ->where('is_available', true)
-            ->with(['enterprise', 'customizationGroups.customizationOptions'])
+            ->where('is_active', true)
+            ->with(['enterprise', 'customizationOptions'])
             ->firstOrFail();
 
-        return view('customer.service-details', compact('service'));
+        $customizationGroups = $service->customizationOptions->groupBy('option_type');
+
+        return view('customer.service-details', compact('service', 'customizationGroups'));
     }
 
 
     public function placeOrder(Request $request)
     {
         $request->validate([
-            'service_id' => 'required|exists:services,service_id',
-            'quantity' => 'required|integer|min:1',
+            'service_id' => 'required|uuid',
+            'quantity' => 'required|integer|min:1|max:100',
             'customizations' => 'nullable|array',
-            'notes' => 'nullable|string',
+            'customizations.*' => 'uuid',
+            'notes' => 'nullable|string|max:500',
         ]);
 
-        $user = Auth::user();
-        $service = Service::findOrFail($request->service_id);
-
-        // Calculate total
-        $subtotal = $service->base_price * $request->quantity;
-
-        if ($request->customizations) {
-            foreach ($request->customizations as $optionId) {
-                $option = \App\Models\CustomizationOption::find($optionId);
-                if ($option) {
-                    $subtotal += $option->price_modifier * $request->quantity;
-                }
-            }
+        $userId = session('user_id');
+        if (!$userId) {
+            return redirect()->route('login');
         }
 
-        // Create order
-        $order = CustomerOrder::create([
-            'customer_account_id' => $user->user_id,
-            'enterprise_id' => $service->enterprise_id,
-            'total_order_amount' => $subtotal,
-            'current_status' => 'Pending',
-        ]);
+        $saved = \App\Models\SavedService::saveService(
+            $userId,
+            $request->service_id,
+            $request->quantity,
+            $request->customizations ?? [],
+            $request->notes
+        );
 
-        // Create order item
-        $orderItem = OrderItem::create([
-            'order_id' => $order->order_id,
-            'service_id' => $service->service_id,
-            'quantity' => $request->quantity,
-            'item_subtotal' => $subtotal,
-            'notes_to_enterprise' => $request->notes,
-        ]);
-
-        // Add customizations
-        if ($request->customizations) {
-            foreach ($request->customizations as $optionId) {
-                $option = \App\Models\CustomizationOption::find($optionId);
-                if ($option) {
-                    OrderItemCustomization::create([
-                        'order_item_id' => $orderItem->item_id,
-                        'option_id' => $option->option_id,
-                        'option_price_snapshot' => $option->price_modifier,
-                    ]);
-                }
-            }
-        }
-
-        // Create status history
-        OrderStatusHistory::create([
-            'order_id' => $order->order_id,
-            'status_name' => 'Pending',
-        ]);
-
-        return redirect()->route('customer.orders')->with('success', 'Order placed successfully!');
+        return redirect()->route('checkout.index');
     }
 
 

@@ -14,10 +14,25 @@ return new class extends Migration
         // Add is_active column to enterprises table
         Schema::table('enterprises', function (Blueprint $table) {
             if (!Schema::hasColumn('enterprises', 'is_active')) {
-                $table->boolean('is_active')->default(true)->after('address_text');
+                if (Schema::hasColumn('enterprises', 'address')) {
+                    $table->boolean('is_active')->default(true)->after('address');
+                } else {
+                    $table->boolean('is_active')->default(true);
+                }
             }
             if (!Schema::hasColumn('enterprises', 'category')) {
-                $table->string('category')->default('General')->after('enterprise_name');
+                if (Schema::hasColumn('enterprises', 'name')) {
+                    $table->string('category')->default('General')->after('name');
+                } else {
+                    $table->string('category')->default('General');
+                }
+            }
+            if (!Schema::hasColumn('enterprises', 'email')) {
+                if (Schema::hasColumn('enterprises', 'contact_number')) {
+                    $table->string('email', 255)->nullable()->after('contact_number');
+                } else {
+                    $table->string('email', 255)->nullable();
+                }
             }
         });
 

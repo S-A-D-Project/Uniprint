@@ -101,8 +101,8 @@ class BusinessChat {
         this.conversations = [];
         this.messages = [];
         this.typingTimeout = null;
-        this.currentUserId = '{{ auth()->id() }}';
-        this.currentUserName = '{{ auth()->user()->name }}';
+        this.currentUserId = '{{ session('user_id') }}';
+        this.currentUserName = '{{ session('user_name') }}';
         this.subscribedChannels = new Map();
         this.retryAttempts = 0;
         this.maxRetries = 3;

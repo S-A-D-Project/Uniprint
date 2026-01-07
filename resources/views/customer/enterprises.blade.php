@@ -35,22 +35,22 @@
                         <i class="bi bi-building text-primary" style="font-size: 2rem;"></i>
                     </div>
                     <div class="flex-grow-1">
-                        <h5 class="card-title mb-1">{{ $enterprise->enterprise_name }}</h5>
+                        <h5 class="card-title mb-1">{{ $enterprise->name }}</h5>
                         <span class="badge bg-info">{{ $enterprise->category }}</span>
                     </div>
                 </div>
 
                 <div class="mb-3">
-                    @if($enterprise->address_text)
+                    @if($enterprise->address)
                     <p class="text-muted small mb-2">
                         <i class="bi bi-geo-alt me-1"></i>
-                        {{ Str::limit($enterprise->address_text, 50) }}
+                        {{ \Illuminate\Support\Str::limit($enterprise->address, 50) }}
                     </p>
                     @endif
-                    @if($enterprise->contact_email)
+                    @if($enterprise->email)
                     <p class="text-muted small mb-0">
                         <i class="bi bi-envelope me-1"></i>
-                        {{ $enterprise->contact_email }}
+                        {{ $enterprise->email }}
                     </p>
                     @endif
                 </div>
@@ -62,7 +62,7 @@
                     <span class="badge bg-success">Active</span>
                 </div>
 
-                <a href="{{ route('customer.enterprise.products', $enterprise->enterprise_id) }}" 
+                <a href="{{ route('customer.enterprise.services', $enterprise->enterprise_id) }}" 
                    class="btn btn-primary w-100">
                     <i class="bi bi-arrow-right-circle me-2"></i>View Products
                 </a>

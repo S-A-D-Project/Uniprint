@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Laravel\Socialite\Facades\Socialite;
 
 class ProfileController extends Controller
 {
@@ -22,13 +23,18 @@ class ProfileController extends Controller
             return redirect()->route('login')->with('error', 'Please login to view your profile');
         }
 
-        try {
-            $user = DB::table('users')->where('user_id', $userId)->first();
-            
-            if (!$user) {
-                return redirect()->route('login')->with('error', 'User not found');
-            }
+        $user = DB::table('users')->where('user_id', $userId)->first();
+        if (!$user) {
+            return redirect()->route('login')->with('error', 'User not found');
+        }
 
+        $roleInfo = null;
+        $enterprise = null;
+        $orderStats = null;
+        $recentOrders = collect();
+        $linkedProviders = collect();
+
+        try {
             // Get user's role information
             $roleInfo = DB::table('roles')
                 ->join('role_types', 'roles.role_type_id', '=', 'role_types.role_type_id')
@@ -36,14 +42,21 @@ class ProfileController extends Controller
                 ->first();
 
             // Get user's enterprise information (if business user)
-            $enterprise = null;
             if ($roleInfo && $roleInfo->user_role_type === 'business_user') {
                 $enterprise = DB::table('staff')
                     ->join('enterprises', 'staff.enterprise_id', '=', 'enterprises.enterprise_id')
                     ->where('staff.user_id', $userId)
                     ->first();
             }
+        } catch (\Exception $e) {
+            Log::error('Profile View Error (role/enterprise)', [
+                'user_id' => $userId,
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+            ]);
+        }
 
+        try {
             // Get order statistics
             $orderStats = DB::table('customer_orders')
                 ->where('customer_id', $userId)
@@ -53,12 +66,30 @@ class ProfileController extends Controller
                     COUNT(CASE WHEN created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) THEN 1 END) as recent_orders
                 ')
                 ->first();
+        } catch (\Exception $e) {
+            Log::error('Profile View Error (orderStats)', [
+                'user_id' => $userId,
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+            ]);
+        }
 
-            // Get recent orders
+        try {
+            // Get recent orders (avoid GROUP BY issues on strict SQL modes)
+            $latestStatusTimes = DB::table('order_status_history')
+                ->select('purchase_order_id', DB::raw('MAX(timestamp) as latest_time'))
+                ->groupBy('purchase_order_id');
+
             $recentOrders = DB::table('customer_orders')
                 ->join('enterprises', 'customer_orders.enterprise_id', '=', 'enterprises.enterprise_id')
-                ->leftJoin(DB::raw('(SELECT purchase_order_id, status_id, MAX(timestamp) as latest_time FROM order_status_history GROUP BY purchase_order_id ORDER BY latest_time DESC) as latest_status'), 'customer_orders.purchase_order_id', '=', 'latest_status.purchase_order_id')
-                ->leftJoin('statuses', 'latest_status.status_id', '=', 'statuses.status_id')
+                ->leftJoinSub($latestStatusTimes, 'latest_status_times', function ($join) {
+                    $join->on('customer_orders.purchase_order_id', '=', 'latest_status_times.purchase_order_id');
+                })
+                ->leftJoin('order_status_history as osh', function ($join) {
+                    $join->on('customer_orders.purchase_order_id', '=', 'osh.purchase_order_id')
+                        ->on('osh.timestamp', '=', 'latest_status_times.latest_time');
+                })
+                ->leftJoin('statuses', 'osh.status_id', '=', 'statuses.status_id')
                 ->select(
                     'customer_orders.*',
                     'enterprises.name as enterprise_name',
@@ -68,19 +99,132 @@ class ProfileController extends Controller
                 ->orderBy('customer_orders.created_at', 'desc')
                 ->limit(5)
                 ->get();
-
-            return view('profile.index', compact('user', 'roleInfo', 'enterprise', 'orderStats', 'recentOrders'));
-            
         } catch (\Exception $e) {
-            Log::error('Profile View Error: ' . $e->getMessage());
-            
-            return view('profile.index', [
-                'user' => null,
-                'roleInfo' => null,
-                'enterprise' => null,
-                'orderStats' => null,
-                'recentOrders' => collect()
-            ])->with('error', 'Failed to load profile information');
+            Log::error('Profile View Error (recentOrders)', [
+                'user_id' => $userId,
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+            ]);
+        }
+
+        try {
+            $linkedProviders = DB::table('social_logins')
+                ->where('user_id', $userId)
+                ->pluck('provider')
+                ->map(fn ($p) => strtolower((string) $p))
+                ->unique()
+                ->values();
+        } catch (\Exception $e) {
+            Log::error('Profile View Error (linkedProviders)', [
+                'user_id' => $userId,
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+            ]);
+        }
+
+        return view('profile.index', compact('user', 'roleInfo', 'enterprise', 'orderStats', 'recentOrders', 'linkedProviders'));
+    }
+
+    public function redirectToFacebookConnect()
+    {
+        $userId = session('user_id');
+        if (!$userId) {
+            return redirect()->route('login')->with('error', 'Please login to continue');
+        }
+
+        return Socialite::driver('facebook')
+            ->scopes(['email'])
+            ->redirectUrl(route('profile.connect-facebook.callback'))
+            ->stateless()
+            ->redirect();
+    }
+
+    public function handleFacebookConnectCallback()
+    {
+        $userId = session('user_id');
+        if (!$userId) {
+            return redirect()->route('login')->with('error', 'Please login to continue');
+        }
+
+        try {
+            $fbUser = Socialite::driver('facebook')
+                ->redirectUrl(route('profile.connect-facebook.callback'))
+                ->stateless()
+                ->user();
+            $providerId = $fbUser->getId();
+
+            if (!$providerId) {
+                return redirect()->route('profile.index')->with('error', 'Failed to get Facebook user information.');
+            }
+
+            $existing = DB::table('social_logins')
+                ->where('provider', 'facebook')
+                ->where('provider_id', $providerId)
+                ->first();
+
+            if ($existing && $existing->user_id && $existing->user_id !== $userId) {
+                return redirect()->route('profile.index')->with('error', 'This Facebook account is already linked to another UniPrint account.');
+            }
+
+            if ($existing) {
+                DB::table('social_logins')
+                    ->where('social_login_id', $existing->social_login_id)
+                    ->update([
+                        'user_id' => $userId,
+                        'email' => $fbUser->getEmail(),
+                        'name' => $fbUser->getName(),
+                        'avatar_url' => $fbUser->getAvatar(),
+                        'updated_at' => now(),
+                    ]);
+            } else {
+                DB::table('social_logins')->insert([
+                    'social_login_id' => (string) Str::uuid(),
+                    'user_id' => $userId,
+                    'provider' => 'facebook',
+                    'provider_id' => $providerId,
+                    'email' => $fbUser->getEmail(),
+                    'name' => $fbUser->getName(),
+                    'avatar_url' => $fbUser->getAvatar(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+
+            $fbEmail = $fbUser->getEmail();
+            if ($fbEmail) {
+                $user = DB::table('users')->where('user_id', $userId)->first();
+                if ($user) {
+                    $currentEmail = (string) ($user->email ?? '');
+                    $hasPlaceholderEmail = $currentEmail === '' || str_ends_with($currentEmail, '@uniprint.local');
+
+                    if ($hasPlaceholderEmail) {
+                        $emailTaken = DB::table('users')
+                            ->where('email', $fbEmail)
+                            ->where('user_id', '!=', $userId)
+                            ->exists();
+
+                        if (!$emailTaken) {
+                            DB::table('users')
+                                ->where('user_id', $userId)
+                                ->update([
+                                    'email' => $fbEmail,
+                                    'updated_at' => now(),
+                                ]);
+                        }
+                    }
+                }
+            }
+
+            return redirect()->route('profile.index')->with('success', 'Facebook account connected successfully.');
+        } catch (\Exception $e) {
+            Log::error('Facebook connect error', [
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+                'code' => $e->getCode(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return redirect()->route('profile.index')->with('error', 'Failed to connect Facebook. Please try again.');
         }
     }
 

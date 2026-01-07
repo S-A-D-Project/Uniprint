@@ -242,14 +242,14 @@
                                     <span class="font-medium text-orange-600" id="service-rush-fee">₱0.00</span>
                                 </div>
 
-                                @auth
+                                @if(session('user_id'))
                                     <button type="submit" id="saveServiceBtn" class="w-full inline-flex items-center justify-center gap-2 px-8 py-4 text-lg font-semibold text-white gradient-primary rounded-lg hover:shadow-glow transition-smooth mb-3">
                                         <i data-lucide="heart" class="h-5 w-5"></i>
                                         <span class="btn-text">Save Service</span>
                                     </button>
                                     
                                     <!-- Order Now Button with Completion Time -->
-                                    <button type="button" onclick="buyNow()" id="service-order-now-btn" class="w-full px-4 py-3 bg-gradient-to-r from-primary to-primary/90 text-white font-semibold rounded-lg hover:shadow-lg transition-all flex flex-col items-center justify-center gap-1 mb-3">
+                                    <button type="button" onclick="orderNow()" id="service-order-now-btn" class="w-full px-4 py-3 bg-gradient-to-r from-primary to-primary/90 text-white font-semibold rounded-lg hover:shadow-lg transition-all flex flex-col items-center justify-center gap-1 mb-3">
                                         <div class="flex items-center gap-2">
                                             <i data-lucide="zap" class="h-5 w-5"></i>
                                             <span>Order Now</span>
@@ -267,7 +267,7 @@
                                     <a href="{{ route('login') }}" class="block w-full text-center px-8 py-4 text-lg font-semibold text-white gradient-primary rounded-lg hover:shadow-glow transition-smooth">
                                         Login to Order Service
                                     </a>
-                                @endauth
+                                @endif
                             </div>
                         </div>
                     </form>
@@ -304,8 +304,11 @@
         document.getElementById('totalPrice').textContent = total.toFixed(2);
     }
     
-    function buyNow() {
-        alert('Order functionality will be implemented');
+    function orderNow() {
+        const form = document.getElementById('serviceForm');
+        if (!form) return;
+        form.action = "{{ route('checkout.from-service') }}";
+        form.submit();
     }
 </script>
 @endpush

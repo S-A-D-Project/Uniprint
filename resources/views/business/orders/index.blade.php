@@ -48,9 +48,10 @@
                                 @if($order->status_name)
                                     <span class="inline-block px-2 py-1 text-xs font-medium rounded-md
                                         @if($order->status_name == 'Pending') bg-warning/10 text-warning
-                                        @elseif($order->status_name == 'Confirmed') bg-blue-500/10 text-blue-500
-                                        @elseif($order->status_name == 'In Progress') bg-primary/10 text-primary
+                                        @elseif(in_array($order->status_name, ['Confirmed', 'Processing', 'In Progress'])) bg-primary/10 text-primary
+                                        @elseif($order->status_name == 'Ready for Pickup') bg-blue-500/10 text-blue-500
                                         @elseif($order->status_name == 'Delivered') bg-success/10 text-success
+                                        @elseif($order->status_name == 'Cancelled') bg-destructive/10 text-destructive
                                         @else bg-secondary text-secondary-foreground
                                         @endif">
                                         {{ $order->status_name }}

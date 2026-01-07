@@ -15,7 +15,8 @@ class SocialAuthController extends Controller
      */
     public function redirectToGoogle()
     {
-        return Socialite::driver('google')->redirect();
+        $this->storeRoleIntentFromRequest();
+        return Socialite::driver('google')->stateless()->redirect();
     }
 
     /**
@@ -24,10 +25,15 @@ class SocialAuthController extends Controller
     public function handleGoogleCallback()
     {
         try {
-            $googleUser = Socialite::driver('google')->user();
+            $googleUser = Socialite::driver('google')->stateless()->user();
             return $this->handleSocialLogin($googleUser, 'google');
         } catch (Exception $e) {
-            \Log::error('Google OAuth error: ' . $e->getMessage());
+            \Log::error('Google OAuth error', [
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+                'code' => $e->getCode(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             return redirect()->route('login')->withErrors(['social' => 'Failed to authenticate with Google. Please try again.']);
         }
     }
@@ -37,7 +43,8 @@ class SocialAuthController extends Controller
      */
     public function redirectToFacebook()
     {
-        return Socialite::driver('facebook')->redirect();
+        $this->storeRoleIntentFromRequest();
+        return Socialite::driver('facebook')->stateless()->redirect();
     }
 
     /**
@@ -46,10 +53,15 @@ class SocialAuthController extends Controller
     public function handleFacebookCallback()
     {
         try {
-            $facebookUser = Socialite::driver('facebook')->user();
+            $facebookUser = Socialite::driver('facebook')->stateless()->user();
             return $this->handleSocialLogin($facebookUser, 'facebook');
         } catch (Exception $e) {
-            \Log::error('Facebook OAuth error: ' . $e->getMessage());
+            \Log::error('Facebook OAuth error', [
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+                'code' => $e->getCode(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             return redirect()->route('login')->withErrors(['social' => 'Failed to authenticate with Facebook. Please try again.']);
         }
     }
@@ -89,7 +101,7 @@ class SocialAuthController extends Controller
 
                 if ($user) {
                     $this->createSession($user);
-                    return redirect()->route('customer.dashboard');
+                    return $this->redirectAfterLogin($user->user_id);
                 }
             }
 
@@ -123,7 +135,7 @@ class SocialAuthController extends Controller
                 }
 
                 $this->createSession($user);
-                return redirect()->route('customer.dashboard');
+                return $this->redirectAfterLogin($user->user_id);
             }
 
             // Create new user
@@ -159,28 +171,90 @@ class SocialAuthController extends Controller
                 'updated_at' => now(),
             ]);
 
-            // Assign customer role
-            $customerRoleType = DB::table('role_types')
-                ->where('user_role_type', 'customer')
-                ->first();
+            $desiredRoleType = session('oauth_role_type', 'customer');
+            if (!in_array($desiredRoleType, ['customer', 'business_user'], true)) {
+                $desiredRoleType = 'customer';
+            }
 
-            if ($customerRoleType) {
+            $roleTypeId = $this->ensureRoleType($desiredRoleType);
+            if ($roleTypeId) {
                 DB::table('roles')->insert([
                     'role_id' => Str::uuid(),
                     'user_id' => $userId,
-                    'role_type_id' => $customerRoleType->role_type_id,
+                    'role_type_id' => $roleTypeId,
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
             }
 
+            session()->forget('oauth_role_type');
+
             $this->createSession(DB::table('users')->where('user_id', $userId)->first());
-            return redirect()->route('customer.dashboard');
+            return $this->redirectAfterLogin($userId);
 
         } catch (Exception $e) {
             \Log::error('Social login error: ' . $e->getMessage() . ' | Trace: ' . $e->getTraceAsString());
             return redirect()->route('login')->withErrors(['social' => 'An error occurred during social login. Please try again.']);
         }
+    }
+
+    private function storeRoleIntentFromRequest(): void
+    {
+        $raw = request()->query('role_type');
+        if (!$raw) {
+            return;
+        }
+
+        if ($raw === 'business') {
+            session(['oauth_role_type' => 'business_user']);
+            return;
+        }
+
+        if (in_array($raw, ['customer', 'business_user'], true)) {
+            session(['oauth_role_type' => $raw]);
+        }
+    }
+
+    private function redirectAfterLogin(string $userId)
+    {
+        $role = DB::table('roles')
+            ->join('role_types', 'roles.role_type_id', '=', 'role_types.role_type_id')
+            ->where('roles.user_id', $userId)
+            ->select('role_types.user_role_type')
+            ->first();
+
+        if ($role && $role->user_role_type === 'business_user') {
+            $hasEnterprise = DB::table('staff')->where('user_id', $userId)->exists();
+            if (!$hasEnterprise) {
+                return redirect()->route('business.onboarding');
+            }
+            return redirect()->route('business.dashboard');
+        }
+
+        if ($role && $role->user_role_type === 'admin') {
+            return redirect()->route('admin.dashboard');
+        }
+
+        return redirect()->route('customer.dashboard');
+    }
+
+    private function ensureRoleType(string $userRoleType): ?string
+    {
+        $roleType = DB::table('role_types')
+            ->where('user_role_type', $userRoleType)
+            ->first();
+
+        if ($roleType && $roleType->role_type_id) {
+            return $roleType->role_type_id;
+        }
+
+        $roleTypeId = (string) Str::uuid();
+        DB::table('role_types')->insert([
+            'role_type_id' => $roleTypeId,
+            'user_role_type' => $userRoleType,
+        ]);
+
+        return $roleTypeId;
     }
 
     /**

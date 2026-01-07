@@ -15,6 +15,7 @@ use App\Http\Controllers\SavedServiceController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ChatController;
+use App\Http\Controllers\BusinessOnboardingController;
 use Illuminate\Http\Request;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Support\Facades\RateLimiter;
@@ -50,17 +51,48 @@ Route::get('/auth/google/callback', [SocialAuthController::class, 'handleGoogleC
 Route::get('/auth/facebook', [SocialAuthController::class, 'redirectToFacebook'])->name('auth.facebook');
 Route::get('/auth/facebook/callback', [SocialAuthController::class, 'handleFacebookCallback'])->name('auth.facebook.callback');
 
+// Admin entrypoint
+Route::get('/admin', function () {
+    $userId = session('user_id');
+    if (!$userId) {
+        return redirect()->route('admin.login');
+    }
+
+    $role = \Illuminate\Support\Facades\DB::table('roles')
+        ->join('role_types', 'roles.role_type_id', '=', 'role_types.role_type_id')
+        ->where('roles.user_id', $userId)
+        ->first();
+
+    $roleType = $role?->user_role_type;
+    if ($roleType === 'admin') {
+        return redirect()->route('admin.dashboard');
+    }
+
+    if ($roleType === 'business_user') {
+        $hasEnterprise = \Illuminate\Support\Facades\DB::table('staff')->where('user_id', $userId)->exists();
+        if (!$hasEnterprise) {
+            return redirect()->route('business.onboarding');
+        }
+        return redirect()->route('business.dashboard');
+    }
+
+    return redirect()->route('customer.dashboard');
+});
+
 
 // Saved Services routes
 Route::middleware([\App\Http\Middleware\CheckAuth::class])->group(function () {
     Route::get('/saved-services', [\App\Http\Controllers\SavedServiceController::class, 'index'])->name('saved-services.index');
     Route::post('/saved-services/save', [\App\Http\Controllers\SavedServiceController::class, 'save'])->name('saved-services.save');
+    Route::post('/checkout/from-service', [\App\Http\Controllers\CheckoutController::class, 'fromService'])->name('checkout.from-service');
     Route::patch('/saved-services/{savedServiceId}', [\App\Http\Controllers\SavedServiceController::class, 'update'])->name('saved-services.update');
     Route::delete('/saved-services/{savedServiceId}', [\App\Http\Controllers\SavedServiceController::class, 'remove'])->name('saved-services.remove');
     Route::post('/saved-services/clear', [\App\Http\Controllers\SavedServiceController::class, 'clear'])->name('saved-services.clear');
     Route::get('/saved-services/count', [\App\Http\Controllers\SavedServiceController::class, 'getCount'])->name('saved-services.count');
     // Profile routes
     Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
+    Route::get('/profile/connect/facebook', [ProfileController::class, 'redirectToFacebookConnect'])->name('profile.connect-facebook');
+    Route::get('/profile/connect/facebook/callback', [ProfileController::class, 'handleFacebookConnectCallback'])->name('profile.connect-facebook.callback');
     Route::post('/profile/update', [ProfileController::class, 'update'])->name('profile.update');
     Route::post('/profile/update-password', [ProfileController::class, 'updatePassword'])->name('profile.update-password');
     Route::post('/profile/upload-picture', [ProfileController::class, 'uploadProfilePicture'])->name('profile.upload-picture');
@@ -81,13 +113,28 @@ Route::middleware([\App\Http\Middleware\CheckAuth::class])->group(function () {
     Route::post('/checkout/apply-discount', [\App\Http\Controllers\CheckoutController::class, 'applyDiscountCode'])->name('checkout.apply-discount');
 });
 
+// Business onboarding routes (must be authenticated and business_user role)
+Route::prefix('business')->middleware([\App\Http\Middleware\CheckAuth::class, \App\Http\Middleware\CheckRole::class.':business_user'])->name('business.')->group(function () {
+    Route::get('/onboarding', [BusinessOnboardingController::class, 'show'])->name('onboarding');
+    Route::post('/onboarding', [BusinessOnboardingController::class, 'store'])->name('onboarding.store');
+});
+
 // Admin routes
 Route::prefix('admin')->middleware([\App\Http\Middleware\CheckAuth::class, \App\Http\Middleware\CheckRole::class.':admin'])->name('admin.')->group(function () {
     Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('dashboard');
     Route::get('/users', [AdminController::class, 'users'])->name('users');
+    Route::get('/users/{id}', [AdminController::class, 'userDetails'])->whereUuid('id')->name('users.details');
+    Route::post('/users/{id}/toggle-active', [AdminController::class, 'toggleUserActive'])->whereUuid('id')->name('users.toggle-active');
     Route::get('/enterprises', [AdminController::class, 'enterprises'])->name('enterprises');
+    Route::get('/enterprises/{id}', [AdminController::class, 'enterpriseDetails'])->whereUuid('id')->name('enterprises.details');
+    Route::post('/enterprises/{id}/toggle-active', [AdminController::class, 'toggleEnterpriseActive'])->whereUuid('id')->name('enterprises.toggle-active');
     Route::get('/orders', [AdminController::class, 'orders'])->name('orders');
+    Route::get('/orders/{id}', [AdminController::class, 'orderDetails'])->whereUuid('id')->name('orders.details');
+    Route::post('/orders/{id}/status', [AdminController::class, 'updateOrderStatus'])->whereUuid('id')->name('orders.update-status');
     Route::get('/services', [AdminController::class, 'services'])->name('services');
+    Route::get('/services/{id}', [AdminController::class, 'serviceDetails'])->whereUuid('id')->name('services.details');
+    Route::post('/services/{id}/toggle-active', [AdminController::class, 'toggleServiceActive'])->whereUuid('id')->name('services.toggle-active');
+    Route::get('/products', [AdminController::class, 'products'])->name('products');
     Route::get('/reports', [AdminController::class, 'reports'])->name('reports');
     
     // Real-time API endpoints
@@ -107,6 +154,11 @@ Route::prefix('admin')->middleware([\App\Http\Middleware\CheckAuth::class, \App\
 // Business routes
 Route::prefix('business')->middleware([\App\Http\Middleware\CheckAuth::class, \App\Http\Middleware\CheckRole::class.':business_user'])->name('business.')->group(function () {
     Route::get('/dashboard', [BusinessController::class, 'dashboard'])->name('dashboard');
+
+    // Settings
+    Route::get('/settings', [BusinessController::class, 'settings'])->name('settings');
+    Route::put('/settings/account', [BusinessController::class, 'updateAccount'])->name('settings.account.update');
+    Route::put('/settings/enterprise', [BusinessController::class, 'updateEnterprise'])->name('settings.enterprise.update');
     
     // Order Management
     Route::get('/orders', [BusinessController::class, 'orders'])->name('orders.index');
@@ -213,11 +265,30 @@ Route::get('/debug/services', function() {
 
 
 // Chat routes (authenticated users)
-Route::middleware(['auth'])->group(function () {
+Route::middleware([\App\Http\Middleware\CheckAuth::class])->group(function () {
     Route::get('/chat', [ChatController::class, 'index'])->name('chat.index');
     Route::get('/direct-chat', [ChatController::class, 'directChat'])->name('chat.direct');
     Route::post('/api/chat/send-message', [ChatController::class, 'sendMessage'])->name('chat.send-message');
 });
+
+// Chat API routes (session-authenticated users)
+Route::prefix('api/chat')
+    ->middleware([\App\Http\Middleware\CheckAuth::class, \App\Http\Middleware\CheckChatAccess::class])
+    ->group(function () {
+        Route::get('/conversations', [ChatController::class, 'getConversations']);
+        Route::post('/conversations', [ChatController::class, 'getOrCreateConversation']);
+        Route::get('/conversations/{conversationId}', [ChatController::class, 'getConversation']);
+        Route::get('/conversations/{conversationId}/messages', [ChatController::class, 'getMessages']);
+        Route::post('/messages', [ChatController::class, 'sendMessage']);
+        Route::post('/messages/read', [ChatController::class, 'markAsRead']);
+        Route::post('/typing', [ChatController::class, 'typing']);
+        Route::post('/online-status', [ChatController::class, 'updateOnlineStatus']);
+        Route::post('/online-status/check', [ChatController::class, 'getOnlineStatus']);
+        Route::get('/available-businesses', [ChatController::class, 'getAvailableBusinesses']);
+        Route::post('/pusher/auth', [ChatController::class, 'pusherAuth']);
+        Route::post('/cleanup', [ChatController::class, 'cleanup']);
+        Route::get('/health', [ChatController::class, 'healthCheck']);
+    });
 
 // Pricing API routes (AJAX)
 Route::prefix('api')->name('api.')->group(function () {

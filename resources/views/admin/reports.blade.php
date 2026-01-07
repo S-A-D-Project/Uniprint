@@ -95,7 +95,7 @@ $breadcrumbs = [
 </div>
 
 <!-- Revenue by Month -->
-<x-admin.card title="Revenue by Month" icon="dollar-sign" :noPadding="true">
+<x-admin.card title="Revenue by Month" icon="peso-sign" :noPadding="true">
     @if($revenue_by_month->count() > 0)
         <div class="admin-table-responsive">
             <table class="admin-table">
@@ -119,7 +119,7 @@ $breadcrumbs = [
         </div>
     @else
         <x-admin.empty-state 
-            icon="dollar-sign"
+            icon="peso-sign"
             title="No revenue data"
             description="Revenue data will appear here once transactions are made" />
     @endif

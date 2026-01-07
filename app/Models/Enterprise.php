@@ -34,17 +34,29 @@ class Enterprise extends Model
     // Accessors for backward compatibility
     public function getIsActiveAttribute()
     {
-        return true; // Default to active for now
+        if (array_key_exists('is_active', $this->attributes)) {
+            return (bool) $this->attributes['is_active'];
+        }
+
+        return true;
     }
 
     public function getCategoryAttribute()
     {
-        return 'Printing Services'; // Default category
+        if (array_key_exists('category', $this->attributes)) {
+            return $this->attributes['category'];
+        }
+
+        return 'Printing Services';
     }
 
     public function getEmailAttribute()
     {
-        return null; // No email field in database
+        if (array_key_exists('email', $this->attributes)) {
+            return $this->attributes['email'];
+        }
+
+        return null;
     }
 
     // Relationships

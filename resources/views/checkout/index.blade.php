@@ -254,8 +254,11 @@
                     @foreach($cartItems as $item)
                     <div class="flex justify-between items-start pb-4 border-b border-gray-200 last:border-b-0">
                         <div class="flex-1">
-                            <h4 class="font-medium text-gray-900 mb-1">{{ $item['product']->service_name }}</h4>
-                            <p class="text-sm text-gray-600 mb-1">{{ $item['product']->enterprise_name }}</p>
+                            @php
+                                $service = $item['service'] ?? ($item['product'] ?? null);
+                            @endphp
+                            <h4 class="font-medium text-gray-900 mb-1">{{ $service->service_name ?? 'Unknown Service' }}</h4>
+                            <p class="text-sm text-gray-600 mb-1">{{ $service->enterprise_name ?? '' }}</p>
                             <p class="text-sm text-gray-500">
                                 Qty: {{ $item['quantity'] }} × ₱{{ number_format($item['unit_price'], 2) }}
                             </p>

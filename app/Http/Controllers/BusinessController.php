@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class BusinessController extends Controller
@@ -23,7 +25,8 @@ class BusinessController extends Controller
             ->first();
         
         if (!$enterprise) {
-            abort(404, 'No enterprise found for this user. Please contact an administrator.');
+            redirect()->route('business.onboarding')->send();
+            exit;
         }
         
         return $enterprise;
@@ -56,21 +59,30 @@ class BusinessController extends Controller
         $userName = session('user_name');
         $enterprise = $this->getUserEnterprise();
 
+        $latestStatusTimes = DB::table('order_status_history')
+            ->select('purchase_order_id', DB::raw('MAX(timestamp) as latest_time'))
+            ->groupBy('purchase_order_id');
+
+        $ordersWithLatestStatus = DB::table('customer_orders')
+            ->where('customer_orders.enterprise_id', $enterprise->enterprise_id)
+            ->leftJoinSub($latestStatusTimes, 'latest_status_times', function ($join) {
+                $join->on('customer_orders.purchase_order_id', '=', 'latest_status_times.purchase_order_id');
+            })
+            ->leftJoin('order_status_history as osh', function ($join) {
+                $join->on('customer_orders.purchase_order_id', '=', 'osh.purchase_order_id')
+                    ->on('osh.timestamp', '=', 'latest_status_times.latest_time');
+            })
+            ->leftJoin('statuses', 'osh.status_id', '=', 'statuses.status_id');
+
         $stats = [
             'total_orders' => DB::table('customer_orders')
                 ->where('enterprise_id', $enterprise->enterprise_id)->count(),
-            'pending_orders' => DB::table('customer_orders')
-                ->join('order_status_history', 'customer_orders.purchase_order_id', '=', 'order_status_history.purchase_order_id')
-                ->join('statuses', 'order_status_history.status_id', '=', 'statuses.status_id')
-                ->where('customer_orders.enterprise_id', $enterprise->enterprise_id)
+            'pending_orders' => (clone $ordersWithLatestStatus)
                 ->where('statuses.status_name', 'Pending')
                 ->distinct()
                 ->count('customer_orders.purchase_order_id'),
-            'in_progress_orders' => DB::table('customer_orders')
-                ->join('order_status_history', 'customer_orders.purchase_order_id', '=', 'order_status_history.purchase_order_id')
-                ->join('statuses', 'order_status_history.status_id', '=', 'statuses.status_id')
-                ->where('customer_orders.enterprise_id', $enterprise->enterprise_id)
-                ->where('statuses.status_name', 'In Progress')
+            'in_progress_orders' => (clone $ordersWithLatestStatus)
+                ->whereIn('statuses.status_name', ['Processing', 'In Progress'])
                 ->distinct()
                 ->count('customer_orders.purchase_order_id'),
             'total_services' => DB::table('services')
@@ -89,17 +101,126 @@ class BusinessController extends Controller
                 ->count(),
         ];
 
-        $recent_orders = DB::table('customer_orders')
+        $recent_orders = (clone $ordersWithLatestStatus)
             ->join('users', 'customer_orders.customer_id', '=', 'users.user_id')
-            ->leftJoin(DB::raw('(SELECT purchase_order_id, status_id, MAX(timestamp) as latest_time FROM order_status_history GROUP BY purchase_order_id, status_id) as latest_status'), 'customer_orders.purchase_order_id', '=', 'latest_status.purchase_order_id')
-            ->leftJoin('statuses', 'latest_status.status_id', '=', 'statuses.status_id')
-            ->where('customer_orders.enterprise_id', $enterprise->enterprise_id)
             ->select('customer_orders.*', 'users.name as customer_name', 'statuses.status_name')
             ->orderBy('customer_orders.created_at', 'desc')
             ->limit(10)
             ->get();
 
         return view('business.dashboard', compact('stats', 'recent_orders', 'enterprise', 'userName'));
+    }
+
+    // =====================================================
+    // SETTINGS
+    // =====================================================
+
+    public function settings()
+    {
+        $userId = session('user_id');
+        $userName = session('user_name');
+        $enterprise = $this->getUserEnterprise();
+
+        $user = DB::table('users')->where('user_id', $userId)->first();
+
+        return view('business.settings', compact('enterprise', 'userName', 'user'));
+    }
+
+    public function updateAccount(Request $request)
+    {
+        $userId = session('user_id');
+
+        $request->validate([
+            'name' => 'required|string|max:200',
+            'email' => 'required|email|max:255',
+            'position' => 'nullable|string|max:100',
+            'department' => 'nullable|string|max:100',
+        ]);
+
+        $existingUser = DB::table('users')->where('user_id', $userId)->first();
+        if (!$existingUser) {
+            return redirect()->back()->with('error', 'User not found');
+        }
+
+        $emailTaken = DB::table('users')
+            ->where('email', $request->email)
+            ->where('user_id', '!=', $userId)
+            ->exists();
+
+        if ($emailTaken) {
+            return redirect()->back()->with('error', 'Email is already taken by another user');
+        }
+
+        DB::table('users')
+            ->where('user_id', $userId)
+            ->update([
+                'name' => $request->name,
+                'email' => $request->email,
+                'position' => $request->position,
+                'department' => $request->department,
+                'updated_at' => now(),
+            ]);
+
+        session()->put([
+            'user_name' => $request->name,
+            'user_email' => $request->email,
+        ]);
+
+        $this->logAudit('update', 'account', $userId, "Updated account profile: {$request->name}", (array) $existingUser, $request->only(['name', 'email', 'position', 'department']));
+
+        return redirect()->back()->with('success', 'Account updated successfully');
+    }
+
+    public function updateEnterprise(Request $request)
+    {
+        $enterprise = $this->getUserEnterprise();
+
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'address' => 'nullable|string',
+            'email' => 'nullable|email|max:255',
+            'contact_person' => 'nullable|string|max:100',
+            'contact_number' => 'nullable|string|max:20',
+            'category' => 'nullable|string|max:255',
+            'is_active' => 'nullable|boolean',
+            'shop_logo' => 'nullable|image|max:2048',
+        ]);
+
+        $oldEnterprise = DB::table('enterprises')->where('enterprise_id', $enterprise->enterprise_id)->first();
+        if (!$oldEnterprise) {
+            return redirect()->back()->with('error', 'Enterprise not found');
+        }
+
+        $update = [
+            'name' => $request->name,
+            'address' => $request->address,
+            'contact_person' => $request->contact_person,
+            'contact_number' => $request->contact_number,
+            'updated_at' => now(),
+        ];
+
+        if (Schema::hasColumn('enterprises', 'email')) {
+            $update['email'] = $request->email;
+        }
+        if (Schema::hasColumn('enterprises', 'category')) {
+            $update['category'] = $request->category;
+        }
+        if (Schema::hasColumn('enterprises', 'is_active')) {
+            $update['is_active'] = $request->has('is_active') ? (bool) $request->is_active : (bool) ($oldEnterprise->is_active ?? true);
+        }
+
+        if ($request->hasFile('shop_logo') && Schema::hasColumn('enterprises', 'shop_logo')) {
+            $path = $request->file('shop_logo')->store('shop-logos', 'public');
+            $update['shop_logo'] = $path;
+        }
+
+        DB::table('enterprises')
+            ->where('enterprise_id', $enterprise->enterprise_id)
+            ->update($update);
+
+        $this->logAudit('update', 'enterprise', $enterprise->enterprise_id, "Updated enterprise settings: {$request->name}", (array) $oldEnterprise, $update);
+
+        return redirect()->back()->with('success', 'Print shop info updated successfully');
     }
 
     // =====================================================
@@ -111,10 +232,20 @@ class BusinessController extends Controller
         $userName = session('user_name');
         $enterprise = $this->getUserEnterprise();
 
+        $latestStatusTimes = DB::table('order_status_history')
+            ->select('purchase_order_id', DB::raw('MAX(timestamp) as latest_time'))
+            ->groupBy('purchase_order_id');
+
         $orders = DB::table('customer_orders')
             ->join('users', 'customer_orders.customer_id', '=', 'users.user_id')
-            ->leftJoin(DB::raw('(SELECT purchase_order_id, status_id, MAX(timestamp) as latest_time FROM order_status_history GROUP BY purchase_order_id, status_id ORDER BY latest_time DESC LIMIT 1) as latest_status'), 'customer_orders.purchase_order_id', '=', 'latest_status.purchase_order_id')
-            ->leftJoin('statuses', 'latest_status.status_id', '=', 'statuses.status_id')
+            ->leftJoinSub($latestStatusTimes, 'latest_status_times', function ($join) {
+                $join->on('customer_orders.purchase_order_id', '=', 'latest_status_times.purchase_order_id');
+            })
+            ->leftJoin('order_status_history as osh', function ($join) {
+                $join->on('customer_orders.purchase_order_id', '=', 'osh.purchase_order_id')
+                    ->on('osh.timestamp', '=', 'latest_status_times.latest_time');
+            })
+            ->leftJoin('statuses', 'osh.status_id', '=', 'statuses.status_id')
             ->where('customer_orders.enterprise_id', $enterprise->enterprise_id)
             ->select('customer_orders.*', 'users.name as customer_name', 'statuses.status_name')
             ->orderBy('customer_orders.created_at', 'desc')
@@ -158,7 +289,7 @@ class BusinessController extends Controller
         // Get status history
         $statusHistory = DB::table('order_status_history')
             ->join('statuses', 'order_status_history.status_id', '=', 'statuses.status_id')
-            ->join('users', 'order_status_history.user_id', '=', 'users.user_id')
+            ->leftJoin('users', 'order_status_history.user_id', '=', 'users.user_id')
             ->where('order_status_history.purchase_order_id', $id)
             ->select('order_status_history.*', 'statuses.status_name', 'statuses.description', 'users.name as user_name')
             ->orderBy('order_status_history.timestamp', 'desc')
@@ -217,8 +348,18 @@ class BusinessController extends Controller
             'updated_at' => now(),
         ]);
 
+        DB::table('customer_orders')
+            ->where('purchase_order_id', $id)
+            ->where('enterprise_id', $enterprise->enterprise_id)
+            ->update([
+                'status_id' => $request->status_id,
+                'updated_at' => now(),
+            ]);
+
         // Get new status name
         $newStatus = DB::table('statuses')->where('status_id', $request->status_id)->first();
+        $oldStatusName = $oldStatus?->status_name ?? 'Unknown';
+        $newStatusName = $newStatus?->status_name ?? 'Unknown';
 
         // Send notification to customer
         DB::table('order_notifications')->insert([
@@ -227,16 +368,16 @@ class BusinessController extends Controller
             'recipient_id' => $order->customer_id,
             'notification_type' => 'status_change',
             'title' => 'Order Status Updated',
-            'message' => "Your order #{$order->order_no} has been updated to: {$newStatus->status_name}. " . ($request->remarks ?? ''),
+            'message' => "Your order #{$order->order_no} has been updated to: {$newStatusName}. " . ($request->remarks ?? ''),
             'is_read' => false,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
 
         // Log audit
-        $this->logAudit('update', 'order_status', $id, "Order status changed from {$oldStatus->status_name} to {$newStatus->status_name}", 
-            ['status' => $oldStatus->status_name],
-            ['status' => $newStatus->status_name, 'remarks' => $request->remarks]
+        $this->logAudit('update', 'order_status', $id, "Order status changed from {$oldStatusName} to {$newStatusName}", 
+            ['status' => $oldStatusName],
+            ['status' => $newStatusName, 'remarks' => $request->remarks]
         );
 
         return redirect()->back()->with('success', 'Order status updated successfully');
@@ -456,10 +597,18 @@ class BusinessController extends Controller
             abort(404);
         }
 
-        $oldOption = DB::table('customization_options')->where('option_id', $optionId)->first();
+        $oldOption = DB::table('customization_options')
+            ->where('option_id', $optionId)
+            ->where('service_id', $serviceId)
+            ->first();
+
+        if (!$oldOption) {
+            abort(404);
+        }
 
         DB::table('customization_options')
             ->where('option_id', $optionId)
+            ->where('service_id', $serviceId)
             ->update([
                 'option_name' => $request->option_name,
                 'option_type' => $request->option_type,
@@ -487,9 +636,19 @@ class BusinessController extends Controller
             abort(404);
         }
 
-        $option = DB::table('customization_options')->where('option_id', $optionId)->first();
+        $option = DB::table('customization_options')
+            ->where('option_id', $optionId)
+            ->where('service_id', $serviceId)
+            ->first();
 
-        DB::table('customization_options')->where('option_id', $optionId)->delete();
+        if (!$option) {
+            abort(404);
+        }
+
+        DB::table('customization_options')
+            ->where('option_id', $optionId)
+            ->where('service_id', $serviceId)
+            ->delete();
 
         // Log audit
         $this->logAudit('delete', 'customization', $optionId, "Deleted customization option: {$option->option_name}", (array)$option, null);
@@ -530,8 +689,8 @@ class BusinessController extends Controller
             'rule_type' => 'required|string|max:50',
             'rule_description' => 'nullable|string',
             'calculation_method' => 'required|in:percentage,fixed_amount,formula',
-            'value' => 'required|numeric',
-            'formula' => 'nullable|string',
+            'value' => 'required_unless:calculation_method,formula|numeric',
+            'formula' => 'required_if:calculation_method,formula|nullable|string',
             'priority' => 'required|integer|min:0',
             'conditions' => 'nullable|json',
             'is_active' => 'boolean',
@@ -539,6 +698,8 @@ class BusinessController extends Controller
 
         $enterprise = $this->getUserEnterprise();
         $ruleId = Str::uuid();
+
+        $value = $request->calculation_method === 'formula' ? 0 : $request->value;
 
         DB::table('pricing_rules')->insert([
             'rule_id' => $ruleId,
@@ -548,7 +709,7 @@ class BusinessController extends Controller
             'rule_description' => $request->rule_description,
             'conditions' => $request->conditions ?? '[]',
             'calculation_method' => $request->calculation_method,
-            'value' => $request->value,
+            'value' => $value,
             'formula' => $request->formula,
             'priority' => $request->priority,
             'is_active' => $request->has('is_active'),
@@ -586,8 +747,8 @@ class BusinessController extends Controller
             'rule_type' => 'required|string|max:50',
             'rule_description' => 'nullable|string',
             'calculation_method' => 'required|in:percentage,fixed_amount,formula',
-            'value' => 'required|numeric',
-            'formula' => 'nullable|string',
+            'value' => 'required_unless:calculation_method,formula|numeric',
+            'formula' => 'required_if:calculation_method,formula|nullable|string',
             'priority' => 'required|integer|min:0',
             'conditions' => 'nullable|json',
             'is_active' => 'boolean',
@@ -601,6 +762,8 @@ class BusinessController extends Controller
             abort(404);
         }
 
+        $value = $request->calculation_method === 'formula' ? 0 : $request->value;
+
         DB::table('pricing_rules')
             ->where('rule_id', $id)
             ->update([
@@ -609,7 +772,7 @@ class BusinessController extends Controller
                 'rule_description' => $request->rule_description,
                 'conditions' => $request->conditions ?? '[]',
                 'calculation_method' => $request->calculation_method,
-                'value' => $request->value,
+                'value' => $value,
                 'formula' => $request->formula,
                 'priority' => $request->priority,
                 'is_active' => $request->has('is_active'),
@@ -732,6 +895,9 @@ class BusinessController extends Controller
      */
     public function chat()
     {
-        return view('business.chat');
+        $userName = session('user_name');
+        $enterprise = $this->getUserEnterprise();
+
+        return view('business.chat', compact('enterprise', 'userName'));
     }
 }

@@ -9,6 +9,11 @@
     
     <!-- TailwindCSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Bootstrap CSS (used by some business components like modals/tooltips) -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     
     <!-- Custom TailwindCSS Configuration -->
     <script>
@@ -58,6 +63,9 @@
             }
         }
     </script>
+
+    <link rel="stylesheet" href="{{ asset('css/design-system.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/chat.css') }}">
     
     <!-- Custom CSS -->
     <style>
@@ -92,6 +100,7 @@
         }
     </style>
     
+    <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body class="min-h-screen bg-background font-sans antialiased">
@@ -129,10 +138,10 @@
                         @endif
                     </a>
                     
-                    <a href="{{ route('business.products.index') }}" 
-                       class="nav-link flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-smooth {{ request()->routeIs('business.products.*') || request()->routeIs('business.customizations.*') ? 'active' : 'text-sidebar-foreground' }}">
+                    <a href="{{ route('business.services.index') }}" 
+                       class="nav-link flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-smooth {{ request()->routeIs('business.services.*') || request()->routeIs('business.customizations.*') ? 'active' : 'text-sidebar-foreground' }}">
                         <i data-lucide="package" class="h-5 w-5"></i>
-                        Products
+                        Services
                     </a>
                     
                     <a href="{{ route('business.pricing.index') }}" 
@@ -146,6 +155,12 @@
                         <i data-lucide="message-circle" class="h-5 w-5"></i>
                         Customer Chat
                         <span id="unread-messages-badge" class="ml-auto bg-primary text-primary-foreground text-xs px-2 py-1 rounded-full hidden">0</span>
+                    </a>
+
+                    <a href="{{ route('business.settings') }}" 
+                       class="nav-link flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-smooth {{ request()->routeIs('business.settings') || request()->routeIs('business.settings.*') ? 'active' : 'text-sidebar-foreground' }}">
+                        <i data-lucide="settings" class="h-5 w-5"></i>
+                        Settings
                     </a>
                     
                     <a href="{{ route('chat.direct') }}" 
@@ -259,6 +274,7 @@
     </div>
     
     <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         // Initialize Lucide icons
         lucide.createIcons();

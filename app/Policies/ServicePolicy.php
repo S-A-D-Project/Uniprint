@@ -40,7 +40,7 @@ class ServicePolicy
 
         // Customers can view all available services
         if ($user->role_type === 'customer') {
-            return $service->is_available;
+            return (bool) $service->is_active;
         }
 
         return false;

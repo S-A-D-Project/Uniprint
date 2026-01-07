@@ -46,7 +46,7 @@
             <div class="col-md-6">
                 <p class="mb-2">
                     <i class="bi bi-envelope me-2 text-primary"></i>
-                    <strong>Email:</strong> {{ $enterprise->contact_email ?? 'Not specified' }}
+                    <strong>Email:</strong> {{ $enterprise->email ?? 'Not specified' }}
                 </p>
             </div>
         </div>
@@ -65,7 +65,7 @@
                 </div>
 
                 <p class="card-text text-muted mb-3">
-                    {{ $service->description_text ? Str::limit($service->description_text, 100) : 'No description available' }}
+                    {{ $service->description ? \Illuminate\Support\Str::limit($service->description, 100) : 'No description available' }}
                 </p>
 
                 <div class="border-top pt-3 mb-3">
@@ -75,11 +75,11 @@
                     </div>
                 </div>
 
-                @if($service->customizationGroups->count() > 0)
+                @if($service->customizationOptions->count() > 0)
                 <div class="mb-3">
                     <small class="text-muted">
                         <i class="bi bi-gear me-1"></i>
-                        {{ $service->customizationGroups->count() }} customization options available
+                        {{ $service->customizationOptions->count() }} customization options available
                     </small>
                 </div>
                 @endif

@@ -85,7 +85,7 @@ $breadcrumbs = [
                 <h3 class="text-3xl font-bold">₱{{ number_format($stats['total_revenue'] ?? 0, 2) }}</h3>
             </div>
             <div class="bg-white/20 p-3 rounded-lg">
-                <i data-lucide="dollar-sign" class="h-6 w-6"></i>
+                <i data-lucide="peso-sign" class="h-6 w-6"></i>
             </div>
         </div>
         <div class="flex items-center gap-1 text-sm text-white/80">
@@ -185,25 +185,42 @@ $breadcrumbs = [
                             </div>
                         </td>
                         <td class="p-4">
-                            <span class="inline-flex items-center gap-1 px-2 py-1 text-xs bg-success/10 text-success rounded-md font-medium">
-                                <i data-lucide="check-circle" class="h-3 w-3"></i>
-                                Active
-                            </span>
+                            @php
+                                $isActive = isset($enterprise->is_active) ? (bool) $enterprise->is_active : true;
+                            @endphp
+                            @if($isActive)
+                                <span class="inline-flex items-center gap-1 px-2 py-1 text-xs bg-success/10 text-success rounded-md font-medium">
+                                    <i data-lucide="check-circle" class="h-3 w-3"></i>
+                                    Active
+                                </span>
+                            @else
+                                <span class="inline-flex items-center gap-1 px-2 py-1 text-xs bg-secondary text-secondary-foreground rounded-md font-medium">
+                                    <i data-lucide="x-circle" class="h-3 w-3"></i>
+                                    Inactive
+                                </span>
+                            @endif
                         </td>
                         <td class="p-4">
                             <div class="flex items-center gap-2">
-                                <button class="p-2 hover:bg-secondary rounded-md transition-colors" title="View Details">
+                                <a href="{{ route('admin.enterprises.details', $enterprise->enterprise_id) }}" class="p-2 hover:bg-secondary rounded-md transition-colors" title="View Details">
                                     <i data-lucide="eye" class="h-4 w-4"></i>
-                                </button>
-                                <button class="p-2 hover:bg-secondary rounded-md transition-colors" title="Manage Services">
+                                </a>
+                                <a href="{{ route('admin.services', ['enterprise_id' => $enterprise->enterprise_id]) }}" class="p-2 hover:bg-secondary rounded-md transition-colors" title="Manage Services">
                                     <i data-lucide="package" class="h-4 w-4"></i>
-                                </button>
-                                <button class="p-2 hover:bg-secondary rounded-md transition-colors" title="View Orders">
+                                </a>
+                                <a href="{{ route('admin.orders', ['enterprise_id' => $enterprise->enterprise_id]) }}" class="p-2 hover:bg-secondary rounded-md transition-colors" title="View Orders">
                                     <i data-lucide="shopping-cart" class="h-4 w-4"></i>
-                                </button>
-                                <button class="p-2 hover:bg-secondary rounded-md transition-colors" title="Settings">
-                                    <i data-lucide="settings" class="h-4 w-4"></i>
-                                </button>
+                                </a>
+                                <form method="POST" action="{{ route('admin.enterprises.toggle-active', $enterprise->enterprise_id) }}">
+                                    @csrf
+                                    <button type="submit" class="p-2 hover:bg-secondary rounded-md transition-colors" title="Toggle Active">
+                                        @if($isActive)
+                                            <i data-lucide="x-circle" class="h-4 w-4"></i>
+                                        @else
+                                            <i data-lucide="check-circle" class="h-4 w-4"></i>
+                                        @endif
+                                    </button>
+                                </form>
                             </div>
                         </td>
                     </tr>
@@ -253,7 +270,7 @@ $breadcrumbs = [
                     </div>
                 </div>
                 <div class="text-right">
-                    <div class="font-semibold">₱{{ number_format($order->total_order_amount ?? 0, 2) }}</div>
+                    <div class="font-semibold">₱{{ number_format($order->total ?? 0, 2) }}</div>
                     <div class="text-xs text-muted-foreground">
                         {{ isset($order->created_at) ? (is_string($order->created_at) ? date('M d, Y', strtotime($order->created_at)) : $order->created_at->format('M d, Y')) : 'Unknown date' }}
                     </div>
@@ -296,7 +313,7 @@ class EnterpriseManager {
         }
 
         // Action buttons
-        document.querySelectorAll('[title="View Details"]').forEach(btn => {
+        document.querySelectorAll('button[title="View Details"]').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const row = e.target.closest('tr');
                 const enterpriseName = row.querySelector('.font-semibold').textContent;
@@ -304,7 +321,7 @@ class EnterpriseManager {
             });
         });
 
-        document.querySelectorAll('[title="Manage Services"]').forEach(btn => {
+        document.querySelectorAll('button[title="Manage Services"]').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const row = e.target.closest('tr');
                 const enterpriseName = row.querySelector('.font-semibold').textContent;
@@ -312,7 +329,7 @@ class EnterpriseManager {
             });
         });
 
-        document.querySelectorAll('[title="View Orders"]').forEach(btn => {
+        document.querySelectorAll('button[title="View Orders"]').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const row = e.target.closest('tr');
                 const enterpriseName = row.querySelector('.font-semibold').textContent;

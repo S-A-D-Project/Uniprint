@@ -58,7 +58,7 @@ $breadcrumbs = [
     <x-admin.stat-card 
         title="Total Revenue" 
         value="₱{{ number_format($stats['total_revenue'] ?? 0, 2) }}" 
-        icon="dollar-sign"
+        icon="peso-sign"
         color="success"
         trend="+15% from last month"
         trendType="up" />

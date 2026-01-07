@@ -59,7 +59,7 @@
             background: linear-gradient(135deg, hsl(16 90% 62%), hsl(16 95% 70%));
         }
         .gradient-hero {
-            background: linear-gradient(135deg, hsl(263 70% 50%) 0%, hsl(220 70% 50%) 100%));
+            background: linear-gradient(135deg, hsl(263 70% 50%) 0%, hsl(220 70% 50%) 100%);
         }
         .shadow-card {
             box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
