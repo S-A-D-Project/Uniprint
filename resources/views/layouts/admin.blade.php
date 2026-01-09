@@ -141,10 +141,10 @@
                         Orders
                     </a>
                     
-                    <a href="{{ route('admin.products') }}" 
-                       class="nav-link flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-smooth {{ request()->routeIs('admin.products') ? 'active' : 'text-sidebar-foreground' }}">
+                    <a href="{{ route('admin.services') }}" 
+                       class="nav-link flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-smooth {{ request()->routeIs('admin.services') || request()->routeIs('admin.products') ? 'active' : 'text-sidebar-foreground' }}">
                         <i data-lucide="package" class="h-5 w-5"></i>
-                        Products
+                        Services
                     </a>
                     
                     <a href="{{ route('admin.reports') }}" 

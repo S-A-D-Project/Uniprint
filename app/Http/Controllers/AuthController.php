@@ -138,6 +138,7 @@ class AuthController extends Controller
             'username' => 'required|string|unique:login,username|max:100',
             'password' => 'required|string|min:6|confirmed',
             'role_type' => 'nullable|string',
+            'terms_accepted' => 'accepted',
         ]);
 
         $desiredRoleType = $request->input('role_type', 'customer');

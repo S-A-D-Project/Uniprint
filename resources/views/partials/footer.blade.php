@@ -75,7 +75,7 @@
             </p>
             <div class="flex gap-6 text-sm">
                 <a href="#" class="text-muted-foreground hover:text-primary transition-smooth">Privacy Policy</a>
-                <a href="#" class="text-muted-foreground hover:text-primary transition-smooth">Terms of Service</a>
+                <a href="{{ route('terms') }}" class="text-muted-foreground hover:text-primary transition-smooth">Terms &amp; Conditions</a>
                 <a href="#" class="text-muted-foreground hover:text-primary transition-smooth">Cookie Policy</a>
             </div>
         </div>

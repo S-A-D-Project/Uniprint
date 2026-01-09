@@ -252,11 +252,11 @@
                     
                     <p class="text-muted-foreground mb-4 flex items-center">
                         <i data-lucide="package" class="h-4 w-4 mr-2"></i>
-                        {{ $enterprise->products_count }} Products Available
+                        {{ $enterprise->products_count }} Services Available
                     </p>
                     
                     <a href="{{ route('enterprises.show', $enterprise->enterprise_id) }}" class="btn btn-outline btn-md w-full">
-                        View Products
+                        View Services
                         <i data-lucide="arrow-right" class="ml-2 h-4 w-4"></i>
                     </a>
                 </div>
@@ -295,7 +295,7 @@
                     <i data-lucide="search" class="h-6 w-6 text-primary-foreground"></i>
                 </div>
                 <h3 class="text-lg font-semibold mb-2">1. Browse</h3>
-                <p class="text-muted-foreground">Find printing businesses and products</p>
+                <p class="text-muted-foreground">Find printing businesses and services</p>
             </div>
             <div class="text-center">
                 <div class="feature-icon mx-auto mb-4">
@@ -491,11 +491,11 @@
                             
                             <p class="product-count mb-3">
                                 <i class="bi bi-box-seam me-1"></i>
-                                {{ $enterprise->products_count }} Products Available
+                                {{ $enterprise->products_count }} Services Available
                             </p>
                             
                             <a href="{{ route('enterprises.show', $enterprise->enterprise_id) }}" class="btn btn-outline-primary w-100">
-                                <i class="bi bi-arrow-right me-2"></i>View Products
+                                <i class="bi bi-arrow-right me-2"></i>View Services
                             </a>
                         </div>
                     </div>
@@ -535,7 +535,7 @@
                             <i class="bi bi-search"></i>
                         </div>
                         <h5 class="mt-3">1. Browse</h5>
-                        <p class="text-muted">Find printing businesses and products</p>
+                        <p class="text-muted">Find printing businesses and services</p>
                     </div>
                 </div>
                 <div class="col-md-3">
@@ -562,7 +562,7 @@
                             <i class="bi bi-truck"></i>
                         </div>
                         <h5 class="mt-3">4. Receive</h5>
-                        <p class="text-muted">Get your products delivered</p>
+                        <p class="text-muted">Get your services delivered</p>
                     </div>
                 </div>
             </div>

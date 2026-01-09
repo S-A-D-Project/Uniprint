@@ -64,7 +64,7 @@
 
                 <a href="{{ route('customer.enterprise.services', $enterprise->enterprise_id) }}" 
                    class="btn btn-primary w-100">
-                    <i class="bi bi-arrow-right-circle me-2"></i>View Products
+                    <i class="bi bi-arrow-right-circle me-2"></i>View Services
                 </a>
             </div>
         </div>

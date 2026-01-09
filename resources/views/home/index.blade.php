@@ -296,7 +296,7 @@
                     <i data-lucide="search" class="h-6 w-6 text-primary-foreground"></i>
                 </div>
                 <h3 class="text-lg font-semibold mb-2">1. Browse</h3>
-                <p class="text-muted-foreground">Find printing businesses and products</p>
+                <p class="text-muted-foreground">Find printing businesses and services</p>
             </div>
             <div class="text-center">
                 <div class="feature-icon mx-auto mb-4">

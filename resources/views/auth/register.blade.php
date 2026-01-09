@@ -121,6 +121,27 @@
                         <label for="password_confirmation" class="text-sm font-medium">Confirm Password</label>
                         <input id="password_confirmation" name="password_confirmation" type="password" required class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
                     </div>
+
+                    <div class="space-y-2">
+                        <label class="flex items-start gap-3 text-sm">
+                            <input
+                                id="terms_accepted"
+                                name="terms_accepted"
+                                type="checkbox"
+                                value="1"
+                                {{ old('terms_accepted') ? 'checked' : '' }}
+                                class="mt-1 h-4 w-4 rounded border-input text-primary focus:ring-ring @error('terms_accepted') border-destructive @enderror"
+                                required
+                            >
+                            <span class="text-muted-foreground">
+                                I agree to the
+                                <a href="{{ route('terms') }}" target="_blank" rel="noopener" class="text-primary hover:underline">Terms &amp; Conditions</a>
+                            </span>
+                        </label>
+                        @error('terms_accepted')
+                            <p class="text-sm text-destructive">{{ $message }}</p>
+                        @enderror
+                    </div>
                     
                     <button type="submit" class="w-full px-4 py-2 bg-primary text-primary-foreground font-medium rounded-md hover:shadow-glow transition-smooth">
                         Create Account
@@ -166,7 +187,7 @@
         </div>
 
         <p class="text-center text-sm text-muted-foreground">
-            By creating an account, you agree to our Terms of Service and Privacy Policy
+            By creating an account, you agree to our <a href="{{ route('terms') }}" class="text-primary hover:underline">Terms &amp; Conditions</a> and Privacy Policy
         </p>
     </div>
 

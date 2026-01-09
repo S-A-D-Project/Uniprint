@@ -316,11 +316,11 @@
                         <span>Orders</span>
                     </a>
                     
-                    <a href="{{ route('admin.products') }}" 
-                       class="nav-link {{ request()->routeIs('admin.products') ? 'active' : '' }}"
-                       aria-label="Products Management">
+                    <a href="{{ route('admin.services') }}" 
+                       class="nav-link {{ request()->routeIs('admin.services') || request()->routeIs('admin.products') ? 'active' : '' }}"
+                       aria-label="Services Management">
                         <i data-lucide="package" class="h-5 w-5"></i>
-                        <span>Products</span>
+                        <span>Services</span>
                     </a>
                     
                     <a href="{{ route('admin.reports') }}" 

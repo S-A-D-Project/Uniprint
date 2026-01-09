@@ -917,7 +917,7 @@ function saveService(productId) {
 }
 
 function orderService(productId) {
-    window.location.href = `/products/${productId}`;
+    window.location.href = `/services/${productId}`;
 }
 
 function switchToServicesTab() {

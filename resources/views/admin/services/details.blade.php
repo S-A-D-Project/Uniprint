@@ -7,7 +7,7 @@
 @php
 $breadcrumbs = [
     ['label' => 'Dashboard', 'url' => route('admin.dashboard')],
-    ['label' => 'Products', 'url' => route('admin.products')],
+    ['label' => 'Services', 'url' => route('admin.services')],
     ['label' => 'Service Details', 'url' => '#'],
 ];
 @endphp

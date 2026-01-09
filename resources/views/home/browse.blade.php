@@ -35,7 +35,7 @@
                         <label class="form-label fw-semibold">Sort By</label>
                         <select name="sort" class="form-select">
                             <option value="name" {{ request('sort') == 'name' ? 'selected' : '' }}>Name</option>
-                            <option value="products" {{ request('sort') == 'products' ? 'selected' : '' }}>Most Products</option>
+                            <option value="services" {{ request('sort') == 'services' ? 'selected' : '' }}>Most Services</option>
                         </select>
                     </div>
                 </div>
@@ -82,7 +82,7 @@
                     </div>
                     
                     <a href="{{ route('home.enterprise', $enterprise->enterprise_id) }}" class="btn btn-outline-primary w-100">
-                        View Products <i class="bi bi-arrow-right ms-2"></i>
+                        View Services <i class="bi bi-arrow-right ms-2"></i>
                     </a>
                 </div>
             </div>

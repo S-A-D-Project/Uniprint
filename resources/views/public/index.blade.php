@@ -44,8 +44,8 @@
                             <div class="text-sm text-muted-foreground">Print Jobs</div>
                         </div>
                         <div>
-                            <div class="text-3xl font-bold text-primary">{{ $stats['total_products'] }}+</div>
-                            <div class="text-sm text-muted-foreground">Products</div>
+                            <div class="text-3xl font-bold text-primary">{{ $stats['total_services'] }}+</div>
+                            <div class="text-sm text-muted-foreground">Services</div>
                         </div>
                     </div>
                 </div>
@@ -130,7 +130,7 @@
                     </div>
                     <h3 class="text-lg font-bold mb-2">Customize Order</h3>
                     <p class="text-muted-foreground text-sm">
-                        Select products and customize with our AI tools
+                        Select services and customize with our AI tools
                     </p>
                 </div>
 
@@ -171,16 +171,16 @@
 
             <div class="grid md:grid-cols-3 lg:grid-cols-6 gap-6">
                 @forelse($popularServices as $index => $service)
-                    <a href="{{ route('products.show', $service->product_id) }}" class="bg-card border border-border rounded-xl shadow-card hover:shadow-card-hover transition-smooth p-6 text-center block">
+                    <a href="{{ route('services.show', $service->service_id ?? $service->product_id) }}" class="bg-card border border-border rounded-xl shadow-card hover:shadow-card-hover transition-smooth p-6 text-center block">
                         <div class="w-12 h-12 mx-auto mb-3 rounded-lg {{ $index % 2 == 0 ? 'gradient-primary' : 'gradient-accent' }} flex items-center justify-center">
                             <i data-lucide="package" class="h-6 w-6 text-white"></i>
                         </div>
-                        <h4 class="font-semibold mb-1">{{ $service->product_name }}</h4>
+                        <h4 class="font-semibold mb-1">{{ $service->service_name ?? $service->product_name }}</h4>
                         <p class="text-xs text-muted-foreground">From ₱{{ number_format($service->base_price, 2) }}</p>
                         <p class="text-xs text-muted-foreground mt-1">{{ $service->enterprise_name }}</p>
                     </a>
                 @empty
-                    <!-- Fallback if no products -->
+                    <!-- Fallback if no services -->
                     <div class="col-span-full text-center text-muted-foreground">
                         No services available yet
                     </div>

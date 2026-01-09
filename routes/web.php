@@ -31,6 +31,7 @@ RateLimiter::for('login', function (Request $request) {
 
 // Public routes
 Route::get('/', [HomeController::class, 'index'])->name('home');
+Route::view('/terms', 'public.terms')->name('terms');
 Route::get('/enterprises', [HomeController::class, 'enterprises'])->name('enterprises.index');
 Route::get('/enterprises/{id}', [HomeController::class, 'showEnterprise'])->whereUuid('id')->name('enterprises.show');
 Route::get('/services/{id}', [HomeController::class, 'showService'])->whereUuid('id')->name('services.show');
@@ -134,7 +135,9 @@ Route::prefix('admin')->middleware([\App\Http\Middleware\CheckAuth::class, \App\
     Route::get('/services', [AdminController::class, 'services'])->name('services');
     Route::get('/services/{id}', [AdminController::class, 'serviceDetails'])->whereUuid('id')->name('services.details');
     Route::post('/services/{id}/toggle-active', [AdminController::class, 'toggleServiceActive'])->whereUuid('id')->name('services.toggle-active');
-    Route::get('/products', [AdminController::class, 'products'])->name('products');
+    Route::get('/products', function () {
+        return redirect()->route('admin.services');
+    })->name('products');
     Route::get('/reports', [AdminController::class, 'reports'])->name('reports');
     
     // Real-time API endpoints

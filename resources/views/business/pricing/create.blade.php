@@ -2,7 +2,7 @@
 
 @section('title', 'Create Pricing Rule')
 @section('page-title', 'Create Pricing Rule')
-@section('page-subtitle', 'Define dynamic pricing for your products')
+@section('page-subtitle', 'Define dynamic pricing for your services')
 
 @section('header-actions')
 <a href="{{ route('business.pricing.index') }}" class="inline-flex items-center gap-2 px-4 py-2 text-sm border border-input rounded-lg hover:bg-secondary transition-smooth">

@@ -229,7 +229,7 @@
         </div>
 
         <p class="text-center text-sm text-muted-foreground">
-            By continuing, you agree to our Terms of Service and Privacy Policy
+            By continuing, you agree to our <a href="{{ route('terms') }}" class="text-primary hover:underline">Terms &amp; Conditions</a> and Privacy Policy
         </p>
     </div>
 

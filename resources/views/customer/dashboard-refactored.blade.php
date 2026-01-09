@@ -263,7 +263,7 @@ class DashboardTabs {
 }
 
 function orderService(productId) {
-    window.location.href = `/products/${productId}`;
+    window.location.href = `/services/${productId}`;
 }
 
 // Initialize when DOM is ready

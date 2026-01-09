@@ -249,7 +249,7 @@ class Chatbot {
         
         // Pricing responses
         if (lowerMessage.includes('price') || lowerMessage.includes('cost') || lowerMessage.includes('how much')) {
-            return "Pricing varies based on the product, quantity, materials, and customization options. You can see exact pricing when you browse products or add items to your cart. We also offer bulk discounts for larger orders.";
+            return "Pricing varies based on the service, quantity, materials, and customization options. You can see exact pricing when you browse services or add items to your cart. We also offer bulk discounts for larger orders.";
         }
         
         // Design-related responses
@@ -271,7 +271,7 @@ class Chatbot {
         const defaultResponses = [
             "That's a great question! Let me help you with that. Could you provide more details about what specific information you need?",
             "I'd be happy to assist you! Our services include business cards, flyers, posters, t-shirts, and more. What type of printing are you interested in?",
-            "Thank you for your inquiry! You can browse our available services and products, or let me know what specific information you need about UniPrint.",
+            "Thank you for your inquiry! You can browse our available services, or let me know what specific information you need about UniPrint.",
             "I'm here to help with all your printing needs! Feel free to ask about our services, pricing, delivery options, or order tracking."
         ];
         
