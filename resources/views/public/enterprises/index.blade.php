@@ -11,33 +11,47 @@
                     Find the perfect printing shop for your needs with AI-enhanced ordering
                 </p>
 
-                <div class="flex flex-col md:flex-row gap-4">
-                    <div class="relative flex-1">
-                        <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground"></i>
-                        <input 
-                            type="text" 
-                            id="searchInput"
-                            placeholder="Search for printing shops..." 
-                            class="w-full pl-10 pr-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-                        />
+                <form method="GET" action="{{ route('enterprises.index') }}" class="grid grid-cols-1 md:grid-cols-12 gap-4">
+                    <div class="md:col-span-6">
+                        <label class="block text-sm font-medium text-muted-foreground mb-1">Search</label>
+                        <div class="relative">
+                            <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground"></i>
+                            <input
+                                type="text"
+                                name="search"
+                                value="{{ request('search') }}"
+                                placeholder="Search for printing shops..."
+                                class="w-full pl-10 pr-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                            />
+                        </div>
                     </div>
-                </div>
 
-                <div class="flex gap-2 mt-4 flex-wrap">
-                    <button onclick="filterCategory('All')" class="category-btn px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground transition-smooth" data-category="All">
-                        All
-                    </button>
-                    @foreach($categories as $category)
-                        <button onclick="filterCategory('{{ $category }}')" class="category-btn px-4 py-2 text-sm font-medium rounded-md border border-input hover:bg-accent hover:text-accent-foreground transition-smooth" data-category="{{ $category }}">
-                            {{ $category }}
+                    <div class="md:col-span-4">
+                        <label class="block text-sm font-medium text-muted-foreground mb-1">Category</label>
+                        <select name="category" class="w-full px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
+                            <option value="">All Categories</option>
+                            @foreach($categories as $category)
+                                <option value="{{ $category }}" {{ request('category') === $category ? 'selected' : '' }}>
+                                    {{ $category }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div class="md:col-span-2 flex items-end gap-2">
+                        <button type="submit" class="w-full px-4 py-2 bg-primary text-primary-foreground font-medium rounded-md hover:shadow-glow transition-smooth">
+                            Apply
                         </button>
-                    @endforeach
-                </div>
+                        <a href="{{ route('enterprises.index') }}" class="w-full text-center px-4 py-2 border border-input rounded-md hover:bg-secondary transition-smooth">
+                            Clear
+                        </a>
+                    </div>
+                </form>
             </div>
 
-            <div id="enterprisesGrid" class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                 @forelse($enterprises as $enterprise)
-                    <div class="enterprise-card bg-card border border-border rounded-xl shadow-card hover:shadow-card-hover transition-smooth overflow-hidden group" data-category="All" data-name="{{ strtolower($enterprise->name) }}">
+                    <div class="bg-card border border-border rounded-xl shadow-card hover:shadow-card-hover transition-smooth overflow-hidden group">
                         <div class="h-48 gradient-hero"></div>
                         
                         <div class="p-6">
@@ -82,58 +96,11 @@
                 @endforelse
             </div>
 
-            <div id="noResults" class="hidden text-center py-12">
-                <i data-lucide="search-x" class="h-16 w-16 mx-auto mb-4 text-muted-foreground"></i>
-                <p class="text-lg text-muted-foreground">No printing shops found matching your criteria</p>
-            </div>
+            @if($enterprises->hasPages())
+                <div class="mt-8 d-flex justify-content-center">
+                    {{ $enterprises->appends(request()->query())->links() }}
+                </div>
+            @endif
         </main>
     </div>
 @endsection
-
-@push('scripts')
-<script>
-    let selectedCategory = 'All';
-    
-    function filterCategory(category) {
-        selectedCategory = category;
-        
-        // Update button styles
-        document.querySelectorAll('.category-btn').forEach(btn => {
-            if (btn.dataset.category === category) {
-                btn.className = 'category-btn px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground transition-smooth';
-            } else {
-                btn.className = 'category-btn px-4 py-2 text-sm font-medium rounded-md border border-input hover:bg-accent hover:text-accent-foreground transition-smooth';
-            }
-        });
-        
-        filterEnterprises();
-    }
-    
-    function filterEnterprises() {
-        const searchQuery = document.getElementById('searchInput').value.toLowerCase();
-        const cards = document.querySelectorAll('.enterprise-card');
-        let visibleCount = 0;
-        
-        cards.forEach(card => {
-            const cardCategory = card.dataset.category;
-            const cardName = card.dataset.name;
-            
-            const matchesCategory = selectedCategory === 'All' || cardCategory === selectedCategory;
-            const matchesSearch = cardName.includes(searchQuery);
-            
-            if (matchesCategory && matchesSearch) {
-                card.style.display = 'block';
-                visibleCount++;
-            } else {
-                card.style.display = 'none';
-            }
-        });
-        
-        // Show/hide no results message
-        document.getElementById('noResults').classList.toggle('hidden', visibleCount > 0);
-    }
-    
-    // Search input listener
-    document.getElementById('searchInput').addEventListener('input', filterEnterprises);
-</script>
-@endpush

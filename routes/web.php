@@ -90,6 +90,8 @@ Route::middleware([\App\Http\Middleware\CheckAuth::class])->group(function () {
     Route::delete('/saved-services/{savedServiceId}', [\App\Http\Controllers\SavedServiceController::class, 'remove'])->name('saved-services.remove');
     Route::post('/saved-services/clear', [\App\Http\Controllers\SavedServiceController::class, 'clear'])->name('saved-services.clear');
     Route::get('/saved-services/count', [\App\Http\Controllers\SavedServiceController::class, 'getCount'])->name('saved-services.count');
+    Route::post('/saved-services/selection', [\App\Http\Controllers\SavedServiceController::class, 'setSelection'])->name('saved-services.selection.set');
+    Route::delete('/saved-services/selection', [\App\Http\Controllers\SavedServiceController::class, 'clearSelection'])->name('saved-services.selection.clear');
     // Profile routes
     Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
     Route::get('/profile/connect/facebook', [ProfileController::class, 'redirectToFacebookConnect'])->name('profile.connect-facebook');
@@ -166,6 +168,7 @@ Route::prefix('business')->middleware([\App\Http\Middleware\CheckAuth::class, \A
     // Order Management
     Route::get('/orders', [BusinessController::class, 'orders'])->name('orders.index');
     Route::get('/orders/{id}', [BusinessController::class, 'orderDetails'])->whereUuid('id')->name('orders.details');
+    Route::post('/orders/{id}/confirm', [BusinessController::class, 'confirmOrder'])->whereUuid('id')->name('orders.confirm');
     Route::post('/orders/{id}/status', [BusinessController::class, 'updateOrderStatus'])->whereUuid('id')->name('orders.update-status');
     
     // Service Management
@@ -174,8 +177,8 @@ Route::prefix('business')->middleware([\App\Http\Middleware\CheckAuth::class, \A
     Route::post('/services', [BusinessController::class, 'storeService'])->name('services.store');
     Route::get('/services/{id}/edit', [BusinessController::class, 'editService'])->whereUuid('id')->name('services.edit');
     Route::put('/services/{id}', [BusinessController::class, 'updateService'])->whereUuid('id')->name('services.update');
+    Route::post('/services/{id}/toggle-status', [BusinessController::class, 'toggleServiceStatus'])->whereUuid('id')->name('services.toggle-status');
     Route::delete('/services/{id}', [BusinessController::class, 'deleteService'])->whereUuid('id')->name('services.delete');
-    
     
     // Customization Management
     Route::get('/services/{serviceId}/customizations', [BusinessController::class, 'customizations'])->whereUuid('serviceId')->name('customizations.index');

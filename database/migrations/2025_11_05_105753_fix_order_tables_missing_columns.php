@@ -12,6 +12,12 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (! Schema::hasTable('statuses') || ! Schema::hasTable('customer_orders')) {
+            return;
+        }
+
+        $isSqlite = DB::connection()->getDriverName() === 'sqlite';
+
         // Seed default statuses if they don't exist first
         DB::table('statuses')->insertOrIgnore([
             [
@@ -42,9 +48,12 @@ return new class extends Migration
         ]);
 
         // Add status_id to customer_orders table for direct status tracking (without foreign key for now)
-        Schema::table('customer_orders', function (Blueprint $table) {
-            if (!Schema::hasColumn('customer_orders', 'status_id')) {
-                $table->uuid('status_id')->nullable()->after('enterprise_id');
+        Schema::table('customer_orders', function (Blueprint $table) use ($isSqlite) {
+            if (! Schema::hasColumn('customer_orders', 'status_id')) {
+                $col = $table->uuid('status_id')->nullable();
+                if (! $isSqlite) {
+                    $col->after('enterprise_id');
+                }
             }
         });
     }

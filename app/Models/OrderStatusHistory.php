@@ -10,30 +10,23 @@ class OrderStatusHistory extends Model
     use HasFactory;
 
     protected $table = 'order_status_history';
-    protected $primaryKey = 'history_id';
+    protected $primaryKey = 'approval_id';
+    protected $keyType = 'string';
+    public $incrementing = false;
 
     protected $fillable = [
-        'order_id',
-        'status_name',
-        'status_timestamp',
-        'staff_id',
+        'approval_id',
+        'purchase_order_id',
+        'user_id',
+        'status_id',
+        'remarks',
+        'timestamp',
     ];
 
     protected function casts(): array
     {
         return [
-            'status_timestamp' => 'datetime',
+            'timestamp' => 'datetime',
         ];
-    }
-
-    // Relationships
-    public function order()
-    {
-        return $this->belongsTo(CustomerOrder::class, 'order_id', 'order_id');
-    }
-
-    public function staff()
-    {
-        return $this->belongsTo(Staff::class, 'staff_id', 'staff_id');
     }
 }

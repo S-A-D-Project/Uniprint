@@ -3,6 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
@@ -11,10 +12,14 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('discount_codes', function (Blueprint $table) {
+        $isSqlite = DB::connection()->getDriverName() === 'sqlite';
+
+        Schema::create('discount_codes', function (Blueprint $table) use ($isSqlite) {
             $table->uuid('id')->primary();
             $table->string('code')->unique();
-            $table->enum('discount_type', ['percentage', 'fixed']);
+            $col = $isSqlite
+                ? $table->string('discount_type')
+                : $table->enum('discount_type', ['percentage', 'fixed']);
             $table->decimal('discount_value', 10, 2);
             $table->decimal('minimum_order', 10, 2)->default(0);
             $table->integer('usage_limit')->nullable();

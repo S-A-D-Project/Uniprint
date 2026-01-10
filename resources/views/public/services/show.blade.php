@@ -21,9 +21,15 @@
             <div class="grid lg:grid-cols-2 gap-8">
                 <!-- Service Image and Info -->
                 <div>
-                    <div class="h-96 gradient-accent rounded-xl mb-4 flex items-center justify-center">
-                        <i data-lucide="printer" class="h-32 w-32 text-white"></i>
-                    </div>
+                    @if(!empty($service->image_path))
+                        <div class="h-96 bg-secondary rounded-xl mb-4 overflow-hidden">
+                            <img src="{{ asset('storage/' . $service->image_path) }}" alt="{{ $service->service_name }}" class="w-full h-full object-cover" />
+                        </div>
+                    @else
+                        <div class="h-96 gradient-accent rounded-xl mb-4 flex items-center justify-center">
+                            <i data-lucide="printer" class="h-32 w-32 text-white"></i>
+                        </div>
+                    @endif
                     <div class="space-y-4">
                         <div>
                             <a href="{{ route('enterprises.show', $service->enterprise_id) }}" class="inline-block px-3 py-1 text-sm font-medium bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-smooth">

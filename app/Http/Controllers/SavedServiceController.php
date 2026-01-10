@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use App\Models\SavedService;
 use App\Models\SavedServiceCollection;
@@ -91,7 +92,8 @@ class SavedServiceController extends Controller
 
             return redirect()->back()->with('success', 'Service saved successfully!');
             
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            Log::error('SavedServiceController@save error: ' . $e->getMessage(), ['exception' => $e]);
             if ($request->expectsJson()) {
                 return response()->json([
                     'success' => false,
@@ -109,7 +111,8 @@ class SavedServiceController extends Controller
     public function update(Request $request, $savedServiceId)
     {
         $request->validate([
-            'quantity' => 'required|integer|min:1|max:100',
+            'quantity' => 'required|integer|min:0|max:100',
+            'special_instructions' => 'nullable|string|max:500',
         ]);
 
         try {
@@ -122,30 +125,124 @@ class SavedServiceController extends Controller
                 ], 401);
             }
             
+            Log::info('SavedServiceController@update request', [
+                'user_id' => $userId,
+                'saved_service_id' => $savedServiceId,
+                'quantity' => $request->quantity,
+                'has_special_instructions' => $request->has('special_instructions'),
+            ]);
+
             $savedService = SavedService::updateServiceQuantity(
                 $userId,
                 $savedServiceId,
-                $request->quantity
+                (int) $request->quantity
             );
-            
-            if ($savedService) {
+
+            // quantity == 0 means removed
+            if ($savedService === null) {
                 return response()->json([
                     'success' => true,
-                    'message' => 'Service updated successfully!',
-                    'total_price' => $savedService->formatted_total_price,
-                    'total_amount' => SavedService::getTotalAmount($userId)
+                    'removed' => true,
+                    'message' => 'Service removed successfully!',
+                    'count' => SavedService::getServicesCount($userId),
+                    'total_amount' => SavedService::getTotalAmount($userId),
                 ]);
-            } else {
+            }
+
+            if ($savedService === false) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Service not found'
                 ], 404);
             }
+
+            if ($request->has('special_instructions')) {
+                $savedService->update([
+                    'special_instructions' => $request->special_instructions,
+                ]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Service updated successfully!',
+                'total_price' => $savedService->formatted_total_price,
+                'total_amount' => SavedService::getTotalAmount($userId)
+            ]);
             
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            Log::error('SavedServiceController@update error: ' . $e->getMessage(), ['exception' => $e]);
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to update service: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Store selected saved services for checkout
+     */
+    public function setSelection(Request $request)
+    {
+        $request->validate([
+            'selected' => 'required|array|min:1',
+            'selected.*' => 'uuid',
+        ]);
+
+        try {
+            $userId = session('user_id');
+
+            if (!$userId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized'
+                ], 401);
+            }
+
+            $selected = array_values(array_unique($request->selected));
+
+            // Ensure the selected IDs belong to the current user
+            $validIds = SavedService::where('user_id', $userId)
+                ->whereIn('saved_service_id', $selected)
+                ->pluck('saved_service_id')
+                ->all();
+
+            if (empty($validIds)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No valid saved services selected'
+                ], 422);
+            }
+
+            session(['checkout_saved_service_ids' => $validIds]);
+
+            return response()->json([
+                'success' => true,
+                'selected_count' => count($validIds),
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('SavedServiceController@setSelection error: ' . $e->getMessage(), ['exception' => $e]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to set selection: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Clear selected saved services for checkout
+     */
+    public function clearSelection(Request $request)
+    {
+        try {
+            session()->forget('checkout_saved_service_ids');
+            return response()->json([
+                'success' => true,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('SavedServiceController@clearSelection error: ' . $e->getMessage(), ['exception' => $e]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to clear selection: ' . $e->getMessage(),
             ], 500);
         }
     }
@@ -181,7 +278,8 @@ class SavedServiceController extends Controller
                 ], 404);
             }
             
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            Log::error('SavedServiceController@remove error: ' . $e->getMessage(), ['exception' => $e]);
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to remove service: ' . $e->getMessage()
@@ -213,7 +311,8 @@ class SavedServiceController extends Controller
                 'total_amount' => 0
             ]);
             
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            Log::error('SavedServiceController@clear error: ' . $e->getMessage(), ['exception' => $e]);
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to clear services: ' . $e->getMessage()
@@ -243,7 +342,8 @@ class SavedServiceController extends Controller
                 'total_amount' => SavedService::getTotalAmount($userId)
             ]);
             
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            Log::error('SavedServiceController@getCount error: ' . $e->getMessage(), ['exception' => $e]);
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to get count: ' . $e->getMessage()

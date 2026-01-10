@@ -3,6 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
@@ -12,6 +13,8 @@ return new class extends Migration
      */
     public function up(): void
     {
+        $isSqlite = DB::connection()->getDriverName() === 'sqlite';
+
         // Check if notifications table exists, if not create it
         if (!Schema::hasTable('notifications')) {
             Schema::create('notifications', function (Blueprint $table) {
@@ -38,18 +41,30 @@ return new class extends Migration
             });
         } else {
             // Enhance existing notifications table
-            Schema::table('notifications', function (Blueprint $table) {
+            Schema::table('notifications', function (Blueprint $table) use ($isSqlite) {
                 if (!Schema::hasColumn('notifications', 'type')) {
-                    $table->string('type', 50)->default('general')->after('user_id');
+                    $col = $table->string('type', 50)->default('general');
+                    if (! $isSqlite) {
+                        $col->after('user_id');
+                    }
                 }
                 if (!Schema::hasColumn('notifications', 'title')) {
-                    $table->string('title', 255)->nullable()->after('type');
+                    $col = $table->string('title', 255)->nullable();
+                    if (! $isSqlite) {
+                        $col->after('type');
+                    }
                 }
                 if (!Schema::hasColumn('notifications', 'data')) {
-                    $table->json('data')->nullable()->after('message');
+                    $col = $table->json('data')->nullable();
+                    if (! $isSqlite) {
+                        $col->after('message');
+                    }
                 }
                 if (!Schema::hasColumn('notifications', 'expires_at')) {
-                    $table->timestamp('expires_at')->nullable()->after('read_at');
+                    $col = $table->timestamp('expires_at')->nullable();
+                    if (! $isSqlite) {
+                        $col->after('read_at');
+                    }
                 }
             });
         }

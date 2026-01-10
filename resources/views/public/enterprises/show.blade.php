@@ -53,7 +53,13 @@
                 @forelse($services as $service)
                     <div class="bg-card border border-border rounded-xl shadow-card hover:shadow-card-hover transition-smooth overflow-hidden group">
                         <!-- Service Image / Placeholder -->
-                        <div class="w-full h-48 gradient-accent"></div>
+                        @if(!empty($service->image_path))
+                            <div class="w-full h-48 bg-secondary overflow-hidden">
+                                <img src="{{ asset('storage/' . $service->image_path) }}" alt="{{ $service->service_name ?? $service->product_name ?? 'Service' }}" class="w-full h-full object-cover" />
+                            </div>
+                        @else
+                            <div class="w-full h-48 gradient-accent"></div>
+                        @endif
 
                         <div class="p-6">
                             <div class="flex items-start justify-between mb-2">

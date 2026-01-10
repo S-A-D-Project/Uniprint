@@ -6,6 +6,7 @@ use App\Models\Enterprise;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Home Controller
@@ -23,6 +24,40 @@ class HomeController extends Controller
      */
     public function index()
     {
+        if (session()->has('user_id')) {
+            $userId = session('user_id');
+
+            try {
+                $role = DB::table('roles')
+                    ->join('role_types', 'roles.role_type_id', '=', 'role_types.role_type_id')
+                    ->where('roles.user_id', $userId)
+                    ->first();
+
+                $roleType = $role?->user_role_type;
+
+                if ($roleType === 'admin') {
+                    return redirect()->route('admin.dashboard');
+                }
+
+                if ($roleType === 'business_user') {
+                    $hasEnterprise = DB::table('staff')->where('user_id', $userId)->exists();
+                    if (! $hasEnterprise) {
+                        return redirect()->route('business.onboarding');
+                    }
+                    return redirect()->route('business.dashboard');
+                }
+
+                return redirect()->route('customer.dashboard');
+            } catch (\Throwable $e) {
+                Log::warning('HomeController@index failed to resolve dashboard redirect', [
+                    'user_id' => $userId,
+                    'exception' => $e,
+                ]);
+
+                return redirect()->route('customer.dashboard');
+            }
+        }
+
         // Get basic statistics
         $stats = [
             'total_enterprises' => DB::table('enterprises')->count(),
@@ -57,49 +92,7 @@ class HomeController extends Controller
             ->limit(6)
             ->get();
 
-        // If user is logged in, get customer dashboard data
         $recent_orders = null;
-        if (session()->has('user_id')) {
-            $userId = session('user_id');
-            
-            // Get customer stats
-            $stats['total_orders'] = DB::table('customer_orders')
-                ->where('customer_id', $userId)
-                ->count();
-            
-            $stats['pending_orders'] = DB::table('customer_orders')
-                ->join('statuses', 'customer_orders.status_id', '=', 'statuses.status_id')
-                ->where('customer_orders.customer_id', $userId)
-                ->where('statuses.status_name', 'Pending')
-                ->count();
-            
-            $stats['completed_orders'] = DB::table('customer_orders')
-                ->join('statuses', 'customer_orders.status_id', '=', 'statuses.status_id')
-                ->where('customer_orders.customer_id', $userId)
-                ->where('statuses.status_name', 'Delivered')
-                ->count();
-            
-            $stats['total_assets'] = DB::table('user_designs')
-                ->where('user_id', $userId)
-                ->count() + DB::table('order_design_files')
-                ->join('customer_orders', 'order_design_files.purchase_order_id', '=', 'customer_orders.purchase_order_id')
-                ->where('customer_orders.customer_id', $userId)
-                ->count();
-
-            // Get recent orders (alias enterprise name for views)
-            $recent_orders = DB::table('customer_orders')
-                ->join('enterprises', 'customer_orders.enterprise_id', '=', 'enterprises.enterprise_id')
-                ->leftJoin('statuses', 'customer_orders.status_id', '=', 'statuses.status_id')
-                ->select(
-                    'customer_orders.*',
-                    DB::raw('enterprises.name as enterprise_name'),
-                    'statuses.status_name'
-                )
-                ->where('customer_orders.customer_id', $userId)
-                ->orderBy('customer_orders.created_at', 'desc')
-                ->limit(10)
-                ->get();
-        }
 
         return view('home.index', compact('stats', 'enterprises', 'recent_orders'));
     }
@@ -140,12 +133,29 @@ class HomeController extends Controller
      */
     public function enterprises()
     {
-        $enterprises = \App\Models\Enterprise::with('services')
+        $query = \App\Models\Enterprise::query()
+            ->where('is_active', true);
+
+        if (request()->filled('category')) {
+            $query->where('category', request('category'));
+        }
+
+        if (request()->filled('search')) {
+            $query->where('name', 'ILIKE', '%' . request('search') . '%');
+        }
+
+        $enterprises = $query
             ->orderBy('name')
-            ->get();
-        
-        // Categories can be derived from enterprise names or set manually
-        $categories = ['All', 'Print Shop', 'T-Shirt Printing', 'Large Format', 'Business Cards'];
+            ->paginate(12);
+
+        $categories = \App\Models\Enterprise::query()
+            ->where('is_active', true)
+            ->whereNotNull('category')
+            ->where('category', '!=', '')
+            ->distinct()
+            ->pluck('category')
+            ->sort()
+            ->values();
 
         return view('public.enterprises.index', compact('enterprises', 'categories'));
     }

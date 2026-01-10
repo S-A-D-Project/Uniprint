@@ -509,12 +509,12 @@ class CustomerOrderService
             ->value('status_id');
 
         DB::table('order_status_history')->insert([
-            'history_id' => \Illuminate\Support\Str::uuid()->toString(),
+            'approval_id' => \Illuminate\Support\Str::uuid()->toString(),
             'purchase_order_id' => $orderId,
             'status_id' => $pendingStatusId,
             'timestamp' => Carbon::now(),
             'user_id' => $userId,
-            'notes' => 'Order created',
+            'remarks' => 'Order created',
             'created_at' => Carbon::now(),
             'updated_at' => Carbon::now(),
         ]);

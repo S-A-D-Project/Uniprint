@@ -77,11 +77,26 @@
         }
     </script>
 
+    <script>
+        (function () {
+            const orig = console.warn;
+            console.warn = function (...args) {
+                if (args && typeof args[0] === 'string' && args[0].includes('cdn.tailwindcss.com should not be used in production')) {
+                    return;
+                }
+                return orig.apply(console, args);
+            };
+        })();
+    </script>
+
     <!-- TailwindCSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
 
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
+
     <!-- Admin Design System CSS -->
     <link rel="stylesheet" href="{{ asset('css/admin-design-system.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/uniprint-ui.css') }}">
     
     <!-- Custom CSS -->
     <style>
@@ -533,6 +548,9 @@
             }
         });
     </script>
+
+    <script src="{{ asset('js/uniprint-ui.js') }}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
     
     @stack('scripts')
 </body>

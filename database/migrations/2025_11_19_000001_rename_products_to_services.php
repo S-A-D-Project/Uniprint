@@ -12,6 +12,8 @@ return new class extends Migration
      */
     public function up(): void
     {
+        $isSqlite = DB::connection()->getDriverName() === 'sqlite';
+
         // Check if products table exists (for fresh databases, it won't)
         if (Schema::hasTable('products')) {
             // Rename products table to services
@@ -29,37 +31,39 @@ return new class extends Migration
         }
 
         // Update customization_options table - rename product_id to service_id (only if it has product_id)
-        if (Schema::hasColumn('customization_options', 'product_id')) {
-            Schema::table('customization_options', function (Blueprint $table) {
-                // Drop the foreign key first
-                $table->dropForeign(['product_id']);
+        if (Schema::hasTable('customization_options') && Schema::hasColumn('customization_options', 'product_id')) {
+            Schema::table('customization_options', function (Blueprint $table) use ($isSqlite) {
+                if (! $isSqlite) {
+                    try { $table->dropForeign(['product_id']); } catch (\Throwable $e) {}
+                }
             });
 
             Schema::table('customization_options', function (Blueprint $table) {
                 $table->renameColumn('product_id', 'service_id');
-                // Re-add the foreign key with new column name
                 $table->foreign('service_id')->references('service_id')->on('services')->onDelete('cascade');
             });
         }
 
         // Update order_items table - rename product_id to service_id (only if it has product_id)
-        if (Schema::hasColumn('order_items', 'product_id')) {
-            Schema::table('order_items', function (Blueprint $table) {
-                // Drop the foreign key first
-                $table->dropForeign(['product_id']);
+        if (Schema::hasTable('order_items') && Schema::hasColumn('order_items', 'product_id')) {
+            Schema::table('order_items', function (Blueprint $table) use ($isSqlite) {
+                if (! $isSqlite) {
+                    try { $table->dropForeign(['product_id']); } catch (\Throwable $e) {}
+                }
             });
 
             Schema::table('order_items', function (Blueprint $table) {
                 $table->renameColumn('product_id', 'service_id');
-                // Re-add the foreign key with new column name
                 $table->foreign('service_id')->references('service_id')->on('services')->onDelete('restrict');
             });
         }
 
         // Update pricing_rules table if it has product_id references
-        if (Schema::hasColumn('pricing_rules', 'product_id')) {
-            Schema::table('pricing_rules', function (Blueprint $table) {
-                $table->dropForeign(['product_id']);
+        if (Schema::hasTable('pricing_rules') && Schema::hasColumn('pricing_rules', 'product_id')) {
+            Schema::table('pricing_rules', function (Blueprint $table) use ($isSqlite) {
+                if (! $isSqlite) {
+                    try { $table->dropForeign(['product_id']); } catch (\Throwable $e) {}
+                }
             });
 
             Schema::table('pricing_rules', function (Blueprint $table) {
@@ -69,7 +73,7 @@ return new class extends Migration
         }
 
         // Update order_design_files table if it has product_id references
-        if (Schema::hasColumn('order_design_files', 'product_id')) {
+        if (Schema::hasTable('order_design_files') && Schema::hasColumn('order_design_files', 'product_id')) {
             Schema::table('order_design_files', function (Blueprint $table) {
                 if (DB::getSchemaBuilder()->hasColumn('order_design_files', 'product_id')) {
                     $table->renameColumn('product_id', 'service_id');
@@ -93,6 +97,8 @@ return new class extends Migration
      */
     public function down(): void
     {
+        $isSqlite = DB::connection()->getDriverName() === 'sqlite';
+
         // Reverse the audit logs update
         if (Schema::hasTable('audit_logs')) {
             DB::table('audit_logs')
@@ -103,16 +109,18 @@ return new class extends Migration
         }
 
         // Reverse order_design_files if applicable
-        if (Schema::hasColumn('order_design_files', 'service_id')) {
+        if (Schema::hasTable('order_design_files') && Schema::hasColumn('order_design_files', 'service_id')) {
             Schema::table('order_design_files', function (Blueprint $table) {
                 $table->renameColumn('service_id', 'product_id');
             });
         }
 
         // Reverse pricing_rules
-        if (Schema::hasColumn('pricing_rules', 'service_id')) {
-            Schema::table('pricing_rules', function (Blueprint $table) {
-                $table->dropForeign(['service_id']);
+        if (Schema::hasTable('pricing_rules') && Schema::hasColumn('pricing_rules', 'service_id')) {
+            Schema::table('pricing_rules', function (Blueprint $table) use ($isSqlite) {
+                if (! $isSqlite) {
+                    try { $table->dropForeign(['service_id']); } catch (\Throwable $e) {}
+                }
             });
 
             Schema::table('pricing_rules', function (Blueprint $table) {
@@ -122,32 +130,41 @@ return new class extends Migration
         }
 
         // Reverse order_items
-        Schema::table('order_items', function (Blueprint $table) {
-            $table->dropForeign(['service_id']);
-        });
+        if (Schema::hasTable('order_items') && Schema::hasColumn('order_items', 'service_id')) {
+            Schema::table('order_items', function (Blueprint $table) use ($isSqlite) {
+                if (! $isSqlite) {
+                    try { $table->dropForeign(['service_id']); } catch (\Throwable $e) {}
+                }
+            });
 
-        Schema::table('order_items', function (Blueprint $table) {
-            $table->renameColumn('service_id', 'product_id');
-            $table->foreign('product_id')->references('product_id')->on('products')->onDelete('restrict');
-        });
+            Schema::table('order_items', function (Blueprint $table) {
+                $table->renameColumn('service_id', 'product_id');
+                $table->foreign('product_id')->references('product_id')->on('products')->onDelete('restrict');
+            });
+        }
 
         // Reverse customization_options
-        Schema::table('customization_options', function (Blueprint $table) {
-            $table->dropForeign(['service_id']);
-        });
+        if (Schema::hasTable('customization_options') && Schema::hasColumn('customization_options', 'service_id')) {
+            Schema::table('customization_options', function (Blueprint $table) use ($isSqlite) {
+                if (! $isSqlite) {
+                    try { $table->dropForeign(['service_id']); } catch (\Throwable $e) {}
+                }
+            });
 
-        Schema::table('customization_options', function (Blueprint $table) {
-            $table->renameColumn('service_id', 'product_id');
-            $table->foreign('product_id')->references('product_id')->on('products')->onDelete('cascade');
-        });
+            Schema::table('customization_options', function (Blueprint $table) {
+                $table->renameColumn('service_id', 'product_id');
+                $table->foreign('product_id')->references('product_id')->on('products')->onDelete('cascade');
+            });
+        }
 
         // Rename columns in services table back to products
-        Schema::table('services', function (Blueprint $table) {
-            $table->renameColumn('service_id', 'product_id');
-            $table->renameColumn('service_name', 'product_name');
-        });
+        if (Schema::hasTable('services') && Schema::hasColumn('services', 'service_id') && Schema::hasColumn('services', 'service_name')) {
+            Schema::table('services', function (Blueprint $table) {
+                $table->renameColumn('service_id', 'product_id');
+                $table->renameColumn('service_name', 'product_name');
+            });
 
-        // Rename services table back to products
-        Schema::rename('services', 'products');
+            Schema::rename('services', 'products');
+        }
     }
 };

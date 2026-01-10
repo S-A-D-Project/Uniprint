@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class SavedService extends Model
@@ -111,6 +112,9 @@ class SavedService extends Model
     public static function saveService($userId, $serviceId, $quantity = 1, $customizations = [], $specialInstructions = null)
     {
         $service = Service::findOrFail($serviceId);
+
+        $customizations = is_array($customizations) ? array_values(array_unique($customizations)) : [];
+        sort($customizations);
         
         // Calculate price including customizations
         $unitPrice = $service->base_price;
@@ -125,13 +129,23 @@ class SavedService extends Model
         $totalPrice = $unitPrice * $quantity;
         
         // Check if service already exists with same customizations
-        // Use JSON comparison that works with PostgreSQL
-        $customizationsJson = json_encode($customizations);
-        $existingService = static::where('user_id', $userId)
+        $existingQuery = static::where('user_id', $userId)
             ->where('service_id', $serviceId)
-            ->whereRaw('customizations::text = ?', [$customizationsJson])
-            ->where('special_instructions', $specialInstructions)
-            ->first();
+            ->where('special_instructions', $specialInstructions);
+
+        if (empty($customizations)) {
+            $existingQuery->where(function ($q) {
+                $q->whereNull('customizations')
+                    ->orWhereJsonLength('customizations', 0);
+            });
+        } else {
+            foreach ($customizations as $optionId) {
+                $existingQuery->whereJsonContains('customizations', $optionId);
+            }
+            $existingQuery->whereJsonLength('customizations', count($customizations));
+        }
+
+        $existingService = $existingQuery->first();
         
         if ($existingService) {
             // Update existing service
@@ -186,7 +200,8 @@ class SavedService extends Model
         
         if ($service) {
             if ($quantity <= 0) {
-                return static::removeService($userId, $savedServiceId);
+                static::removeService($userId, $savedServiceId);
+                return null;
             }
             
             $service->update([

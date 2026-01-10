@@ -3,6 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
@@ -11,23 +12,88 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('customer_orders', function (Blueprint $table) {
+        if (! Schema::hasTable('customer_orders')) {
+            return;
+        }
+
+        $isSqlite = DB::connection()->getDriverName() === 'sqlite';
+
+        Schema::table('customer_orders', function (Blueprint $table) use ($isSqlite) {
             // Add rush delivery columns
-            $table->decimal('rush_fee', 10, 2)->default(0)->after('shipping_fee');
-            $table->enum('rush_option', ['standard', 'express', 'rush', 'same_day'])->default('standard')->after('rush_fee');
-            $table->timestamp('pickup_date')->nullable()->after('delivery_date');
+            if (! Schema::hasColumn('customer_orders', 'rush_fee')) {
+                $col = $table->decimal('rush_fee', 10, 2)->default(0);
+                if (! $isSqlite) {
+                    $col->after('shipping_fee');
+                }
+            }
+
+            if (! Schema::hasColumn('customer_orders', 'rush_option')) {
+                $col = $isSqlite
+                    ? $table->string('rush_option')
+                    : $table->enum('rush_option', ['standard', 'express', 'rush', 'same_day']);
+                $col->default('standard');
+                if (! $isSqlite) {
+                    $col->after('rush_fee');
+                }
+            }
+
+            if (! Schema::hasColumn('customer_orders', 'pickup_date')) {
+                $col = $table->timestamp('pickup_date')->nullable();
+                if (! $isSqlite) {
+                    $col->after('delivery_date');
+                }
+            }
             
             // Add contact information columns
-            $table->string('contact_name', 255)->nullable()->after('rush_option');
-            $table->string('contact_phone', 20)->nullable()->after('contact_name');
-            $table->string('contact_email', 255)->nullable()->after('contact_phone');
+            if (! Schema::hasColumn('customer_orders', 'contact_name')) {
+                $col = $table->string('contact_name', 255)->nullable();
+                if (! $isSqlite) {
+                    $col->after('rush_option');
+                }
+            }
+
+            if (! Schema::hasColumn('customer_orders', 'contact_phone')) {
+                $col = $table->string('contact_phone', 20)->nullable();
+                if (! $isSqlite) {
+                    $col->after('contact_name');
+                }
+            }
+
+            if (! Schema::hasColumn('customer_orders', 'contact_email')) {
+                $col = $table->string('contact_email', 255)->nullable();
+                if (! $isSqlite) {
+                    $col->after('contact_phone');
+                }
+            }
             
             // Add payment information
-            $table->enum('payment_method', ['gcash', 'cash'])->default('cash')->after('contact_email');
-            $table->enum('payment_status', ['pending', 'paid', 'failed'])->default('pending')->after('payment_method');
+            if (! Schema::hasColumn('customer_orders', 'payment_method')) {
+                $col = $isSqlite
+                    ? $table->string('payment_method')
+                    : $table->enum('payment_method', ['gcash', 'cash']);
+                $col->default('cash');
+                if (! $isSqlite) {
+                    $col->after('contact_email');
+                }
+            }
+
+            if (! Schema::hasColumn('customer_orders', 'payment_status')) {
+                $col = $isSqlite
+                    ? $table->string('payment_status')
+                    : $table->enum('payment_status', ['pending', 'paid', 'failed']);
+                $col->default('pending');
+                if (! $isSqlite) {
+                    $col->after('payment_method');
+                }
+            }
             
             // Add tax column
-            $table->decimal('tax', 10, 2)->default(0)->after('subtotal');
+            if (! Schema::hasColumn('customer_orders', 'tax')) {
+                $col = $table->decimal('tax', 10, 2)->default(0);
+                if (! $isSqlite) {
+                    $col->after('subtotal');
+                }
+            }
         });
     }
 

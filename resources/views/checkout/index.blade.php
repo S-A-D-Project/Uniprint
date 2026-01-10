@@ -48,6 +48,36 @@
                     <i data-lucide="clock" class="h-5 w-5 text-primary"></i>
                     <h3 class="text-lg font-semibold text-gray-900">Pickup Timeline</h3>
                 </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Fulfillment *</label>
+                        <div class="flex items-center gap-4">
+                            @php
+                                $canPickup = !isset($availableFulfillmentMethods) || in_array('pickup', $availableFulfillmentMethods);
+                                $canDelivery = !isset($availableFulfillmentMethods) || in_array('delivery', $availableFulfillmentMethods);
+                            @endphp
+                            @if($canPickup)
+                                <label class="flex items-center gap-2">
+                                    <input type="radio" name="fulfillment_method" value="pickup" checked>
+                                    <span>Pickup</span>
+                                </label>
+                            @endif
+                            @if($canDelivery)
+                                <label class="flex items-center gap-2">
+                                    <input type="radio" name="fulfillment_method" value="delivery" {{ !$canPickup ? 'checked' : '' }}>
+                                    <span>Delivery</span>
+                                </label>
+                            @endif
+                        </div>
+                    </div>
+                    <div>
+                        <label for="requested_fulfillment_date" class="block text-sm font-medium text-gray-700 mb-2">Requested Date (Optional)</label>
+                        <input type="date" id="requested_fulfillment_date" name="requested_fulfillment_date" min="{{ now()->toDateString() }}"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors">
+                        <p class="text-xs text-gray-500 mt-1">Order now, but choose a later pickup/delivery date.</p>
+                    </div>
+                </div>
                 
                 <div class="space-y-4" id="rush-options">
                     <!-- Standard Pickup -->
@@ -196,6 +226,10 @@
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="payment-methods">
                     <!-- GCash Payment -->
+                    @php
+                        $pm = $availablePaymentMethods ?? ['gcash', 'cash'];
+                    @endphp
+                    @if(in_array('gcash', $pm))
                     <label class="relative cursor-pointer">
                         <input type="radio" name="payment_method" value="gcash" checked class="sr-only peer">
                         <div class="border-2 border-gray-200 rounded-lg p-4 text-center transition-all peer-checked:border-primary peer-checked:bg-primary/5 hover:border-gray-300">
@@ -209,10 +243,12 @@
                             </div>
                         </div>
                     </label>
+                    @endif
                     
                     <!-- Cash Payment -->
+                    @if(in_array('cash', $pm))
                     <label class="relative cursor-pointer">
-                        <input type="radio" name="payment_method" value="cash" class="sr-only peer">
+                        <input type="radio" name="payment_method" value="cash" {{ !in_array('gcash', $pm) ? 'checked' : '' }} class="sr-only peer">
                         <div class="border-2 border-gray-200 rounded-lg p-4 text-center transition-all peer-checked:border-primary peer-checked:bg-primary/5 hover:border-gray-300">
                             <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
                                 <i data-lucide="banknote" class="h-6 w-6 text-green-600"></i>
@@ -224,6 +260,7 @@
                             </div>
                         </div>
                     </label>
+                    @endif
                 </div>
             </div>
 

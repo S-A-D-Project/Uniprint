@@ -22,6 +22,9 @@ class Service extends Model
         'enterprise_id',
         'service_name',
         'description',
+        'image_path',
+        'fulfillment_type',
+        'allowed_payment_methods',
         'base_price',
         'is_active',
     ];
@@ -33,6 +36,9 @@ class Service extends Model
             'enterprise_id' => 'string',
             'base_price' => 'decimal:2',
             'is_active' => 'boolean',
+            'image_path' => 'string',
+            'fulfillment_type' => 'string',
+            'allowed_payment_methods' => 'string',
         ];
     }
 

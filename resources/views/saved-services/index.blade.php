@@ -145,7 +145,11 @@
 // Saved Services functionality
 async function updateQuantity(serviceId, quantity) {
     if (quantity < 1) {
-        if (confirm('Remove this service from saved items?')) {
+        const ok = window.UniPrintUI?.confirm
+            ? await window.UniPrintUI.confirm('Remove this service from saved items?', { title: 'Remove Service', confirmText: 'Remove', cancelText: 'Cancel', danger: true })
+            : confirm('Remove this service from saved items?');
+
+        if (ok) {
             removeService(serviceId);
         }
         return;
@@ -156,15 +160,21 @@ async function updateQuantity(serviceId, quantity) {
         
         if (!csrfToken) {
             console.error('CSRF token not found');
-            alert('Security token missing. Please refresh the page.');
+            if (window.UniPrintUI?.alert) {
+                await window.UniPrintUI.alert('Security token missing. Please refresh the page.', { title: 'Error', variant: 'danger' });
+            } else {
+                alert('Security token missing. Please refresh the page.');
+            }
             return;
         }
 
         const response = await fetch(`/saved-services/${serviceId}`, {
             method: 'PATCH',
+            credentials: 'same-origin',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': csrfToken,
+                'X-Requested-With': 'XMLHttpRequest',
                 'Accept': 'application/json'
             },
             body: JSON.stringify({ quantity: parseInt(quantity) })
@@ -174,24 +184,49 @@ async function updateQuantity(serviceId, quantity) {
         if (!response.ok) {
             console.error('Response status:', response.status);
             if (response.status === 401) {
-                alert('Your session has expired. Please login again.');
+                if (window.UniPrintUI?.alert) {
+                    await window.UniPrintUI.alert('Your session has expired. Please login again.', { title: 'Session Expired', variant: 'warning' });
+                } else {
+                    alert('Your session has expired. Please login again.');
+                }
                 window.location.href = '{{ route("login") }}';
                 return;
             }
-            throw new Error(`HTTP error! status: ${response.status}`);
+
+            let message = `HTTP error! status: ${response.status}`;
+            try {
+                const ct = response.headers.get('content-type') || '';
+                if (ct.includes('application/json')) {
+                    const err = await response.json();
+                    message = err?.message || message;
+                } else {
+                    const text = await response.text();
+                    if (text) message = text;
+                }
+            } catch (e) {}
+
+            throw new Error(message);
         }
 
         // Check if response has content
         const contentType = response.headers.get('content-type');
         if (!contentType || !contentType.includes('application/json')) {
             console.error('Invalid response content type:', contentType);
-            alert('Server returned an invalid response. Please try again.');
+            if (window.UniPrintUI?.alert) {
+                await window.UniPrintUI.alert('Server returned an invalid response. Please try again.', { title: 'Error', variant: 'danger' });
+            } else {
+                alert('Server returned an invalid response. Please try again.');
+            }
             return;
         }
 
         const result = await response.json();
 
         if (result.success) {
+            if (result.removed) {
+                window.location.reload();
+                return;
+            }
             // Update the displayed total price
             const input = document.querySelector(`input[data-service-id="${serviceId}"]`);
             if (input) {
@@ -204,11 +239,20 @@ async function updateQuantity(serviceId, quantity) {
             // Update order summary
             updateOrderSummary();
         } else {
-            alert(result.message || 'Failed to update quantity');
+            if (window.UniPrintUI?.alert) {
+                await window.UniPrintUI.alert(result.message || 'Failed to update quantity', { title: 'Error', variant: 'danger' });
+            } else {
+                alert(result.message || 'Failed to update quantity');
+            }
         }
     } catch (error) {
         console.error('Error updating quantity:', error);
-        alert('Network error. Please check your connection and try again.');
+        const msg = error?.message || 'Network error. Please check your connection and try again.';
+        if (window.UniPrintUI?.alert) {
+            await window.UniPrintUI.alert(msg, { title: 'Network Error', variant: 'danger' });
+        } else {
+            alert(msg);
+        }
     }
 }
 
@@ -218,15 +262,21 @@ async function removeService(serviceId) {
         
         if (!csrfToken) {
             console.error('CSRF token not found');
-            alert('Security token missing. Please refresh the page.');
+            if (window.UniPrintUI?.alert) {
+                await window.UniPrintUI.alert('Security token missing. Please refresh the page.', { title: 'Error', variant: 'danger' });
+            } else {
+                alert('Security token missing. Please refresh the page.');
+            }
             return;
         }
 
         const response = await fetch(`/saved-services/${serviceId}`, {
             method: 'DELETE',
+            credentials: 'same-origin',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': csrfToken,
+                'X-Requested-With': 'XMLHttpRequest',
                 'Accept': 'application/json'
             }
         });
@@ -235,18 +285,39 @@ async function removeService(serviceId) {
         if (!response.ok) {
             console.error('Response status:', response.status);
             if (response.status === 401) {
-                alert('Your session has expired. Please login again.');
+                if (window.UniPrintUI?.alert) {
+                    await window.UniPrintUI.alert('Your session has expired. Please login again.', { title: 'Session Expired', variant: 'warning' });
+                } else {
+                    alert('Your session has expired. Please login again.');
+                }
                 window.location.href = '{{ route("login") }}';
                 return;
             }
-            throw new Error(`HTTP error! status: ${response.status}`);
+
+            let message = `HTTP error! status: ${response.status}`;
+            try {
+                const ct = response.headers.get('content-type') || '';
+                if (ct.includes('application/json')) {
+                    const err = await response.json();
+                    message = err?.message || message;
+                } else {
+                    const text = await response.text();
+                    if (text) message = text;
+                }
+            } catch (e) {}
+
+            throw new Error(message);
         }
 
         // Check if response has content
         const contentType = response.headers.get('content-type');
         if (!contentType || !contentType.includes('application/json')) {
             console.error('Invalid response content type:', contentType);
-            alert('Server returned an invalid response. Please try again.');
+            if (window.UniPrintUI?.alert) {
+                await window.UniPrintUI.alert('Server returned an invalid response. Please try again.', { title: 'Error', variant: 'danger' });
+            } else {
+                alert('Server returned an invalid response. Please try again.');
+            }
             return;
         }
 
@@ -269,11 +340,20 @@ async function removeService(serviceId) {
                 updateOrderSummary();
             }
         } else {
-            alert(result.message || 'Failed to remove service');
+            if (window.UniPrintUI?.alert) {
+                await window.UniPrintUI.alert(result.message || 'Failed to remove service', { title: 'Error', variant: 'danger' });
+            } else {
+                alert(result.message || 'Failed to remove service');
+            }
         }
     } catch (error) {
         console.error('Error removing service:', error);
-        alert('Network error. Please check your connection and try again.');
+        const msg = error?.message || 'Network error. Please check your connection and try again.';
+        if (window.UniPrintUI?.alert) {
+            await window.UniPrintUI.alert(msg, { title: 'Network Error', variant: 'danger' });
+        } else {
+            alert(msg);
+        }
     }
 }
 
@@ -296,9 +376,13 @@ function updateHeaderBadge(count) {
 
 // Handle remove service forms
 document.querySelectorAll('.remove-service-form').forEach(form => {
-    form.addEventListener('submit', function(e) {
+    form.addEventListener('submit', async function(e) {
         e.preventDefault();
-        if (confirm('Remove this service from saved items?')) {
+        const ok = window.UniPrintUI?.confirm
+            ? await window.UniPrintUI.confirm('Remove this service from saved items?', { title: 'Remove Service', confirmText: 'Remove', cancelText: 'Cancel', danger: true })
+            : confirm('Remove this service from saved items?');
+
+        if (ok) {
             const serviceId = this.action.split('/').pop();
             removeService(serviceId);
         }

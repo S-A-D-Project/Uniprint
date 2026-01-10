@@ -14,22 +14,28 @@ return new class extends Migration
         // Add indexes for frequently queried columns to improve performance
         
         // Chat system indexes
-        Schema::table('conversations', function (Blueprint $table) {
-            $table->index(['customer_id', 'business_id'], 'idx_conversations_participants');
-            $table->index(['last_message_at'], 'idx_conversations_last_message');
-            $table->index(['status'], 'idx_conversations_status');
-        });
+        if (Schema::hasTable('conversations')) {
+            Schema::table('conversations', function (Blueprint $table) {
+                $table->index(['customer_id', 'business_id'], 'idx_conversations_participants');
+                $table->index(['last_message_at'], 'idx_conversations_last_message');
+                $table->index(['status'], 'idx_conversations_status');
+            });
+        }
 
-        Schema::table('chat_messages', function (Blueprint $table) {
-            $table->index(['conversation_id', 'created_at'], 'idx_messages_conversation_time');
-            $table->index(['sender_id'], 'idx_messages_sender');
-            $table->index(['is_read'], 'idx_messages_read_status');
-        });
+        if (Schema::hasTable('chat_messages')) {
+            Schema::table('chat_messages', function (Blueprint $table) {
+                $table->index(['conversation_id', 'created_at'], 'idx_messages_conversation_time');
+                $table->index(['sender_id'], 'idx_messages_sender');
+                $table->index(['is_read'], 'idx_messages_read_status');
+            });
+        }
 
-        Schema::table('online_users', function (Blueprint $table) {
-            $table->index(['last_seen_at'], 'idx_online_users_last_seen');
-            $table->index(['status'], 'idx_online_users_status');
-        });
+        if (Schema::hasTable('online_users')) {
+            Schema::table('online_users', function (Blueprint $table) {
+                $table->index(['last_seen_at'], 'idx_online_users_last_seen');
+                $table->index(['status'], 'idx_online_users_status');
+            });
+        }
 
         // User and authentication indexes
         // Skip - email already has a unique index from the users table migration
@@ -118,22 +124,28 @@ return new class extends Migration
         // Drop all performance indexes
         
         // Chat system indexes
-        Schema::table('conversations', function (Blueprint $table) {
-            $table->dropIndex('idx_conversations_participants');
-            $table->dropIndex('idx_conversations_last_message');
-            $table->dropIndex('idx_conversations_status');
-        });
+        if (Schema::hasTable('conversations')) {
+            Schema::table('conversations', function (Blueprint $table) {
+                try { $table->dropIndex('idx_conversations_participants'); } catch (\Throwable $e) {}
+                try { $table->dropIndex('idx_conversations_last_message'); } catch (\Throwable $e) {}
+                try { $table->dropIndex('idx_conversations_status'); } catch (\Throwable $e) {}
+            });
+        }
 
-        Schema::table('chat_messages', function (Blueprint $table) {
-            $table->dropIndex('idx_messages_conversation_time');
-            $table->dropIndex('idx_messages_sender');
-            $table->dropIndex('idx_messages_read_status');
-        });
+        if (Schema::hasTable('chat_messages')) {
+            Schema::table('chat_messages', function (Blueprint $table) {
+                try { $table->dropIndex('idx_messages_conversation_time'); } catch (\Throwable $e) {}
+                try { $table->dropIndex('idx_messages_sender'); } catch (\Throwable $e) {}
+                try { $table->dropIndex('idx_messages_read_status'); } catch (\Throwable $e) {}
+            });
+        }
 
-        Schema::table('online_users', function (Blueprint $table) {
-            $table->dropIndex('idx_online_users_last_seen');
-            $table->dropIndex('idx_online_users_status');
-        });
+        if (Schema::hasTable('online_users')) {
+            Schema::table('online_users', function (Blueprint $table) {
+                try { $table->dropIndex('idx_online_users_last_seen'); } catch (\Throwable $e) {}
+                try { $table->dropIndex('idx_online_users_status'); } catch (\Throwable $e) {}
+            });
+        }
 
         // User indexes
         // Skip - no indexes were added for users table
@@ -141,10 +153,10 @@ return new class extends Migration
         // Order system indexes
         if (Schema::hasTable('customer_orders')) {
             Schema::table('customer_orders', function (Blueprint $table) {
-                $table->dropIndex('idx_orders_customer_date');
-                $table->dropIndex('idx_orders_enterprise');
-                $table->dropIndex('idx_orders_status');
-                $table->dropIndex('idx_orders_date_requested');
+                try { $table->dropIndex('idx_orders_customer_date'); } catch (\Throwable $e) {}
+                try { $table->dropIndex('idx_orders_enterprise'); } catch (\Throwable $e) {}
+                try { $table->dropIndex('idx_orders_status'); } catch (\Throwable $e) {}
+                try { $table->dropIndex('idx_orders_date_requested'); } catch (\Throwable $e) {}
             });
         }
 

@@ -6,6 +6,18 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Login - UniPrint</title>
     
+    <script>
+        (function () {
+            const orig = console.warn;
+            console.warn = function (...args) {
+                if (args && typeof args[0] === 'string' && args[0].includes('cdn.tailwindcss.com should not be used in production')) {
+                    return;
+                }
+                return orig.apply(console, args);
+            };
+        })();
+    </script>
+
     <!-- TailwindCSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     

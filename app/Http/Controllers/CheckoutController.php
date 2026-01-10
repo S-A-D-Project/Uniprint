@@ -57,6 +57,11 @@ class CheckoutController extends Controller
 
         // Get saved services instead of cart
         $savedServices = SavedService::getUserServices($userId);
+
+        $selectedIds = session('checkout_saved_service_ids');
+        if (is_array($selectedIds) && !empty($selectedIds)) {
+            $savedServices = $savedServices->whereIn('saved_service_id', $selectedIds)->values();
+        }
         
         if ($savedServices->isEmpty()) {
             return redirect()->route('saved-services.index')->with('error', 'Your saved services are empty');
@@ -118,8 +123,35 @@ class CheckoutController extends Controller
         // Calculate totals (no shipping for pickup)
         $tax = $subtotal * 0.12; // 12% tax
         $total = $subtotal + $tax;
-        
-        return view('checkout.index', compact('cartItems', 'subtotal', 'tax', 'total', 'user'));
+
+        $availablePaymentMethods = ['gcash', 'cash'];
+        $availableFulfillmentMethods = ['pickup', 'delivery'];
+
+        foreach ($cartItems as $item) {
+            $service = $item['service'] ?? null;
+            if (!$service) continue;
+
+            if (Schema::hasColumn('services', 'allowed_payment_methods') && !empty($service->allowed_payment_methods)) {
+                $decoded = json_decode($service->allowed_payment_methods, true);
+                if (is_array($decoded) && !empty($decoded)) {
+                    $availablePaymentMethods = array_values(array_intersect($availablePaymentMethods, $decoded));
+                }
+            }
+
+            if (Schema::hasColumn('services', 'fulfillment_type') && !empty($service->fulfillment_type)) {
+                $supported = [];
+                if ($service->fulfillment_type === 'pickup') {
+                    $supported = ['pickup'];
+                } elseif ($service->fulfillment_type === 'delivery') {
+                    $supported = ['delivery'];
+                } else {
+                    $supported = ['pickup', 'delivery'];
+                }
+                $availableFulfillmentMethods = array_values(array_intersect($availableFulfillmentMethods, $supported));
+            }
+        }
+
+        return view('checkout.index', compact('cartItems', 'subtotal', 'tax', 'total', 'user', 'availablePaymentMethods', 'availableFulfillmentMethods'));
     }
 
     /**
@@ -129,6 +161,8 @@ class CheckoutController extends Controller
     {
         $request->validate([
             'payment_method' => 'required|in:gcash,cash',
+            'fulfillment_method' => 'required|in:pickup,delivery',
+            'requested_fulfillment_date' => 'nullable|date|after_or_equal:today',
             'notes' => 'nullable|string|max:1000',
             'contact_phone' => 'required|string|max:20',
             'contact_email' => 'required|email|max:255',
@@ -145,6 +179,11 @@ class CheckoutController extends Controller
 
         // Get saved services instead of cart
         $savedServices = SavedService::getUserServices($userId);
+
+        $selectedIds = session('checkout_saved_service_ids');
+        if (is_array($selectedIds) && !empty($selectedIds)) {
+            $savedServices = $savedServices->whereIn('saved_service_id', $selectedIds)->values();
+        }
         
         if ($savedServices->isEmpty()) {
             return response()->json(['success' => false, 'message' => 'No saved services found'], 400);
@@ -181,6 +220,22 @@ class CheckoutController extends Controller
                     $serviceData = DB::table('services')->where('service_id', $savedService->service_id)->first();
                     $itemPrice = $savedService->unit_price;
                     $itemTotal = $savedService->total_price;
+
+                    if ($request->fulfillment_method && Schema::hasColumn('services', 'fulfillment_type') && !empty($serviceData->fulfillment_type)) {
+                        if ($serviceData->fulfillment_type === 'pickup' && $request->fulfillment_method !== 'pickup') {
+                            return response()->json(['success' => false, 'message' => 'One or more services are pickup-only.'], 422);
+                        }
+                        if ($serviceData->fulfillment_type === 'delivery' && $request->fulfillment_method !== 'delivery') {
+                            return response()->json(['success' => false, 'message' => 'One or more services are delivery-only.'], 422);
+                        }
+                    }
+
+                    if ($request->payment_method && Schema::hasColumn('services', 'allowed_payment_methods') && !empty($serviceData->allowed_payment_methods)) {
+                        $decoded = json_decode($serviceData->allowed_payment_methods, true);
+                        if (is_array($decoded) && !empty($decoded) && !in_array($request->payment_method, $decoded, true)) {
+                            return response()->json(['success' => false, 'message' => 'Selected payment method is not accepted by one or more services.'], 422);
+                        }
+                    }
                     
                     // Get customizations
                     $customizationsData = [];
@@ -225,6 +280,17 @@ class CheckoutController extends Controller
                 // Calculate pickup date based on rush option
                 $pickupDate = $this->calculatePickupDate($rushOption);
                 $deliveryDate = $pickupDate ? $pickupDate->toDateString() : now()->toDateString();
+
+                $requestedDate = $request->requested_fulfillment_date;
+                if ($requestedDate) {
+                    if ($requestedDate < $deliveryDate) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Your requested date is too soon for the selected timeline. Please choose a later date.'
+                        ], 422);
+                    }
+                    $deliveryDate = $requestedDate;
+                }
                 
                 $tax = ($subtotal + $rushFee) * 0.12;
                 $total = $subtotal + $rushFee + $tax;
@@ -255,6 +321,14 @@ class CheckoutController extends Controller
                     'created_at' => now(),
                     'updated_at' => now(),
                 ];
+
+                if (Schema::hasColumn('customer_orders', 'fulfillment_method')) {
+                    $orderData['fulfillment_method'] = $request->fulfillment_method;
+                }
+
+                if (Schema::hasColumn('customer_orders', 'requested_fulfillment_date')) {
+                    $orderData['requested_fulfillment_date'] = $request->requested_fulfillment_date;
+                }
                 
                 DB::table('customer_orders')->insert($orderData);
                 
@@ -323,7 +397,14 @@ class CheckoutController extends Controller
             DB::commit();
             
             // Clear saved services after successful order
-            SavedService::clearServices($userId);
+            if (is_array($selectedIds) && !empty($selectedIds)) {
+                SavedService::where('user_id', $userId)
+                    ->whereIn('saved_service_id', $selectedIds)
+                    ->delete();
+                session()->forget('checkout_saved_service_ids');
+            } else {
+                SavedService::clearServices($userId);
+            }
             
             return response()->json([
                 'success' => true,

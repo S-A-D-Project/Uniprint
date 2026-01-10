@@ -304,7 +304,86 @@ class BusinessController extends Controller
         // Get available statuses
         $statuses = DB::table('statuses')->get();
 
-        return view('business.orders.details', compact('order', 'orderItems', 'statusHistory', 'designFiles', 'statuses', 'enterprise', 'userName'));
+        $currentStatusName = DB::table('order_status_history')
+            ->join('statuses', 'order_status_history.status_id', '=', 'statuses.status_id')
+            ->where('order_status_history.purchase_order_id', $id)
+            ->orderBy('order_status_history.timestamp', 'desc')
+            ->value('statuses.status_name');
+
+        return view('business.orders.details', compact('order', 'orderItems', 'statusHistory', 'designFiles', 'statuses', 'currentStatusName', 'enterprise', 'userName'));
+    }
+
+    public function confirmOrder($id)
+    {
+        $enterprise = $this->getUserEnterprise();
+        $userId = session('user_id');
+
+        $order = DB::table('customer_orders')
+            ->where('purchase_order_id', $id)
+            ->where('enterprise_id', $enterprise->enterprise_id)
+            ->first();
+
+        if (!$order) {
+            abort(404);
+        }
+
+        $currentStatusName = DB::table('order_status_history')
+            ->join('statuses', 'order_status_history.status_id', '=', 'statuses.status_id')
+            ->where('order_status_history.purchase_order_id', $id)
+            ->orderBy('order_status_history.timestamp', 'desc')
+            ->value('statuses.status_name');
+
+        if ($currentStatusName && $currentStatusName !== 'Pending') {
+            return redirect()->back()->with('error', 'Only pending orders can be confirmed.');
+        }
+
+        $confirmedStatusId = DB::table('statuses')->where('status_name', 'Confirmed')->value('status_id');
+        if (!$confirmedStatusId) {
+            $confirmedStatusId = DB::table('statuses')->where('status_name', 'Processing')->value('status_id');
+        }
+
+        if (!$confirmedStatusId) {
+            return redirect()->back()->with('error', 'Order status "Confirmed" is not configured. Please seed statuses.');
+        }
+
+        DB::table('order_status_history')->insert([
+            'approval_id' => Str::uuid(),
+            'purchase_order_id' => $id,
+            'user_id' => $userId,
+            'status_id' => $confirmedStatusId,
+            'remarks' => 'Order confirmed by business',
+            'timestamp' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        if (Schema::hasColumn('customer_orders', 'status_id')) {
+            DB::table('customer_orders')
+                ->where('purchase_order_id', $id)
+                ->where('enterprise_id', $enterprise->enterprise_id)
+                ->update([
+                    'status_id' => $confirmedStatusId,
+                    'updated_at' => now(),
+                ]);
+        }
+
+        $newStatusName = DB::table('statuses')->where('status_id', $confirmedStatusId)->value('status_name') ?? 'Confirmed';
+
+        DB::table('order_notifications')->insert([
+            'notification_id' => Str::uuid(),
+            'purchase_order_id' => $id,
+            'recipient_id' => $order->customer_id,
+            'notification_type' => 'status_change',
+            'title' => 'Order Confirmed',
+            'message' => "Your order #{$order->order_no} has been confirmed and is now: {$newStatusName}.",
+            'is_read' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->logAudit('update', 'order_status', $id, "Order confirmed by business", ['status' => $currentStatusName], ['status' => $newStatusName]);
+
+        return redirect()->back()->with('success', 'Order confirmed successfully');
     }
 
     public function updateOrderStatus(Request $request, $id)
@@ -413,26 +492,66 @@ class BusinessController extends Controller
 
     public function storeService(Request $request)
     {
-        $request->validate([
+        $rules = [
             'service_name' => 'required|string|max:255',
             'description' => 'nullable|string|max:2000',
             'base_price' => 'required|numeric|min:0',
+            'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
             'is_active' => 'boolean',
-        ]);
+        ];
+
+        if (Schema::hasColumn('services', 'fulfillment_type')) {
+            $rules['fulfillment_type'] = 'required|in:pickup,delivery,both';
+        }
+
+        if (Schema::hasColumn('services', 'allowed_payment_methods')) {
+            $rules['allowed_payment_methods'] = 'nullable|array';
+            $rules['allowed_payment_methods.*'] = 'in:gcash,cash';
+        }
+
+        $request->validate($rules);
 
         $enterprise = $this->getUserEnterprise();
         $serviceId = Str::uuid();
 
-        DB::table('services')->insert([
+        $imagePath = null;
+        if ($request->hasFile('image')) {
+            $imagePath = $request->file('image')->store('service-images', 'public');
+        }
+
+        $allowedPaymentMethods = $request->input('allowed_payment_methods', []);
+        if (!is_array($allowedPaymentMethods)) {
+            $allowedPaymentMethods = [];
+        }
+        $allowedPaymentMethodsJson = json_encode(array_values(array_unique($allowedPaymentMethods)));
+
+        $insert = [
             'service_id' => $serviceId,
             'enterprise_id' => $enterprise->enterprise_id,
             'service_name' => $request->service_name,
             'description' => $request->description,
+            'image_path' => $imagePath,
+            'fulfillment_type' => $request->fulfillment_type,
+            'allowed_payment_methods' => $allowedPaymentMethodsJson,
             'base_price' => $request->base_price,
             'is_active' => $request->has('is_active'),
             'created_at' => now(),
             'updated_at' => now(),
-        ]);
+        ];
+
+        if (!Schema::hasColumn('services', 'image_path')) {
+            unset($insert['image_path']);
+        }
+
+        if (!Schema::hasColumn('services', 'fulfillment_type')) {
+            unset($insert['fulfillment_type']);
+        }
+
+        if (!Schema::hasColumn('services', 'allowed_payment_methods')) {
+            unset($insert['allowed_payment_methods']);
+        }
+
+        DB::table('services')->insert($insert);
 
         // Log audit
         $this->logAudit('create', 'service', $serviceId, "Created service: {$request->service_name}", null, $request->all());
@@ -459,12 +578,24 @@ class BusinessController extends Controller
 
     public function updateService(Request $request, $id)
     {
-        $request->validate([
+        $rules = [
             'service_name' => 'required|string|max:255',
             'description' => 'nullable|string|max:2000',
             'base_price' => 'required|numeric|min:0',
+            'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
             'is_active' => 'boolean',
-        ]);
+        ];
+
+        if (Schema::hasColumn('services', 'fulfillment_type')) {
+            $rules['fulfillment_type'] = 'required|in:pickup,delivery,both';
+        }
+
+        if (Schema::hasColumn('services', 'allowed_payment_methods')) {
+            $rules['allowed_payment_methods'] = 'nullable|array';
+            $rules['allowed_payment_methods.*'] = 'in:gcash,cash';
+        }
+
+        $request->validate($rules);
 
         $enterprise = $this->getUserEnterprise();
 
@@ -474,15 +605,40 @@ class BusinessController extends Controller
             abort(404);
         }
 
+        $allowedPaymentMethods = $request->input('allowed_payment_methods', []);
+        if (!is_array($allowedPaymentMethods)) {
+            $allowedPaymentMethods = [];
+        }
+        $allowedPaymentMethodsJson = json_encode(array_values(array_unique($allowedPaymentMethods)));
+
+        $update = [
+            'service_name' => $request->service_name,
+            'description' => $request->description,
+            'base_price' => $request->base_price,
+            'is_active' => $request->has('is_active'),
+            'fulfillment_type' => $request->fulfillment_type,
+            'allowed_payment_methods' => $allowedPaymentMethodsJson,
+            'updated_at' => now(),
+        ];
+
+        if (!Schema::hasColumn('services', 'fulfillment_type')) {
+            unset($update['fulfillment_type']);
+        }
+
+        if (!Schema::hasColumn('services', 'allowed_payment_methods')) {
+            unset($update['allowed_payment_methods']);
+        }
+
+        if ($request->hasFile('image') && Schema::hasColumn('services', 'image_path')) {
+            if (!empty($oldService->image_path)) {
+                Storage::disk('public')->delete($oldService->image_path);
+            }
+            $update['image_path'] = $request->file('image')->store('service-images', 'public');
+        }
+
         DB::table('services')
             ->where('service_id', $id)
-            ->update([
-                'service_name' => $request->service_name,
-                'description' => $request->description,
-                'base_price' => $request->base_price,
-                'is_active' => $request->has('is_active'),
-                'updated_at' => now(),
-            ]);
+            ->update($update);
 
         // Log audit
         $this->logAudit('update', 'service', $id, "Updated service: {$request->service_name}", 
@@ -491,6 +647,34 @@ class BusinessController extends Controller
         );
 
         return redirect()->route('business.services.index')->with('success', 'Service updated successfully');
+    }
+
+    public function toggleServiceStatus($id)
+    {
+        $enterprise = $this->getUserEnterprise();
+
+        $service = DB::table('services')
+            ->where('service_id', $id)
+            ->where('enterprise_id', $enterprise->enterprise_id)
+            ->first();
+
+        if (!$service) {
+            abort(404);
+        }
+
+        $newStatus = !(bool) $service->is_active;
+
+        DB::table('services')
+            ->where('service_id', $id)
+            ->where('enterprise_id', $enterprise->enterprise_id)
+            ->update([
+                'is_active' => $newStatus,
+                'updated_at' => now(),
+            ]);
+
+        $this->logAudit('update', 'service', $id, ($newStatus ? 'Activated' : 'Deactivated') . " service: {$service->service_name}", ['is_active' => (bool) $service->is_active], ['is_active' => $newStatus]);
+
+        return redirect()->back()->with('success', $newStatus ? 'Service activated successfully' : 'Service deactivated successfully');
     }
 
     public function deleteService($id)

@@ -53,7 +53,7 @@
 
                 <div class="hero-stats">
                     <div class="hero-stat">
-                        <div class="hero-stat-value">{{ $enterprises->count() }}+</div>
+                        <div class="hero-stat-value">{{ $stats['total_enterprises'] ?? $enterprises->count() }}+</div>
                         <div class="hero-stat-label">Printing Shops</div>
                     </div>
                     <div class="hero-stat">
@@ -322,7 +322,5 @@
         </div>
     </div>
 </section>
-
-@include('components.chatbot')
 
 @endsection

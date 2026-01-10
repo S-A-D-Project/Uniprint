@@ -36,6 +36,11 @@
 
 <div class="row g-4">
     <div class="col-lg-8">
+        @if(!empty($service->image_path))
+        <div class="card mb-4">
+            <img src="{{ asset('storage/' . $service->image_path) }}" alt="{{ $service->service_name }}" class="card-img-top" style="height: 320px; object-fit: cover;">
+        </div>
+        @endif
         <!-- Service Information -->
         <div class="card mb-4">
             <div class="card-body">

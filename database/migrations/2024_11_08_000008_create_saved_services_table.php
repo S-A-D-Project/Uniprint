@@ -21,7 +21,7 @@ return new class extends Migration
             $table->text('special_instructions')->nullable();
             $table->decimal('unit_price', 10, 2);
             $table->decimal('total_price', 10, 2);
-            $table->timestamp('saved_at')->default(DB::raw('CURRENT_TIMESTAMP'));
+            $table->timestamp('saved_at')->useCurrent();
             $table->timestamps();
             
             // Indexes

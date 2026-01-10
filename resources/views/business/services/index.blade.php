@@ -18,9 +18,15 @@
     <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
         @forelse($services as $service)
             <div class="bg-card border border-border rounded-xl shadow-card hover:shadow-card-hover transition-smooth overflow-hidden">
-                <div class="h-48 gradient-accent flex items-center justify-center">
-                    <i data-lucide="package" class="h-24 w-24 text-white"></i>
-                </div>
+                @if(!empty($service->image_path))
+                    <div class="h-48 bg-secondary overflow-hidden">
+                        <img src="{{ asset('storage/' . $service->image_path) }}" alt="{{ $service->service_name }}" class="w-full h-full object-cover" />
+                    </div>
+                @else
+                    <div class="h-48 gradient-accent flex items-center justify-center">
+                        <i data-lucide="package" class="h-24 w-24 text-white"></i>
+                    </div>
+                @endif
                 <div class="p-6">
                     <div class="flex justify-between items-start mb-3">
                         <h3 class="font-bold text-lg">{{ $service->service_name }}</h3>
@@ -62,6 +68,12 @@
                            class="flex-1 px-3 py-2 text-sm text-center bg-primary text-primary-foreground rounded-md hover:shadow-glow transition-smooth">
                             Edit
                         </a>
+                        <form action="{{ route('business.services.toggle-status', $service->service_id) }}" method="POST">
+                            @csrf
+                            <button type="submit" class="px-3 py-2 text-sm {{ $service->is_active ? 'bg-secondary text-secondary-foreground' : 'bg-success text-white' }} rounded-md hover:opacity-90">
+                                {{ $service->is_active ? 'Deactivate' : 'Activate' }}
+                            </button>
+                        </form>
                         <form action="{{ route('business.services.delete', $service->service_id) }}" method="POST" 
                               onsubmit="return confirm('Are you sure you want to delete this service?')">
                             @csrf

@@ -12,7 +12,7 @@ use App\Models\User;
  * 
  * @package App\Policies
  */
-class ServicePolicy
+class ProductPolicy
 {
     /**
      * Determine if the user can view any services.

@@ -177,6 +177,19 @@
                 </div>
             </div>
 
+            <!-- Order Actions -->
+            @if(($currentStatusName ?? null) === 'Pending')
+            <div class="bg-card border border-border rounded-xl shadow-card p-6">
+                <h3 class="font-bold mb-4">Order Actions</h3>
+                <form action="{{ route('business.orders.confirm', $order->purchase_order_id) }}" method="POST" class="js-confirm-order">
+                    @csrf
+                    <button type="submit" class="w-full px-4 py-2 bg-success text-white font-medium rounded-md hover:opacity-90 transition-smooth">
+                        Confirm Order
+                    </button>
+                </form>
+            </div>
+            @endif
+
             <!-- Update Status -->
             <div class="bg-card border border-border rounded-xl shadow-card p-6">
                 <h3 class="font-bold mb-4">Update Order Status</h3>
@@ -207,6 +220,23 @@
         </div>
     </div>
 </div>
+
+@push('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const form = document.querySelector('form.js-confirm-order');
+        if (!form) return;
+
+        form.addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const ok = window.UniPrintUI?.confirm
+                ? await window.UniPrintUI.confirm('Confirm this order? This will move it out of Pending.', { title: 'Confirm Order', confirmText: 'Confirm', cancelText: 'Cancel' })
+                : confirm('Confirm this order?');
+            if (ok) form.submit();
+        });
+    });
+</script>
+@endpush
 
 <!-- Reject Modal -->
 <div id="rejectModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">

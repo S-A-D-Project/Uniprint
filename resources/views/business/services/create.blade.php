@@ -52,7 +52,7 @@
                 <p class="text-muted mb-0 mt-1">Fill in the details below to add a new service to your catalog</p>
             </div>
             <div class="enhanced-card-body">
-                <form action="{{ route('business.services.store') }}" method="POST" class="needs-validation" novalidate>
+                <form action="{{ route('business.services.store') }}" method="POST" enctype="multipart/form-data" class="needs-validation" novalidate>
                     @csrf
                     <div class="row">
                         <div class="col-md-8 mb-3">
@@ -91,6 +91,49 @@
                                     <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
                             </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="image" class="form-label fw-semibold">
+                            <i data-lucide="image" class="h-4 w-4 me-1"></i>
+                            Service Image
+                        </label>
+                        <input type="file"
+                               class="form-control form-control-enhanced @error('image') is-invalid @enderror"
+                               id="image"
+                               name="image"
+                               accept="image/png,image/jpeg,image/webp">
+                        <div class="form-text">Upload an image to advertise this service (JPG/PNG/WebP).</div>
+                        @error('image')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="fulfillment_type" class="form-label fw-semibold">
+                                Fulfillment Type *
+                            </label>
+                            <select id="fulfillment_type" name="fulfillment_type" required class="form-select form-control-enhanced">
+                                <option value="pickup" {{ old('fulfillment_type', 'pickup') === 'pickup' ? 'selected' : '' }}>Pickup</option>
+                                <option value="delivery" {{ old('fulfillment_type') === 'delivery' ? 'selected' : '' }}>Delivery</option>
+                                <option value="both" {{ old('fulfillment_type') === 'both' ? 'selected' : '' }}>Pickup & Delivery</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold">Allowed Payment Methods</label>
+                            <div class="d-flex flex-wrap gap-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="allowed_payment_methods[]" id="pm_gcash" value="gcash" {{ in_array('gcash', old('allowed_payment_methods', ['gcash','cash'])) ? 'checked' : '' }}>
+                                    <label class="form-check-label" for="pm_gcash">GCash</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="allowed_payment_methods[]" id="pm_cash" value="cash" {{ in_array('cash', old('allowed_payment_methods', ['gcash','cash'])) ? 'checked' : '' }}>
+                                    <label class="form-check-label" for="pm_cash">Cash</label>
+                                </div>
+                            </div>
+                            <div class="form-text">If none selected, customers may not be able to checkout.</div>
                         </div>
                     </div>
 

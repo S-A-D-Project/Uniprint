@@ -12,6 +12,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            return;
+        }
+
         // Add UUID validation function if it doesn't exist
         DB::statement("
             CREATE OR REPLACE FUNCTION is_valid_uuid(uuid_text TEXT)
@@ -115,6 +119,10 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            return;
+        }
+
         // Drop the constraints
         DB::statement("ALTER TABLE services DROP CONSTRAINT IF EXISTS services_enterprise_id_uuid_check;");
         DB::statement("ALTER TABLE enterprises DROP CONSTRAINT IF EXISTS enterprises_enterprise_id_uuid_check;");

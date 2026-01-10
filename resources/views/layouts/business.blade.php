@@ -7,11 +7,23 @@
     
     <title>@yield('title', 'Business Dashboard') - UniPrint</title>
     
+    <script>
+        (function () {
+            const orig = console.warn;
+            console.warn = function (...args) {
+                if (args && typeof args[0] === 'string' && args[0].includes('cdn.tailwindcss.com should not be used in production')) {
+                    return;
+                }
+                return orig.apply(console, args);
+            };
+        })();
+    </script>
+
     <!-- TailwindCSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
 
     <!-- Bootstrap CSS (used by some business components like modals/tooltips) -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     
@@ -66,6 +78,7 @@
 
     <link rel="stylesheet" href="{{ asset('css/design-system.css') }}">
     <link rel="stylesheet" href="{{ asset('css/chat.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/uniprint-ui.css') }}">
     
     <!-- Custom CSS -->
     <style>
@@ -274,7 +287,7 @@
     </div>
     
     <!-- Scripts -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         // Initialize Lucide icons
         lucide.createIcons();
@@ -309,6 +322,8 @@
             }
         });
     </script>
+
+    <script src="{{ asset('js/uniprint-ui.js') }}"></script>
     
     @stack('scripts')
 </body>

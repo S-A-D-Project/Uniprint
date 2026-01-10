@@ -3,6 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
@@ -13,11 +14,14 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // First, remove foreign key constraint from enterprises table
-        Schema::table('enterprises', function (Blueprint $table) {
-            $table->dropForeign(['vat_type_id']);
-            $table->dropColumn('vat_type_id');
-        });
+        if (Schema::hasColumn('enterprises', 'vat_type_id')) {
+            Schema::table('enterprises', function (Blueprint $table) {
+                if (DB::connection()->getDriverName() !== 'sqlite') {
+                    $table->dropForeign(['vat_type_id']);
+                }
+                $table->dropColumn('vat_type_id');
+            });
+        }
 
         // Drop the vat_types table entirely
         Schema::dropIfExists('vat_types');

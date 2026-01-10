@@ -58,6 +58,9 @@
     @forelse($services as $service)
     <div class="col-md-6 col-lg-4">
         <div class="card h-100 border-0 shadow-sm">
+            @if(!empty($service->image_path))
+                <img src="{{ asset('storage/' . $service->image_path) }}" alt="{{ $service->service_name }}" class="card-img-top" style="height: 180px; object-fit: cover;">
+            @endif
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start mb-3">
                     <h5 class="card-title mb-0">{{ $service->service_name }}</h5>

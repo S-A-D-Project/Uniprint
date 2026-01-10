@@ -3,6 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
@@ -11,14 +12,23 @@ return new class extends Migration
      */
     public function up(): void
     {
+        $isSqlite = DB::connection()->getDriverName() === 'sqlite';
+
         // Create conversations table
-        Schema::create('conversations', function (Blueprint $table) {
+        Schema::create('conversations', function (Blueprint $table) use ($isSqlite) {
             $table->uuid('conversation_id')->primary();
             $table->uuid('customer_id');
             $table->uuid('business_id');
             $table->string('subject')->nullable();
-            $table->enum('status', ['active', 'closed', 'archived'])->default('active');
-            $table->enum('initiated_by', ['customer', 'business'])->default('customer');
+            $statusCol = $isSqlite
+                ? $table->string('status')
+                : $table->enum('status', ['active', 'closed', 'archived']);
+            $statusCol->default('active');
+
+            $initiatedByCol = $isSqlite
+                ? $table->string('initiated_by')
+                : $table->enum('initiated_by', ['customer', 'business']);
+            $initiatedByCol->default('customer');
             $table->timestamp('initiated_at')->nullable();
             $table->timestamp('last_message_at')->nullable();
             $table->timestamps();
@@ -32,12 +42,15 @@ return new class extends Migration
         });
 
         // Create chat messages table
-        Schema::create('chat_messages', function (Blueprint $table) {
+        Schema::create('chat_messages', function (Blueprint $table) use ($isSqlite) {
             $table->uuid('message_id')->primary();
             $table->uuid('conversation_id');
             $table->uuid('sender_id');
             $table->text('message_text');
-            $table->enum('message_type', ['text', 'image', 'file', 'system'])->default('text');
+            $typeCol = $isSqlite
+                ? $table->string('message_type')
+                : $table->enum('message_type', ['text', 'image', 'file', 'system']);
+            $typeCol->default('text');
             $table->string('attachment_url')->nullable();
             $table->boolean('is_read')->default(false);
             $table->timestamp('read_at')->nullable();
@@ -51,10 +64,13 @@ return new class extends Migration
         });
 
         // Create online users tracking table
-        Schema::create('online_users', function (Blueprint $table) {
+        Schema::create('online_users', function (Blueprint $table) use ($isSqlite) {
             $table->uuid('user_id')->primary();
             $table->timestamp('last_seen_at');
-            $table->enum('status', ['online', 'away', 'offline'])->default('online');
+            $statusCol = $isSqlite
+                ? $table->string('status')
+                : $table->enum('status', ['online', 'away', 'offline']);
+            $statusCol->default('online');
             
             $table->foreign('user_id')->references('user_id')->on('users')->onDelete('cascade');
         });
