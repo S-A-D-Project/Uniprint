@@ -25,7 +25,7 @@ class PusherService
     public function broadcastMessage($conversationId, $message)
     {
         try {
-            $channel = "conversation.{$conversationId}";
+            $channel = "private-conversation.{$conversationId}";
             $event = 'new-message';
             
             $this->pusher->trigger($channel, $event, [
@@ -51,7 +51,7 @@ class PusherService
     public function broadcastTyping($conversationId, $userId, $userName, $isTyping)
     {
         try {
-            $channel = "conversation.{$conversationId}";
+            $channel = "private-conversation.{$conversationId}";
             $event = 'user-typing';
             
             $this->pusher->trigger($channel, $event, [
@@ -95,7 +95,7 @@ class PusherService
     public function broadcastMessageRead($conversationId, $messageIds, $userId)
     {
         try {
-            $channel = "conversation.{$conversationId}";
+            $channel = "private-conversation.{$conversationId}";
             $event = 'messages-read';
             
             $this->pusher->trigger($channel, $event, [

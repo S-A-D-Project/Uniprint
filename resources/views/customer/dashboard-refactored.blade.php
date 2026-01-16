@@ -245,16 +245,13 @@ class DashboardTabs {
     renderServices(services) {
         const container = document.getElementById('services-container');
         container.innerHTML = services.map(service => `
-            <div class="customer-card bg-white rounded-lg shadow-sm overflow-hidden">
+            <div class="customer-card bg-white rounded-lg shadow-sm overflow-hidden cursor-pointer" onclick="orderService('${service.product_id}')">
                 <div class="aspect-video bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
                     <i data-lucide="printer" class="h-12 w-12 text-primary"></i>
                 </div>
                 <div class="p-4">
                     <h3 class="font-semibold text-gray-900 mb-2">${service.product_name}</h3>
                     <p class="text-lg font-bold text-primary mb-3">₱${service.base_price}</p>
-                    <button onclick="orderService('${service.product_id}')" class="w-full customer-button-primary">
-                        Order Now
-                    </button>
                 </div>
             </div>
         `).join('');
@@ -263,7 +260,7 @@ class DashboardTabs {
 }
 
 function orderService(productId) {
-    window.location.href = `/services/${productId}`;
+    window.location.href = `/customer/services/${productId}`;
 }
 
 // Initialize when DOM is ready

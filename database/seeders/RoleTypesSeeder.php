@@ -16,6 +16,11 @@ class RoleTypesSeeder extends Seeder
             ['role_type_id' => Str::uuid(), 'user_role_type' => 'admin'],
         ];
 
-        DB::table('role_types')->insert($roleTypes);
+        foreach ($roleTypes as $roleType) {
+            DB::table('role_types')->updateOrInsert(
+                ['user_role_type' => $roleType['user_role_type']],
+                ['role_type_id' => $roleType['role_type_id']]
+            );
+        }
     }
 }

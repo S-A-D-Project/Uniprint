@@ -90,10 +90,10 @@
                 </span>
             </a>
             <h1 class="text-3xl font-bold">Welcome</h1>
-            <p class="text-muted-foreground">Sign in or create your account</p>
+            <p class="text-muted-foreground">Sign in or sign up</p>
         </div>
 
-        <div class="bg-card border border-border rounded-xl shadow-card-hover" x-data="{ activeTab: 'login' }">
+        <div class="bg-card border border-border rounded-xl shadow-card-hover" x-data="{ activeTab: '{{ request('tab') === 'signup' ? 'signup' : 'login' }}' }">
             <!-- Tabs -->
             <div class="grid grid-cols-2 gap-0 border-b border-border p-4">
                 <button @click="activeTab = 'login'" :class="activeTab === 'login' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'" class="px-4 py-2 text-sm font-medium rounded-md transition-smooth">
@@ -202,6 +202,26 @@
                         <div class="space-y-2">
                             <label for="signup-password-confirm" class="text-sm font-medium">Confirm Password</label>
                             <input id="signup-password-confirm" name="password_confirmation" type="password" placeholder="••••••••" required class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="flex items-start gap-3 text-sm">
+                                <input
+                                    id="signup-terms_accepted"
+                                    name="terms_accepted"
+                                    type="checkbox"
+                                    value="1"
+                                    {{ old('terms_accepted') ? 'checked' : '' }}
+                                    class="mt-1 h-4 w-4 rounded border-input text-primary focus:ring-ring @error('terms_accepted') border-destructive @enderror"
+                                    required
+                                >
+                                <span class="text-muted-foreground">
+                                    I agree to the
+                                    <a href="{{ route('terms') }}" target="_blank" rel="noopener" class="text-primary hover:underline">Terms &amp; Conditions</a>
+                                </span>
+                            </label>
+                            @error('terms_accepted')
+                                <p class="text-sm text-destructive">{{ $message }}</p>
+                            @enderror
                         </div>
                         <button type="submit" class="w-full px-4 py-2 bg-primary text-primary-foreground font-medium rounded-md hover:shadow-glow transition-smooth">
                             Sign Up

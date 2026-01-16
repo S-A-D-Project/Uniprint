@@ -21,6 +21,12 @@
 
 @section('content')
 <div class="page-header">
+    <nav class="mb-2" aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="{{ route('home') }}">Home</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Shops</li>
+        </ol>
+    </nav>
     <h2 class="mb-0"><i class="bi bi-shop me-2"></i>Printing Shops</h2>
     <p class="text-muted mb-0">Discover and browse printing services</p>
 </div>

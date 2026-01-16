@@ -59,12 +59,11 @@ class AIDesignController extends Controller
             
             // Save to temporary storage
             $filename = 'ai-design-' . Str::uuid() . '.png';
-            $path = 'temp/designs/' . $filename;
-            Storage::disk('public')->put($path, $imageContents);
+            $base64Png = base64_encode($imageContents);
             
             return response()->json([
                 'success' => true,
-                'image_url' => Storage::url($path),
+                'image_base64' => $base64Png,
                 'filename' => $filename,
                 'prompt' => $prompt,
                 'style' => $style,
@@ -156,12 +155,12 @@ class AIDesignController extends Controller
     private function getSizeDimensions($size)
     {
         $dimensions = [
-            'square' => ['aspectRatio' => '1:1'],
-            'landscape' => ['aspectRatio' => '16:9'],
-            'portrait' => ['aspectRatio' => '9:16'],
-            'business-card' => ['aspectRatio' => '1.75:1'], // 3.5 x 2
-            'flyer' => ['aspectRatio' => '1:1.414'], // A4
-            'poster' => ['aspectRatio' => '2:3'],
+            'square' => ['aspectRatio' => '1:1', 'width' => 768, 'height' => 768],
+            'landscape' => ['aspectRatio' => '16:9', 'width' => 1024, 'height' => 576],
+            'portrait' => ['aspectRatio' => '9:16', 'width' => 576, 'height' => 1024],
+            'business-card' => ['aspectRatio' => '1.75:1', 'width' => 1050, 'height' => 600], // 3.5 x 2
+            'flyer' => ['aspectRatio' => '1:1.414', 'width' => 768, 'height' => 1086], // A4
+            'poster' => ['aspectRatio' => '2:3', 'width' => 800, 'height' => 1200],
         ];
         
         return $dimensions[$size] ?? $dimensions['square'];
@@ -175,6 +174,7 @@ class AIDesignController extends Controller
         $request->validate([
             'image_url' => 'required|string',
             'filename' => 'required|string',
+            'storage_path' => 'nullable|string',
             'title' => 'required|string|max:255',
             'description' => 'nullable|string|max:1000'
         ]);
@@ -189,37 +189,59 @@ class AIDesignController extends Controller
                 ], 401);
             }
 
-            // Move from temp to permanent storage
-            $tempPath = str_replace('/storage/', 'public/', $request->image_url);
-            $permanentPath = 'designs/' . $userId . '/' . $request->filename;
-            
-            if (Storage::exists($tempPath)) {
-                Storage::move($tempPath, $permanentPath);
-                
-                // Save to database
-                $designId = Str::uuid();
-                \DB::table('user_designs')->insert([
-                    'design_id' => $designId,
-                    'user_id' => $userId,
-                    'title' => $request->title,
-                    'description' => $request->description,
-                    'file_path' => $permanentPath,
-                    'file_url' => Storage::url($permanentPath),
-                    'created_at' => now(),
-                    'updated_at' => now()
-                ]);
-                
+            $imageUrl = $request->image_url;
+
+            // Legacy local storage flow (backward compatible)
+            if (str_contains($imageUrl, '/storage/')) {
+                $tempPath = str_replace('/storage/', 'public/', $imageUrl);
+                $permanentPath = 'designs/' . $userId . '/' . $request->filename;
+
+                if (Storage::exists($tempPath)) {
+                    Storage::move($tempPath, $permanentPath);
+
+                    $designId = Str::uuid();
+                    \DB::table('user_designs')->insert([
+                        'design_id' => $designId,
+                        'user_id' => $userId,
+                        'title' => $request->title,
+                        'description' => $request->description,
+                        'file_path' => $permanentPath,
+                        'file_url' => Storage::url($permanentPath),
+                        'created_at' => now(),
+                        'updated_at' => now()
+                    ]);
+
+                    return response()->json([
+                        'success' => true,
+                        'message' => 'Design saved successfully!',
+                        'design_id' => $designId
+                    ]);
+                }
+
                 return response()->json([
-                    'success' => true,
-                    'message' => 'Design saved successfully!',
-                    'design_id' => $designId
-                ]);
+                    'success' => false,
+                    'message' => 'Design file not found'
+                ], 404);
             }
-            
+
+            // Supabase/public URL flow
+            $designId = Str::uuid();
+            \DB::table('user_designs')->insert([
+                'design_id' => $designId,
+                'user_id' => $userId,
+                'title' => $request->title,
+                'description' => $request->description,
+                'file_path' => $request->storage_path,
+                'file_url' => $imageUrl,
+                'created_at' => now(),
+                'updated_at' => now()
+            ]);
+
             return response()->json([
-                'success' => false,
-                'message' => 'Design file not found'
-            ], 404);
+                'success' => true,
+                'message' => 'Design saved successfully!',
+                'design_id' => $designId
+            ]);
             
         } catch (\Exception $e) {
             Log::error('AI Design Save Error: ' . $e->getMessage());
@@ -309,14 +331,18 @@ class AIDesignController extends Controller
      */
     private function generateMockImage($prompt, $style, $size)
     {
-        // Demo images based on style
-        $demoImages = [
-            'modern' => 'https://images.unsplash.com/photo-1634942537034-2531766767d1?w=800&h=800&fit=crop',
-            'classic' => 'https://images.unsplash.com/photo-1626785774573-4b799315345d?w=800&h=800&fit=crop',
-            'minimalist' => 'https://images.unsplash.com/photo-1586953208448-b95a79798f07?w=800&h=800&fit=crop',
-            'vintage' => 'https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=800&h=800&fit=crop'
-        ];
+        $dimensions = $this->getSizeDimensions($size);
+        $w = $dimensions['width'] ?? 768;
+        $h = $dimensions['height'] ?? 768;
 
-        return $demoImages[$style] ?? $demoImages['modern'];
+        $safePrompt = trim($prompt);
+        if ($style) {
+            $safePrompt .= ", {$style} style";
+        }
+
+        // Prompt-based image generation (no API key). This is a fallback only.
+        // Using an external generator avoids unrelated images (e.g. random Unsplash) when Gemini is not configured.
+        $encoded = rawurlencode($safePrompt);
+        return "https://image.pollinations.ai/prompt/{$encoded}?width={$w}&height={$h}&nologo=true";
     }
 }

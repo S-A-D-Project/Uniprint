@@ -531,10 +531,20 @@ class CustomerOrderService
      */
     private function notifyBusiness(string $enterpriseId, string $orderId, string $orderNo, string $type = 'new_order'): void
     {
-        $businessUserId = DB::table('staff')
-            ->where('enterprise_id', $enterpriseId)
-            ->whereNotNull('user_id')
-            ->value('user_id');
+        $businessUserId = null;
+
+        if (\Illuminate\Support\Facades\Schema::hasColumn('enterprises', 'owner_user_id')) {
+            $businessUserId = DB::table('enterprises')
+                ->where('enterprise_id', $enterpriseId)
+                ->value('owner_user_id');
+        }
+
+        if (! $businessUserId && \Illuminate\Support\Facades\Schema::hasTable('staff')) {
+            $businessUserId = DB::table('staff')
+                ->where('enterprise_id', $enterpriseId)
+                ->whereNotNull('user_id')
+                ->value('user_id');
+        }
 
         if ($businessUserId) {
             $messages = [

@@ -5,6 +5,14 @@
 @section('content')
     <div class="min-h-screen bg-background">
         <main class="container mx-auto px-4 py-8">
+            <div class="mb-6">
+                <div class="flex items-center gap-2 text-sm text-muted-foreground">
+                    <a href="{{ route('home') }}" class="hover:text-primary">Home</a>
+                    <i data-lucide="chevron-right" class="h-4 w-4"></i>
+                    <span class="text-foreground">Shops</span>
+                </div>
+            </div>
+
             <div class="mb-8">
                 <h1 class="mb-4">Printing Shops in Baguio</h1>
                 <p class="text-lg text-muted-foreground mb-6">

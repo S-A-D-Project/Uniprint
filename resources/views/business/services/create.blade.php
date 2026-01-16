@@ -171,6 +171,16 @@
                                         </label>
                                         <div class="form-text">Active services are visible to customers</div>
                                     </div>
+
+                                    @if(\Illuminate\Support\Facades\Schema::hasColumn('services', 'requires_file_upload'))
+                                        <div class="form-check form-switch mt-3">
+                                            <input class="form-check-input" type="checkbox" name="requires_file_upload" id="requires_file_upload" value="1" {{ old('requires_file_upload') ? 'checked' : '' }}>
+                                            <label class="form-check-label fw-semibold" for="requires_file_upload">
+                                                Requires File Upload
+                                            </label>
+                                            <div class="form-text">If enabled, customers must upload design files for this service.</div>
+                                        </div>
+                                    @endif
                                 </div>
                             </div>
                         </div>

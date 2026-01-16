@@ -365,10 +365,57 @@
 @endpush
 
 @push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 // Initialize Lucide icons
 if (typeof lucide !== 'undefined') {
     lucide.createIcons();
+}
+
+window.UniPrintSupabase = {
+    url: '{{ env('SUPABASE_URL') }}',
+    anonKey: '{{ env('SUPABASE_ANON_KEY') }}',
+    bucket: '{{ env('SUPABASE_STORAGE_BUCKET', 'Uniprint') }}'
+};
+
+function getSupabaseClient() {
+    if (!window.UniPrintSupabase?.url || !window.UniPrintSupabase?.anonKey) {
+        throw new Error('Supabase is not configured. Please set SUPABASE_URL and SUPABASE_ANON_KEY.');
+    }
+    return supabase.createClient(window.UniPrintSupabase.url, window.UniPrintSupabase.anonKey);
+}
+
+function base64ToUint8Array(base64) {
+    const binaryString = atob(base64);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes;
+}
+
+async function uploadGeneratedDesignToSupabase(base64Png, filename) {
+    const client = getSupabaseClient();
+    const bucket = window.UniPrintSupabase.bucket || 'Uniprint';
+
+    const bytes = base64ToUint8Array(base64Png);
+    const path = `ai-design/temp/${filename}`;
+
+    const { error: uploadError } = await client.storage
+        .from(bucket)
+        .upload(path, bytes, { contentType: 'image/png', upsert: true });
+
+    if (uploadError) {
+        throw new Error(uploadError.message || 'Failed to upload to Supabase storage');
+    }
+
+    const { data } = client.storage.from(bucket).getPublicUrl(path);
+    if (!data?.publicUrl) {
+        throw new Error('Failed to get public URL from Supabase');
+    }
+
+    return { publicUrl: data.publicUrl, path };
 }
 
 // Tab Management
@@ -593,6 +640,8 @@ document.getElementById('ai-design-form').addEventListener('submit', async funct
         const prompt = document.getElementById('prompt').value;
         const style = document.getElementById('style').value;
         const size = document.getElementById('size').value;
+        const designType = document.getElementById('design-type')?.value;
+        const colorScheme = document.getElementById('color-scheme')?.value;
         
         console.log('Sending request with:', { prompt, style, size });
         
@@ -606,7 +655,9 @@ document.getElementById('ai-design-form').addEventListener('submit', async funct
             body: JSON.stringify({
                 prompt: prompt,
                 style: style,
-                size: size
+                size: size,
+                design_type: designType,
+                color_scheme: colorScheme
             })
         });
         
@@ -621,13 +672,15 @@ document.getElementById('ai-design-form').addEventListener('submit', async funct
         const result = await response.json();
         console.log('API Response:', result);
         
-        if (result.success && result.image_url) {
+        if (result.success && result.image_base64 && result.filename) {
+            const upload = await uploadGeneratedDesignToSupabase(result.image_base64, result.filename);
+
             // Display generated design
             const outputDiv = document.getElementById('design-output');
             outputDiv.innerHTML = `
                 <div class="text-center">
                     <div class="relative inline-block">
-                        <img id="generated-design-img" src="${result.image_url}" class="max-w-full h-auto rounded-xl shadow-lg border border-border" alt="Generated Design" style="max-height: 400px;">
+                        <img id="generated-design-img" src="${upload.publicUrl}" class="max-w-full h-auto rounded-xl shadow-lg border border-border" alt="Generated Design" style="max-height: 400px;">
                         <div class="absolute -top-2 -right-2 w-6 h-6 bg-success rounded-full flex items-center justify-center">
                             <i data-lucide="check" class="h-3 w-3 text-white"></i>
                         </div>
@@ -651,7 +704,11 @@ document.getElementById('ai-design-form').addEventListener('submit', async funct
             document.getElementById('design-actions').classList.remove('hidden');
             
             // Store design data for saving
-            window.currentDesign = result;
+            window.currentDesign = {
+                ...result,
+                image_url: upload.publicUrl,
+                storage_path: upload.path
+            };
             
         } else {
             const errorMsg = result.message || 'Failed to generate design. Please check your API key and try again.';
@@ -733,6 +790,49 @@ document.getElementById('reset-btn').addEventListener('click', function() {
     if (typeof lucide !== 'undefined') {
         lucide.createIcons();
     }
+});
+
+// Save Design
+document.getElementById('save-design-btn').addEventListener('click', async function() {
+    try {
+        if (!window.currentDesign?.image_url || !window.currentDesign?.filename) {
+            throw new Error('No generated design to save yet.');
+        }
+
+        const title = window.prompt('Enter a title for this design:', 'My AI Design');
+        if (!title) return;
+
+        const response = await fetch('{{ route("ai-design.save") }}', {
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                image_url: window.currentDesign.image_url,
+                filename: window.currentDesign.filename,
+                storage_path: window.currentDesign.storage_path || null,
+                title: title,
+                description: window.currentDesign.prompt || null
+            })
+        });
+
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+            throw new Error(result.message || 'Failed to save design');
+        }
+
+        showToast('Design saved successfully!', 'success');
+    } catch (error) {
+        console.error('Save design error:', error);
+        showToast(error.message || 'Failed to save design', 'error');
+    }
+});
+
+// Regenerate
+document.getElementById('regenerate-btn').addEventListener('click', function() {
+    document.getElementById('ai-design-form').dispatchEvent(new Event('submit'));
 });
 
 // Design Chat Functionality

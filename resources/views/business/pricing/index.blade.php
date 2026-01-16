@@ -60,11 +60,12 @@
                                            class="text-primary hover:text-primary/80 text-sm font-medium">
                                             Edit
                                         </a>
-                                        <form action="{{ route('business.pricing.delete', $rule->rule_id) }}" method="POST"
-                                              onsubmit="return confirm('Delete this rule?')">
+                                        <form id="delete-pricing-rule-{{ $rule->rule_id }}" action="{{ route('business.pricing.delete', $rule->rule_id) }}" method="POST">
                                             @csrf
                                             @method('DELETE')
-                                            <button type="submit" class="text-destructive hover:text-destructive/80 text-sm font-medium">
+                                            <button type="button"
+                                                    class="text-destructive hover:text-destructive/80 text-sm font-medium"
+                                                    onclick="confirmPricingRuleDelete('{{ $rule->rule_id }}', @json($rule->rule_name))">
                                                 Delete
                                             </button>
                                         </form>
@@ -95,4 +96,24 @@
         @endif
     </div>
 </div>
+
+<x-modals.confirm-action />
 @endsection
+
+@push('scripts')
+<script>
+function confirmPricingRuleDelete(ruleId, ruleName) {
+    if (typeof window.showConfirmModal !== 'function') return;
+
+    showConfirmModal({
+        title: 'Delete Pricing Rule',
+        message: `Are you sure you want to delete "${ruleName}"? This action cannot be undone.`,
+        confirmText: 'Delete',
+        variant: 'danger',
+        callback: async () => {
+            document.getElementById(`delete-pricing-rule-${ruleId}`).submit();
+        }
+    });
+}
+</script>
+@endpush

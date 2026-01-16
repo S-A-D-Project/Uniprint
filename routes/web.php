@@ -177,6 +177,7 @@ Route::prefix('business')->middleware([\App\Http\Middleware\CheckAuth::class, \A
     Route::post('/services', [BusinessController::class, 'storeService'])->name('services.store');
     Route::get('/services/{id}/edit', [BusinessController::class, 'editService'])->whereUuid('id')->name('services.edit');
     Route::put('/services/{id}', [BusinessController::class, 'updateService'])->whereUuid('id')->name('services.update');
+    Route::post('/services/{id}/upload-settings', [BusinessController::class, 'updateServiceUploadSettings'])->whereUuid('id')->name('services.upload-settings');
     Route::post('/services/{id}/toggle-status', [BusinessController::class, 'toggleServiceStatus'])->whereUuid('id')->name('services.toggle-status');
     Route::delete('/services/{id}', [BusinessController::class, 'deleteService'])->whereUuid('id')->name('services.delete');
     
@@ -185,6 +186,10 @@ Route::prefix('business')->middleware([\App\Http\Middleware\CheckAuth::class, \A
     Route::post('/services/{serviceId}/customizations', [BusinessController::class, 'storeCustomization'])->whereUuid('serviceId')->name('customizations.store');
     Route::put('/services/{serviceId}/customizations/{optionId}', [BusinessController::class, 'updateCustomization'])->whereUuid('serviceId')->whereUuid('optionId')->name('customizations.update');
     Route::delete('/services/{serviceId}/customizations/{optionId}', [BusinessController::class, 'deleteCustomization'])->whereUuid('serviceId')->whereUuid('optionId')->name('customizations.delete');
+
+    Route::post('/services/{serviceId}/custom-fields', [BusinessController::class, 'storeCustomField'])->whereUuid('serviceId')->name('custom-fields.store');
+    Route::put('/services/{serviceId}/custom-fields/{fieldId}', [BusinessController::class, 'updateCustomField'])->whereUuid('serviceId')->whereUuid('fieldId')->name('custom-fields.update');
+    Route::delete('/services/{serviceId}/custom-fields/{fieldId}', [BusinessController::class, 'deleteCustomField'])->whereUuid('serviceId')->whereUuid('fieldId')->name('custom-fields.delete');
     
     
     // Pricing Rules Management
@@ -240,6 +245,8 @@ Route::prefix('customer')->middleware([\App\Http\Middleware\CheckAuth::class, \A
     Route::post('/order', [CustomerController::class, 'placeOrder'])->name('order.place');
     Route::get('/orders', [CustomerController::class, 'orders'])->name('orders');
     Route::get('/orders/{id}', [CustomerController::class, 'orderDetails'])->whereUuid('id')->name('order.details');
+    Route::post('/orders/{id}/confirm-completion', [CustomerController::class, 'confirmCompletion'])->whereUuid('id')->name('orders.confirm-completion');
+    Route::post('/orders/{id}/cancel', [CustomerController::class, 'cancelOrder'])->whereUuid('id')->name('orders.cancel');
     
     // Design File Upload
     Route::post('/orders/{orderId}/upload-design', [CustomerController::class, 'uploadDesignFile'])->whereUuid('orderId')->name('orders.upload-design');
@@ -273,9 +280,16 @@ Route::get('/debug/services', function() {
 // Chat routes (authenticated users)
 Route::middleware([\App\Http\Middleware\CheckAuth::class])->group(function () {
     Route::get('/chat', [ChatController::class, 'index'])->name('chat.index');
-    Route::get('/direct-chat', [ChatController::class, 'directChat'])->name('chat.direct');
-    Route::post('/api/chat/send-message', [ChatController::class, 'sendMessage'])->name('chat.send-message');
+    Route::get('/chat/enterprise/{enterpriseId}', [ChatController::class, 'startEnterpriseChat'])
+        ->whereUuid('enterpriseId')
+        ->name('chat.enterprise');
 });
+
+Route::prefix('api/chat')
+    ->middleware([\App\Http\Middleware\CheckAuth::class])
+    ->group(function () {
+        Route::post('/enterprise-owner', [ChatController::class, 'resolveEnterpriseOwner']);
+    });
 
 // Chat API routes (session-authenticated users)
 Route::prefix('api/chat')

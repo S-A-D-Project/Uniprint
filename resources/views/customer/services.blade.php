@@ -22,6 +22,13 @@
 @section('content')
 <div class="page-header d-flex justify-content-between align-items-center">
     <div>
+        <nav class="mb-2" aria-label="breadcrumb">
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item"><a href="{{ route('home') }}">Home</a></li>
+                <li class="breadcrumb-item"><a href="{{ route('customer.enterprises') }}">Shops</a></li>
+                <li class="breadcrumb-item active" aria-current="page">{{ $enterprise->name ?? 'Shop' }}</li>
+            </ol>
+        </nav>
         <h2 class="mb-0"><i class="bi bi-box-seam me-2"></i>{{ $enterprise->name ?? 'Unknown Enterprise' }}</h2>
         <p class="text-muted mb-0">
             <span class="badge bg-info me-2">{{ $enterprise->category }}</span>
@@ -57,7 +64,7 @@
 <div class="row g-4">
     @forelse($services as $service)
     <div class="col-md-6 col-lg-4">
-        <div class="card h-100 border-0 shadow-sm">
+        <div class="card h-100 border-0 shadow-sm" role="button" onclick="window.location.href='{{ route('customer.service.details', $service->service_id) }}'">
             @if(!empty($service->image_path))
                 <img src="{{ asset('storage/' . $service->image_path) }}" alt="{{ $service->service_name }}" class="card-img-top" style="height: 180px; object-fit: cover;">
             @endif
@@ -86,11 +93,6 @@
                     </small>
                 </div>
                 @endif
-
-                <a href="{{ route('customer.service.details', $service->service_id) }}" 
-                   class="btn btn-primary w-100">
-                    <i class="bi bi-eye me-2"></i>View Details
-                </a>
             </div>
         </div>
     </div>

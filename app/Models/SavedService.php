@@ -20,6 +20,7 @@ class SavedService extends Model
         'service_id',
         'quantity',
         'customizations',
+        'custom_fields',
         'special_instructions',
         'unit_price',
         'total_price',
@@ -31,6 +32,7 @@ class SavedService extends Model
         'user_id' => 'string',
         'service_id' => 'string',
         'customizations' => 'array',
+        'custom_fields' => 'array',
         'unit_price' => 'decimal:2',
         'total_price' => 'decimal:2',
         'saved_at' => 'datetime',
@@ -109,12 +111,37 @@ class SavedService extends Model
     /**
      * Save a service for user
      */
-    public static function saveService($userId, $serviceId, $quantity = 1, $customizations = [], $specialInstructions = null)
+    public static function saveService($userId, $serviceId, $quantity = 1, $customizations = [], $customFields = [], $specialInstructions = null)
     {
-        $service = Service::findOrFail($serviceId);
+        $service = Service::with('customFields')->findOrFail($serviceId);
 
         $customizations = is_array($customizations) ? array_values(array_unique($customizations)) : [];
         sort($customizations);
+
+        $customFields = is_array($customFields) ? $customFields : [];
+        $customFields = array_filter($customFields, fn($v) => $v !== null);
+        foreach ($customFields as $k => $v) {
+            if (!is_string($k)) {
+                unset($customFields[$k]);
+                continue;
+            }
+            $customFields[$k] = is_string($v) ? trim($v) : '';
+            if ($customFields[$k] === '') {
+                unset($customFields[$k]);
+            }
+        }
+        ksort($customFields);
+
+        $missing = [];
+        foreach ($service->customFields->where('is_required', true) as $field) {
+            if (empty($customFields[$field->field_id] ?? null)) {
+                $missing[] = $field->field_label;
+            }
+        }
+
+        if (!empty($missing)) {
+            throw new \InvalidArgumentException('Please fill in required fields: ' . implode(', ', $missing));
+        }
         
         // Calculate price including customizations
         $unitPrice = $service->base_price;
@@ -132,6 +159,8 @@ class SavedService extends Model
         $existingQuery = static::where('user_id', $userId)
             ->where('service_id', $serviceId)
             ->where('special_instructions', $specialInstructions);
+
+        $existingQuery->whereRaw("COALESCE(custom_fields, '{}'::jsonb) = ?::jsonb", [json_encode($customFields)]);
 
         if (empty($customizations)) {
             $existingQuery->where(function ($q) {
@@ -165,6 +194,7 @@ class SavedService extends Model
                 'service_id' => $serviceId,
                 'quantity' => $quantity,
                 'customizations' => $customizations,
+                'custom_fields' => $customFields,
                 'special_instructions' => $specialInstructions,
                 'unit_price' => $unitPrice,
                 'total_price' => $totalPrice,

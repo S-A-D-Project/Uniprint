@@ -78,11 +78,6 @@ class User extends Authenticatable
         return $this->hasMany(AiImageGeneration::class, 'user_id', 'user_id');
     }
 
-    public function chatbotInteractions()
-    {
-        return $this->hasMany(ChatbotInteraction::class, 'user_id', 'user_id');
-    }
-
     // Helper methods
     public function isAdmin()
     {

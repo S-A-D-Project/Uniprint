@@ -119,12 +119,13 @@ class AdminController extends Controller
                 ->leftJoin('login', 'users.user_id', '=', 'login.user_id')
                 ->leftJoin('roles', 'users.user_id', '=', 'roles.user_id')
                 ->leftJoin('role_types', 'roles.role_type_id', '=', 'role_types.role_type_id')
+                ->leftJoin('enterprises as owned_enterprises', 'users.user_id', '=', 'owned_enterprises.owner_user_id')
                 ->leftJoin('staff', 'users.user_id', '=', 'staff.user_id')
-                ->leftJoin('enterprises', 'staff.enterprise_id', '=', 'enterprises.enterprise_id')
+                ->leftJoin('enterprises as staff_enterprises', 'staff.enterprise_id', '=', 'staff_enterprises.enterprise_id')
                 ->select(
                     'users.*', 
                     'role_types.user_role_type as role_type',
-                    'enterprises.name as enterprise_name',
+                    DB::raw('COALESCE(owned_enterprises.name, staff_enterprises.name) as enterprise_name'),
                     DB::raw('1 as is_active'),
                     DB::raw('COALESCE(users.email, \'\') as email'),
                     DB::raw('COALESCE(login.username, users.name) as username')
@@ -179,12 +180,13 @@ class AdminController extends Controller
                 ->leftJoin('login', 'users.user_id', '=', 'login.user_id')
                 ->leftJoin('roles', 'users.user_id', '=', 'roles.user_id')
                 ->leftJoin('role_types', 'roles.role_type_id', '=', 'role_types.role_type_id')
+                ->leftJoin('enterprises as owned_enterprises', 'users.user_id', '=', 'owned_enterprises.owner_user_id')
                 ->leftJoin('staff', 'users.user_id', '=', 'staff.user_id')
-                ->leftJoin('enterprises', 'staff.enterprise_id', '=', 'enterprises.enterprise_id')
+                ->leftJoin('enterprises as staff_enterprises', 'staff.enterprise_id', '=', 'staff_enterprises.enterprise_id')
                 ->select(
                     'users.*', 
                     'role_types.user_role_type as role_type',
-                    'enterprises.name as enterprise_name',
+                    DB::raw('COALESCE(owned_enterprises.name, staff_enterprises.name) as enterprise_name'),
                     DB::raw(($hasUserIsActive ? 'COALESCE(users.is_active, true)' : 'true') . ' as is_active'),
                     DB::raw('COALESCE(users.email, \'\') as email'),
                     DB::raw('COALESCE(login.username, users.name) as username')
@@ -206,14 +208,15 @@ class AdminController extends Controller
             ->leftJoin('login', 'users.user_id', '=', 'login.user_id')
             ->leftJoin('roles', 'users.user_id', '=', 'roles.user_id')
             ->leftJoin('role_types', 'roles.role_type_id', '=', 'role_types.role_type_id')
+            ->leftJoin('enterprises as owned_enterprises', 'users.user_id', '=', 'owned_enterprises.owner_user_id')
             ->leftJoin('staff', 'users.user_id', '=', 'staff.user_id')
-            ->leftJoin('enterprises', 'staff.enterprise_id', '=', 'enterprises.enterprise_id')
+            ->leftJoin('enterprises as staff_enterprises', 'staff.enterprise_id', '=', 'staff_enterprises.enterprise_id')
             ->where('users.user_id', $id)
             ->select(
                 'users.*',
                 'role_types.user_role_type as role_type',
-                'enterprises.enterprise_id as enterprise_id',
-                'enterprises.name as enterprise_name',
+                DB::raw('COALESCE(owned_enterprises.enterprise_id, staff_enterprises.enterprise_id) as enterprise_id'),
+                DB::raw('COALESCE(owned_enterprises.name, staff_enterprises.name) as enterprise_name'),
                 DB::raw(($hasUserIsActive ? 'COALESCE(users.is_active, true)' : 'true') . ' as is_active'),
                 DB::raw('COALESCE(users.email, \'\') as email'),
                 DB::raw('COALESCE(login.username, users.name) as username')

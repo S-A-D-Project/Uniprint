@@ -25,6 +25,7 @@ class Service extends Model
         'image_path',
         'fulfillment_type',
         'allowed_payment_methods',
+        'requires_file_upload',
         'base_price',
         'is_active',
     ];
@@ -36,6 +37,7 @@ class Service extends Model
             'enterprise_id' => 'string',
             'base_price' => 'decimal:2',
             'is_active' => 'boolean',
+            'requires_file_upload' => 'boolean',
             'image_path' => 'string',
             'fulfillment_type' => 'string',
             'allowed_payment_methods' => 'string',
@@ -51,6 +53,11 @@ class Service extends Model
     public function customizationOptions()
     {
         return $this->hasMany(CustomizationOption::class, 'service_id', 'service_id');
+    }
+
+    public function customFields()
+    {
+        return $this->hasMany(ServiceCustomField::class, 'service_id', 'service_id')->orderBy('sort_order')->orderBy('field_label');
     }
 
     public function orderItems()

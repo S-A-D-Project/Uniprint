@@ -25,14 +25,6 @@
                 <small>{{ auth()->user()->role_type === 'customer' ? 'Customer' : 'Business Representative' }}</small>
             </div>
 
-            @if(auth()->user()->role_type === 'customer')
-            <div class="new-chat-section">
-                <button class="btn btn-primary btn-sm w-100 mb-3" id="startNewChatBtn">
-                    <i class="bi bi-plus-circle"></i> Start New Chat
-                </button>
-            </div>
-            @endif
-
             <div class="conversations-search">
                 <input type="text" class="form-control" id="searchConversations" placeholder="Search conversations...">
             </div>
@@ -44,29 +36,6 @@
                 </div>
             </div>
 
-            @if(auth()->user()->role_type === 'customer')
-            <!-- Available Businesses Modal -->
-            <div class="modal fade" id="businessListModal" tabindex="-1">
-                <div class="modal-dialog">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title">
-                                <i class="bi bi-building"></i> Start Chat with Business
-                            </h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                        </div>
-                        <div class="modal-body">
-                            <div id="businessList">
-                                <div class="text-center py-4">
-                                    <div class="spinner mx-auto"></div>
-                                    <p class="mt-2 text-muted">Loading businesses...</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            @endif
         </div>
 
         <!-- Chat Panel -->

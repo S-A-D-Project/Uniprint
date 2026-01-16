@@ -15,9 +15,13 @@ return new class extends Migration
     public function up(): void
     {
         // This migration fixes any existing data with integer IDs instead of UUIDs
+        $driver = DB::connection()->getDriverName();
         
         // Fix services table
-        $services = DB::table('services')->whereRaw("service_id::text ~ '^[0-9]+$'")->get();
+        $servicesQuery = $driver === 'sqlite' 
+            ? "CAST(service_id AS TEXT) LIKE '%0%' OR CAST(service_id AS TEXT) LIKE '%1%' OR CAST(service_id AS TEXT) LIKE '%2%' OR CAST(service_id AS TEXT) LIKE '%3%' OR CAST(service_id AS TEXT) LIKE '%4%' OR CAST(service_id AS TEXT) LIKE '%5%' OR CAST(service_id AS TEXT) LIKE '%6%' OR CAST(service_id AS TEXT) LIKE '%7%' OR CAST(service_id AS TEXT) LIKE '%8%' OR CAST(service_id AS TEXT) LIKE '%9%'"
+            : "service_id::text ~ '^[0-9]+$'";
+        $services = DB::table('services')->whereRaw($servicesQuery)->get();
         foreach ($services as $service) {
             $newUuid = Str::uuid();
             
@@ -41,7 +45,10 @@ return new class extends Migration
         }
         
         // Fix customization_options table
-        $options = DB::table('customization_options')->whereRaw("option_id::text ~ '^[0-9]+$'")->get();
+        $optionsQuery = $driver === 'sqlite'
+            ? "CAST(option_id AS TEXT) LIKE '%0%' OR CAST(option_id AS TEXT) LIKE '%1%' OR CAST(option_id AS TEXT) LIKE '%2%' OR CAST(option_id AS TEXT) LIKE '%3%' OR CAST(option_id AS TEXT) LIKE '%4%' OR CAST(option_id AS TEXT) LIKE '%5%' OR CAST(option_id AS TEXT) LIKE '%6%' OR CAST(option_id AS TEXT) LIKE '%7%' OR CAST(option_id AS TEXT) LIKE '%8%' OR CAST(option_id AS TEXT) LIKE '%9%'"
+            : "option_id::text ~ '^[0-9]+$'";
+        $options = DB::table('customization_options')->whereRaw($optionsQuery)->get();
         foreach ($options as $option) {
             $newUuid = Str::uuid();
             
@@ -70,7 +77,10 @@ return new class extends Migration
         }
         
         // Fix users table
-        $users = DB::table('users')->whereRaw("user_id::text ~ '^[0-9]+$'")->get();
+        $usersQuery = $driver === 'sqlite'
+            ? "CAST(user_id AS TEXT) LIKE '%0%' OR CAST(user_id AS TEXT) LIKE '%1%' OR CAST(user_id AS TEXT) LIKE '%2%' OR CAST(user_id AS TEXT) LIKE '%3%' OR CAST(user_id AS TEXT) LIKE '%4%' OR CAST(user_id AS TEXT) LIKE '%5%' OR CAST(user_id AS TEXT) LIKE '%6%' OR CAST(user_id AS TEXT) LIKE '%7%' OR CAST(user_id AS TEXT) LIKE '%8%' OR CAST(user_id AS TEXT) LIKE '%9%'"
+            : "user_id::text ~ '^[0-9]+$'";
+        $users = DB::table('users')->whereRaw($usersQuery)->get();
         foreach ($users as $user) {
             $newUuid = Str::uuid();
             
@@ -90,7 +100,10 @@ return new class extends Migration
         }
         
         // Fix enterprises table
-        $enterprises = DB::table('enterprises')->whereRaw("enterprise_id::text ~ '^[0-9]+$'")->get();
+        $enterprisesQuery = $driver === 'sqlite'
+            ? "CAST(enterprise_id AS TEXT) LIKE '%0%' OR CAST(enterprise_id AS TEXT) LIKE '%1%' OR CAST(enterprise_id AS TEXT) LIKE '%2%' OR CAST(enterprise_id AS TEXT) LIKE '%3%' OR CAST(enterprise_id AS TEXT) LIKE '%4%' OR CAST(enterprise_id AS TEXT) LIKE '%5%' OR CAST(enterprise_id AS TEXT) LIKE '%6%' OR CAST(enterprise_id AS TEXT) LIKE '%7%' OR CAST(enterprise_id AS TEXT) LIKE '%8%' OR CAST(enterprise_id AS TEXT) LIKE '%9%'"
+            : "enterprise_id::text ~ '^[0-9]+$'";
+        $enterprises = DB::table('enterprises')->whereRaw($enterprisesQuery)->get();
         foreach ($enterprises as $enterprise) {
             $newUuid = Str::uuid();
             

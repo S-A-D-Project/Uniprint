@@ -224,7 +224,10 @@ class SocialAuthController extends Controller
             ->first();
 
         if ($role && $role->user_role_type === 'business_user') {
-            $hasEnterprise = DB::table('staff')->where('user_id', $userId)->exists();
+            $hasEnterprise = DB::table('enterprises')->where('owner_user_id', $userId)->exists();
+            if (! $hasEnterprise) {
+                $hasEnterprise = DB::table('staff')->where('user_id', $userId)->exists();
+            }
             if (!$hasEnterprise) {
                 return redirect()->route('business.onboarding');
             }

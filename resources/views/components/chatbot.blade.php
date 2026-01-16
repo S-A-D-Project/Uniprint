@@ -259,7 +259,7 @@ class Chatbot {
         
         // Account-related responses
         if (lowerMessage.includes('account') || lowerMessage.includes('register') || lowerMessage.includes('sign up')) {
-            return "Creating an account is free and easy! Click the 'Sign Up' button to register as a customer. Business users can register as enterprise partners to offer printing services.";
+            return "Signing up is free and easy! Use the Sign Up tab on the login page to register as a customer or business user.";
         }
         
         // Help/support responses

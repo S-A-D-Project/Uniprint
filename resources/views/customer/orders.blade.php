@@ -89,7 +89,7 @@ use Illuminate\Support\Facades\DB;
                                         {{ $order->status_name ?? 'Unknown' }}
                                     </span>
                                     <!-- Chat Button -->
-                                    <button onclick="openOrderChat('{{ $order->purchase_order_id }}', '{{ $order->enterprise_name }}')" 
+                                    <button onclick="openOrderChat('{{ $order->purchase_order_id }}', '{{ $order->enterprise_id }}', '{{ $order->enterprise_name }}')" 
                                             class="inline-flex items-center px-3 py-1.5 border border-primary text-primary text-sm font-medium rounded-md hover:bg-primary hover:text-white transition-colors">
                                         <i data-lucide="message-circle" class="h-4 w-4 mr-1"></i>
                                         Chat
@@ -193,6 +193,15 @@ use Illuminate\Support\Facades\DB;
                            class="customer-button-primary w-full text-center">
                             <i data-lucide="eye" class="h-4 w-4 mr-2"></i>View Details
                         </a>
+
+                        @if(($order->status_name ?? 'Pending') === 'Pending')
+                        <form action="{{ route('customer.orders.cancel', $order->purchase_order_id) }}" method="POST" class="mt-2" onsubmit="return confirm('Cancel this order?');">
+                            @csrf
+                            <button type="submit" class="w-full inline-flex items-center justify-center px-4 py-2 border border-red-200 text-red-600 rounded-md hover:bg-red-50 transition-colors">
+                                <i data-lucide="x-circle" class="h-4 w-4 mr-2"></i>Cancel Order
+                            </button>
+                        </form>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -317,8 +326,9 @@ function initializePusher() {
 }
 
 // Open chat modal for specific order
-async function openOrderChat(orderId, businessName) {
+async function openOrderChat(orderId, enterpriseId, businessName) {
     currentOrderId = orderId;
+    window.currentEnterpriseId = enterpriseId;
     
     // Update modal header
     document.getElementById('chatBusinessName').textContent = businessName;
@@ -328,36 +338,36 @@ async function openOrderChat(orderId, businessName) {
     document.getElementById('chatModal').classList.remove('hidden');
     
     // Initialize chat
-    await initializeOrderChat(businessName);
+    await initializeOrderChat(enterpriseId);
     
     // Focus message input
     document.getElementById('messageInput').focus();
 }
 
 // Initialize chat for specific order
-async function initializeOrderChat(businessName) {
+async function initializeOrderChat(enterpriseId) {
     try {
-        // Get business user ID from enterprise name
-        const businessResponse = await fetch('/api/chat/available-businesses', {
+        // Resolve enterprise owner user_id (works regardless of online status)
+        const businessResponse = await fetch('/api/chat/enterprise-owner', {
+            method: 'POST',
             headers: {
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
                 'Content-Type': 'application/json'
-            }
+            },
+            body: JSON.stringify({ enterprise_id: enterpriseId })
         });
-        
+
         if (!businessResponse.ok) {
-            throw new Error('Failed to get business information');
+            throw new Error('Failed to resolve print shop owner');
         }
-        
+
         const businessData = await businessResponse.json();
-        const business = businessData.businesses.find(b => b.name === businessName);
-        
-        if (!business) {
-            showChatError('Business not found');
+        if (!businessData.success || !businessData.business_user_id) {
+            showChatError(businessData.message || 'Business owner not found');
             return;
         }
-        
-        currentBusinessId = business.user_id;
+
+        currentBusinessId = businessData.business_user_id;
         
         // Get or create conversation
         const conversationResponse = await fetch('/api/chat/conversations', {

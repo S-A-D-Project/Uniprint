@@ -569,7 +569,7 @@ class TabManager {
     renderServices(services) {
         const container = document.getElementById('services-container');
         container.innerHTML = services.map(service => `
-            <div class="service-card bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-lg transition-all">
+            <div class="service-card bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-lg transition-all cursor-pointer" onclick="orderService('${service.product_id}')">
                 <div class="aspect-video bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
                     <i data-lucide="printer" class="h-12 w-12 text-primary"></i>
                 </div>
@@ -592,12 +592,9 @@ class TabManager {
                         </div>
                     </div>
                     <div class="flex gap-2">
-                        <button onclick="saveService('${service.product_id}')" class="flex-1 px-3 py-2 border border-primary text-primary rounded-lg hover:bg-primary/5 transition-colors text-sm font-medium">
+                        <button onclick="saveService(event, '${service.product_id}')" class="flex-1 px-3 py-2 border border-primary text-primary rounded-lg hover:bg-primary/5 transition-colors text-sm font-medium">
                             <i data-lucide="heart" class="h-4 w-4 inline mr-1"></i>
                             Save
-                        </button>
-                        <button onclick="orderService('${service.product_id}')" class="flex-1 px-3 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium">
-                            Order Now
                         </button>
                     </div>
                 </div>
@@ -890,7 +887,11 @@ class TabManager {
 }
 
 // Global functions for service actions
-function saveService(productId) {
+function saveService(event, productId) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
     fetch('/saved-services/save', {
         method: 'POST',
         headers: {
@@ -898,26 +899,26 @@ function saveService(productId) {
             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
         },
         body: JSON.stringify({
-            product_id: productId,
-            quantity: 1
+            service_id: productId,
+            quantity: 1,
+            customizations: []
         })
     })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            updateSavedServicesBadge(data.count);
-            showNotification('Service saved successfully!');
-        } else {
-            showNotification(data.message || 'Failed to save service', 'error');
-        }
-    })
-    .catch(error => {
-        showNotification('Network error. Please try again.', 'error');
-    });
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('Service saved successfully!');
+            } else {
+                showNotification('Failed to save service', 'error');
+            }
+        })
+        .catch(() => {
+            showNotification('Failed to save service', 'error');
+        });
 }
 
 function orderService(productId) {
-    window.location.href = `/services/${productId}`;
+    window.location.href = `/customer/services/${productId}`;
 }
 
 function switchToServicesTab() {

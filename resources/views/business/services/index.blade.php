@@ -14,6 +14,10 @@
 
 @section('content')
 
+    @php
+        $hasRequiresFileUpload = \Illuminate\Support\Facades\Schema::hasColumn('services', 'requires_file_upload');
+    @endphp
+
     <!-- Services Grid -->
     <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
         @forelse($services as $service)
@@ -68,17 +72,29 @@
                            class="flex-1 px-3 py-2 text-sm text-center bg-primary text-primary-foreground rounded-md hover:shadow-glow transition-smooth">
                             Edit
                         </a>
-                        <form action="{{ route('business.services.toggle-status', $service->service_id) }}" method="POST">
+
+                        @if($hasRequiresFileUpload)
+                            <button type="button"
+                                    class="px-3 py-2 text-sm border border-input rounded-md hover:bg-secondary transition-smooth"
+                                    onclick="openServiceUploadSettings('{{ $service->service_id }}', @json($service->service_name), {{ !empty($service->requires_file_upload) ? 'true' : 'false' }})">
+                                Files
+                            </button>
+                        @endif
+
+                        <form id="toggle-service-{{ $service->service_id }}" action="{{ route('business.services.toggle-status', $service->service_id) }}" method="POST">
                             @csrf
-                            <button type="submit" class="px-3 py-2 text-sm {{ $service->is_active ? 'bg-secondary text-secondary-foreground' : 'bg-success text-white' }} rounded-md hover:opacity-90">
+                            <button type="button"
+                                    class="px-3 py-2 text-sm {{ $service->is_active ? 'bg-secondary text-secondary-foreground' : 'bg-success text-white' }} rounded-md hover:opacity-90"
+                                    onclick="confirmServiceToggleStatus('{{ $service->service_id }}', @json($service->service_name), {{ $service->is_active ? 'true' : 'false' }})">
                                 {{ $service->is_active ? 'Deactivate' : 'Activate' }}
                             </button>
                         </form>
-                        <form action="{{ route('business.services.delete', $service->service_id) }}" method="POST" 
-                              onsubmit="return confirm('Are you sure you want to delete this service?')">
+
+                        <form id="delete-service-{{ $service->service_id }}" action="{{ route('business.services.delete', $service->service_id) }}" method="POST">
                             @csrf
                             @method('DELETE')
-                            <button type="submit" class="px-3 py-2 text-sm bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90">
+                            <button type="button" class="px-3 py-2 text-sm bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90"
+                                    onclick="confirmServiceDelete('{{ $service->service_id }}', @json($service->service_name))">
                                 <i data-lucide="trash-2" class="h-4 w-4"></i>
                             </button>
                         </form>
@@ -105,4 +121,97 @@
         </div>
     @endif
 </div>
+
+    <x-modals.service-upload-settings />
+    <x-modals.confirm-action />
 @endsection
+
+@push('scripts')
+<script>
+function openServiceUploadSettings(serviceId, serviceName, requiresFileUpload) {
+    const modalEl = document.getElementById('serviceUploadSettingsModal');
+    if (!modalEl) return;
+
+    const nameEl = document.getElementById('serviceUploadSettingsName');
+    const checkboxEl = document.getElementById('serviceUploadSettingsRequires');
+    const formEl = document.getElementById('serviceUploadSettingsForm');
+
+    if (nameEl) nameEl.textContent = serviceName || 'Service';
+    if (checkboxEl) checkboxEl.checked = Boolean(requiresFileUpload);
+    if (formEl) {
+        formEl.action = `{{ route('business.services.upload-settings', ':id') }}`.replace(':id', serviceId);
+    }
+
+    const modal = new bootstrap.Modal(modalEl);
+    modal.show();
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    const formEl = document.getElementById('serviceUploadSettingsForm');
+    if (!formEl) return;
+
+    formEl.addEventListener('submit', async function (e) {
+        e.preventDefault();
+
+        try {
+            const response = await fetch(formEl.action, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                },
+                body: new FormData(formEl)
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to save');
+            }
+
+            if (window.UniPrintUI && typeof window.UniPrintUI.toast === 'function') {
+                window.UniPrintUI.toast('File upload settings updated.', { variant: 'success' });
+            }
+
+            const modalEl = document.getElementById('serviceUploadSettingsModal');
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            if (modal) modal.hide();
+
+            setTimeout(() => window.location.reload(), 600);
+        } catch (err) {
+            console.error(err);
+            if (window.UniPrintUI && typeof window.UniPrintUI.toast === 'function') {
+                window.UniPrintUI.toast('Failed to update file upload settings.', { variant: 'danger' });
+            }
+        }
+    });
+});
+
+function confirmServiceDelete(serviceId, serviceName) {
+    if (typeof window.showConfirmModal !== 'function') return;
+    showConfirmModal({
+        title: 'Delete Service',
+        message: `Are you sure you want to delete "${serviceName}"? This action cannot be undone.`,
+        confirmText: 'Delete',
+        variant: 'danger',
+        callback: async () => {
+            document.getElementById(`delete-service-${serviceId}`).submit();
+        }
+    });
+}
+
+function confirmServiceToggleStatus(serviceId, serviceName, currentlyActive) {
+    if (typeof window.showConfirmModal !== 'function') return;
+
+    const actionWord = currentlyActive ? 'deactivate' : 'activate';
+    showConfirmModal({
+        title: 'Confirm Action',
+        message: `Are you sure you want to ${actionWord} "${serviceName}"?`,
+        confirmText: currentlyActive ? 'Deactivate' : 'Activate',
+        variant: 'warning',
+        callback: async () => {
+            document.getElementById(`toggle-service-${serviceId}`).submit();
+        }
+    });
+}
+</script>
+@endpush

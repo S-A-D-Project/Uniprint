@@ -127,7 +127,7 @@ class AuthController extends Controller
 
     public function showRegister()
     {
-        return view('auth.register');
+        return redirect()->route('login', ['tab' => 'signup']);
     }
 
     public function register(Request $request)
@@ -136,7 +136,7 @@ class AuthController extends Controller
             'name' => 'required|string|max:200',
             'email' => 'required|email|unique:users,email|max:255',
             'username' => 'required|string|unique:login,username|max:100',
-            'password' => 'required|string|min:6|confirmed',
+            'password' => 'required|string|min:8|confirmed',
             'role_type' => 'nullable|string',
             'terms_accepted' => 'accepted',
         ]);
@@ -151,12 +151,15 @@ class AuthController extends Controller
 
         // Create user record
         $userId = Str::uuid();
+
+        $position = $desiredRoleType === 'business_user' ? 'Owner' : 'Customer';
+        $department = $desiredRoleType === 'business_user' ? 'Management' : 'External';
         DB::table('users')->insert([
             'user_id' => $userId,
             'name' => $request->name,
             'email' => $request->email,
-            'position' => 'Customer',
-            'department' => 'External',
+            'position' => $position,
+            'department' => $department,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -192,12 +195,17 @@ class AuthController extends Controller
             'updated_at' => now(),
         ]);
 
-        // Log in the user
-        session([
+        // Log in the user (match login() session behavior)
+        $request->session()->regenerate();
+        $request->session()->put([
             'user_id' => $userId,
             'user_name' => $request->name,
             'user_email' => $request->email,
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'last_activity' => now(),
         ]);
+        $request->session()->regenerateToken();
 
         return $this->redirectToDashboard();
     }
@@ -221,7 +229,20 @@ class AuthController extends Controller
                 case 'admin':
                     return redirect()->route('admin.dashboard');
                 case 'business_user':
-                    $hasEnterprise = DB::table('staff')->where('user_id', $userId)->exists();
+                    $hasEnterprise = false;
+
+                    if (\Illuminate\Support\Facades\Schema::hasColumn('enterprises', 'owner_user_id')) {
+                        $hasEnterprise = DB::table('enterprises')
+                            ->where('owner_user_id', $userId)
+                            ->exists();
+                    }
+
+                    if (! $hasEnterprise && \Illuminate\Support\Facades\Schema::hasTable('staff')) {
+                        // Backward-compatibility for legacy data
+                        $hasEnterprise = DB::table('staff')
+                            ->where('user_id', $userId)
+                            ->exists();
+                    }
                     if (!$hasEnterprise) {
                         return redirect()->route('business.onboarding');
                     }

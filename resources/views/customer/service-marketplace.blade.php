@@ -638,9 +638,6 @@ class ServiceMarketplace {
                                 <span class="text-lg font-bold text-orange-600">₱${service.price}</span>
                                 ${service.original_price ? `<span class="text-sm text-gray-500 line-through ml-2">₱${service.original_price}</span>` : ''}
                             </div>
-                            <button class="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors text-sm font-medium">
-                                View Details
-                            </button>
                         </div>
                     </div>
                 </div>
@@ -757,36 +754,7 @@ function toggleFavorite(event, serviceId) {
 }
 
 function viewServiceDetail(serviceId) {
-    // Show modal with service details
-    const modal = document.getElementById('service-modal');
-    const content = document.getElementById('service-modal-content');
-    
-    content.innerHTML = `
-        <div class="p-6">
-            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto"></div>
-        </div>
-    `;
-    
-    modal.classList.remove('hidden');
-    
-    fetch(`/api/marketplace/service/${serviceId}`)
-        .then(response => response.json())
-        .then(data => {
-            content.innerHTML = createServiceDetailModal(data);
-            
-            // Re-initialize Lucide icons
-            if (typeof lucide !== 'undefined') {
-                lucide.createIcons();
-            }
-        })
-        .catch(error => {
-            content.innerHTML = `
-                <div class="p-6 text-center">
-                    <i data-lucide="alert-circle" class="h-12 w-12 text-red-500 mx-auto mb-4"></i>
-                    <p class="text-gray-600">Failed to load service details</p>
-                </div>
-            `;
-        });
+    window.location.href = `/customer/services/${serviceId}`;
 }
 
 function closeServiceModal() {

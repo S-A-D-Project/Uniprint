@@ -14,6 +14,7 @@ class OrderItem extends Model
     protected $fillable = [
         'order_id',
         'service_id',
+        'custom_fields',
         'quantity',
         'item_subtotal',
         'notes_to_enterprise',
@@ -24,6 +25,7 @@ class OrderItem extends Model
         return [
             'quantity' => 'integer',
             'item_subtotal' => 'decimal:2',
+            'custom_fields' => 'array',
         ];
     }
 

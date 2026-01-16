@@ -14,7 +14,6 @@ class DatabaseSeeder extends Seeder
         $this->call([
             RoleTypesSeeder::class,
             StatusesSeeder::class,
-            FixUUIDDataSeeder::class, // Fix any existing UUID inconsistencies
             NewUsersSeeder::class,
             BaguioPrintshopsSeeder::class,
             ProductsSeeder::class,

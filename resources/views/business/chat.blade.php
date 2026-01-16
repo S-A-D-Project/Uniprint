@@ -423,7 +423,7 @@ class BusinessChat {
     subscribeToConversation(conversationId) {
         if (!this.pusher) return;
 
-        const channelName = `conversation.${conversationId}`;
+        const channelName = `private-conversation.${conversationId}`;
         
         // Unsubscribe from previous channel
         this.subscribedChannels.forEach((channel, name) => {

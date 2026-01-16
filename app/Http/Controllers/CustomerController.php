@@ -115,14 +115,44 @@ class CustomerController extends Controller
         }
 
         // Get order items with service info
-        $orderItems = DB::table('order_items')
+        $itemsQuery = DB::table('order_items')
             ->join('services', 'order_items.service_id', '=', 'services.service_id')
-            ->where('order_items.purchase_order_id', $id)
-            ->select('order_items.*', 'services.service_name')
-            ->get();
+            ->where('order_items.purchase_order_id', $id);
+
+        $hasRequiresFileUploadColumn = \Illuminate\Support\Facades\Schema::hasColumn('services', 'requires_file_upload');
+
+        $orderItems = $hasRequiresFileUploadColumn
+            ? $itemsQuery->select('order_items.*', 'services.service_name', 'services.requires_file_upload')->get()
+            : $itemsQuery->select('order_items.*', 'services.service_name')->get();
+
+        $requiresFileUpload = $hasRequiresFileUploadColumn
+            ? $orderItems->contains(fn($item) => !empty($item->requires_file_upload))
+            : false;
 
         // Get customizations for each item
         foreach ($orderItems as $item) {
+            $rawFields = $item->custom_fields ?? null;
+            if (is_string($rawFields)) {
+                $rawFields = json_decode($rawFields, true);
+            } elseif (is_object($rawFields)) {
+                $rawFields = (array) $rawFields;
+            }
+            $rawFields = is_array($rawFields) ? $rawFields : [];
+
+            $fieldDefs = DB::table('service_custom_fields')
+                ->where('service_id', $item->service_id)
+                ->orderBy('sort_order')
+                ->orderBy('field_label')
+                ->get();
+
+            $item->custom_field_values = collect($fieldDefs)
+                ->filter(fn($f) => isset($rawFields[$f->field_id]) && trim((string) $rawFields[$f->field_id]) !== '')
+                ->map(fn($f) => (object) [
+                    'label' => $f->field_label,
+                    'value' => $rawFields[$f->field_id],
+                ])
+                ->values();
+
             $item->customizations = DB::table('order_item_customizations')
                 ->join('customization_options', 'order_item_customizations.option_id', '=', 'customization_options.option_id')
                 ->where('order_item_customizations.order_item_id', $item->item_id)
@@ -139,6 +169,12 @@ class CustomerController extends Controller
             ->orderBy('order_status_history.timestamp', 'desc')
             ->get();
 
+        $currentStatusName = DB::table('order_status_history')
+            ->join('statuses', 'order_status_history.status_id', '=', 'statuses.status_id')
+            ->where('order_status_history.purchase_order_id', $id)
+            ->orderBy('order_status_history.timestamp', 'desc')
+            ->value('statuses.status_name') ?? 'Pending';
+
         // Get transaction if exists
         $transaction = DB::table('transactions')
             ->where('purchase_order_id', $id)
@@ -150,7 +186,158 @@ class CustomerController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
-        return view('customer.order-details', compact('order', 'orderItems', 'statusHistory', 'transaction', 'designFiles', 'userName'));
+        return view('customer.order-details', compact('order', 'orderItems', 'statusHistory', 'transaction', 'designFiles', 'userName', 'currentStatusName', 'requiresFileUpload'));
+    }
+
+    public function confirmCompletion($id)
+    {
+        $userId = session('user_id');
+
+        $order = DB::table('customer_orders')
+            ->where('purchase_order_id', $id)
+            ->where('customer_id', $userId)
+            ->first();
+
+        if (! $order) {
+            abort(404);
+        }
+
+        $currentStatusName = DB::table('order_status_history')
+            ->join('statuses', 'order_status_history.status_id', '=', 'statuses.status_id')
+            ->where('order_status_history.purchase_order_id', $id)
+            ->orderBy('order_status_history.timestamp', 'desc')
+            ->value('statuses.status_name') ?? 'Pending';
+
+        if (! in_array($currentStatusName, ['Ready for Pickup', 'Delivered'], true)) {
+            return redirect()->back()->with('error', 'You can only confirm orders that are ready or delivered.');
+        }
+
+        $completedStatusId = DB::table('statuses')->where('status_name', 'Completed')->value('status_id');
+        if (! $completedStatusId) {
+            return redirect()->back()->with('error', 'Status "Completed" is not configured.');
+        }
+
+        DB::table('order_status_history')->insert([
+            'approval_id' => \Illuminate\Support\Str::uuid(),
+            'purchase_order_id' => $id,
+            'user_id' => $userId,
+            'status_id' => $completedStatusId,
+            'remarks' => 'Order confirmed complete by customer',
+            'timestamp' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('customer_orders')
+            ->where('purchase_order_id', $id)
+            ->where('customer_id', $userId)
+            ->update([
+                'status_id' => $completedStatusId,
+                'updated_at' => now(),
+            ]);
+
+        // Notify enterprise owner (owner_user_id preferred, fallback to first staff user)
+        $recipientId = null;
+        if (\Illuminate\Support\Facades\Schema::hasColumn('enterprises', 'owner_user_id')) {
+            $recipientId = DB::table('enterprises')->where('enterprise_id', $order->enterprise_id)->value('owner_user_id');
+        }
+        if (! $recipientId && \Illuminate\Support\Facades\Schema::hasTable('staff')) {
+            $recipientId = DB::table('staff')
+                ->where('enterprise_id', $order->enterprise_id)
+                ->orderByRaw("CASE WHEN position = 'Owner' THEN 0 ELSE 1 END")
+                ->value('user_id');
+        }
+
+        DB::table('order_notifications')->insert([
+            'notification_id' => \Illuminate\Support\Str::uuid(),
+            'purchase_order_id' => $id,
+            'recipient_id' => $recipientId ?: $order->customer_id,
+            'notification_type' => 'status_change',
+            'title' => 'Order Completed',
+            'message' => "Customer confirmed completion for order #{$order->order_no}.",
+            'is_read' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return redirect()->back()->with('success', 'Thanks! Order marked as completed.');
+    }
+
+    public function cancelOrder($id)
+    {
+        $userId = session('user_id');
+
+        $order = DB::table('customer_orders')
+            ->where('purchase_order_id', $id)
+            ->where('customer_id', $userId)
+            ->first();
+
+        if (! $order) {
+            abort(404);
+        }
+
+        $currentStatusName = DB::table('order_status_history')
+            ->join('statuses', 'order_status_history.status_id', '=', 'statuses.status_id')
+            ->where('order_status_history.purchase_order_id', $id)
+            ->orderBy('order_status_history.timestamp', 'desc')
+            ->value('statuses.status_name') ?? 'Pending';
+
+        if ($currentStatusName !== 'Pending') {
+            return redirect()->back()->with('error', 'You can only cancel orders that are still pending.');
+        }
+
+        $cancelledStatusId = DB::table('statuses')->where('status_name', 'Cancelled')->value('status_id');
+        if (! $cancelledStatusId) {
+            return redirect()->back()->with('error', 'Status "Cancelled" is not configured.');
+        }
+
+        DB::table('order_status_history')->insert([
+            'approval_id' => \Illuminate\Support\Str::uuid(),
+            'purchase_order_id' => $id,
+            'user_id' => $userId,
+            'status_id' => $cancelledStatusId,
+            'remarks' => 'Order cancelled by customer',
+            'timestamp' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('customer_orders')
+            ->where('purchase_order_id', $id)
+            ->where('customer_id', $userId)
+            ->update([
+                'status_id' => $cancelledStatusId,
+                'updated_at' => now(),
+            ]);
+
+        // Notify enterprise owner (owner_user_id preferred, fallback to first staff user)
+        $recipientId = null;
+        if (\Illuminate\Support\Facades\Schema::hasColumn('enterprises', 'owner_user_id')) {
+            $recipientId = DB::table('enterprises')->where('enterprise_id', $order->enterprise_id)->value('owner_user_id');
+        }
+        if (! $recipientId && \Illuminate\Support\Facades\Schema::hasTable('staff')) {
+            $recipientId = DB::table('staff')
+                ->where('enterprise_id', $order->enterprise_id)
+                ->orderByRaw("CASE WHEN position = 'Owner' THEN 0 ELSE 1 END")
+                ->value('user_id');
+        }
+
+        if ($recipientId) {
+            $shortId = substr((string) ($order->order_no ?? $id), 0, 16);
+            DB::table('order_notifications')->insert([
+                'notification_id' => \Illuminate\Support\Str::uuid(),
+                'purchase_order_id' => $id,
+                'recipient_id' => $recipientId,
+                'notification_type' => 'status_change',
+                'title' => 'Order Cancelled',
+                'message' => "Customer cancelled order #{$shortId}.",
+                'is_read' => false,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        return redirect()->back()->with('success', 'Order cancelled successfully.');
     }
 
     public function uploadDesignFile(Request $request, $orderId)
@@ -170,6 +357,16 @@ class CustomerController extends Controller
 
         if (!$order) {
             abort(404);
+        }
+
+        $currentStatusName = DB::table('order_status_history')
+            ->join('statuses', 'order_status_history.status_id', '=', 'statuses.status_id')
+            ->where('order_status_history.purchase_order_id', $orderId)
+            ->orderBy('order_status_history.timestamp', 'desc')
+            ->value('statuses.status_name') ?? 'Pending';
+
+        if (in_array($currentStatusName, ['Delivered', 'Cancelled', 'Completed'], true)) {
+            return redirect()->back()->with('error', 'You cannot upload design files for this order at its current status.');
         }
 
         // Handle file upload
@@ -306,7 +503,7 @@ class CustomerController extends Controller
     {
         $service = Service::where('service_id', $id)
             ->where('is_active', true)
-            ->with(['enterprise', 'customizationOptions'])
+            ->with(['enterprise', 'customizationOptions', 'customFields'])
             ->firstOrFail();
 
         $customizationGroups = $service->customizationOptions->groupBy('option_type');
@@ -322,6 +519,8 @@ class CustomerController extends Controller
             'quantity' => 'required|integer|min:1|max:100',
             'customizations' => 'nullable|array',
             'customizations.*' => 'uuid',
+            'custom_fields' => 'nullable|array',
+            'custom_fields.*' => 'nullable|string|max:500',
             'notes' => 'nullable|string|max:500',
         ]);
 
@@ -335,6 +534,7 @@ class CustomerController extends Controller
             $request->service_id,
             $request->quantity,
             $request->customizations ?? [],
+            $request->custom_fields ?? [],
             $request->notes
         );
 

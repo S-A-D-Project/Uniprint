@@ -43,7 +43,7 @@
                 <ul class="space-y-2 text-sm">
                     <li><a href="{{ route('enterprises.index') }}" class="text-muted-foreground hover:text-primary transition-smooth">Browse Shops</a></li>
                     <li><a href="{{ route('login') }}" class="text-muted-foreground hover:text-primary transition-smooth">Sign In</a></li>
-                    <li><a href="{{ route('register') }}" class="text-muted-foreground hover:text-primary transition-smooth">Create Account</a></li>
+                    <li><a href="{{ route('login', ['tab' => 'signup']) }}" class="text-muted-foreground hover:text-primary transition-smooth">Sign Up</a></li>
                     <li><a href="#" class="text-muted-foreground hover:text-primary transition-smooth">Help Center</a></li>
                     <li><a href="#" class="text-muted-foreground hover:text-primary transition-smooth">Contact Us</a></li>
                 </ul>

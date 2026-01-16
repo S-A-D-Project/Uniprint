@@ -10,6 +10,10 @@
         <i data-lucide="plus" class="h-4 w-4"></i>
         Add Customization
     </button>
+    <button type="button" class="inline-flex items-center gap-2 px-4 py-2 text-sm border border-input rounded-lg hover:bg-secondary transition-smooth" data-bs-toggle="modal" data-bs-target="#addCustomFieldModal">
+        <i data-lucide="text-cursor-input" class="h-4 w-4"></i>
+        Add Text Field
+    </button>
     <a href="{{ route('business.services.index') }}" class="inline-flex items-center gap-2 px-4 py-2 text-sm border border-input rounded-lg hover:bg-secondary transition-smooth">
         <i data-lucide="arrow-left" class="h-4 w-4"></i>
         Back to Services
@@ -70,6 +74,50 @@
                     <div class="text-center py-12">
                         <i data-lucide="sliders" class="h-16 w-16 mx-auto mb-4 text-muted-foreground"></i>
                         <p class="text-muted-foreground">No customization options yet</p>
+                    </div>
+                @endif
+            </div>
+
+            <div class="bg-card border border-border rounded-xl shadow-card p-6 mt-6">
+                <h2 class="text-xl font-bold mb-4">Custom Text Fields</h2>
+
+                @php
+                    $fields = $customFields ?? collect();
+                @endphp
+
+                @if($fields->isNotEmpty())
+                    <div class="space-y-2">
+                        @foreach($fields as $field)
+                            <div class="flex items-center justify-between p-3 border border-border rounded-lg hover:bg-secondary/30">
+                                <div>
+                                    <p class="font-medium">{{ $field->field_label }}</p>
+                                    <p class="text-sm text-muted-foreground">
+                                        {{ $field->is_required ? 'Required' : 'Optional' }}
+                                        @if(!empty($field->placeholder))
+                                            • Placeholder: {{ $field->placeholder }}
+                                        @endif
+                                        • Order: {{ $field->sort_order ?? 0 }}
+                                    </p>
+                                </div>
+                                <div class="flex gap-2">
+                                    <x-ui.tooltip text="Edit this text field">
+                                        <button type="button" class="px-3 py-1 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80" onclick="editCustomField('{{ $field->field_id }}', '{{ $field->field_label }}', '{{ $field->placeholder ?? '' }}', {{ (int)($field->is_required ?? 0) }}, {{ (int)($field->sort_order ?? 0) }})">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                    </x-ui.tooltip>
+                                    <x-ui.tooltip text="Delete this text field">
+                                        <button type="button" class="px-3 py-1 text-sm bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90" onclick="deleteCustomField('{{ $field->field_id }}', '{{ $field->field_label }}')">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </x-ui.tooltip>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @else
+                    <div class="text-center py-12">
+                        <i data-lucide="text-cursor-input" class="h-16 w-16 mx-auto mb-4 text-muted-foreground"></i>
+                        <p class="text-muted-foreground">No custom text fields yet</p>
                     </div>
                 @endif
             </div>
@@ -138,6 +186,40 @@
     </x-slot>
 </x-ui.modal>
 
+<x-ui.modal id="addCustomFieldModal" title="Add Custom Text Field" size="md" centered>
+    <form id="addCustomFieldForm" action="{{ route('business.custom-fields.store', $service->service_id) }}" method="POST">
+        @csrf
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium mb-2">Field Label *</label>
+                <input type="text" name="field_label" required
+                       class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-2">Placeholder</label>
+                <input type="text" name="placeholder"
+                       class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
+            </div>
+            <div class="flex items-center justify-between">
+                <label class="text-sm font-medium">Required?</label>
+                <input type="checkbox" name="is_required" value="1" class="h-4 w-4 rounded">
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-2">Sort Order</label>
+                <input type="number" name="sort_order" value="0" min="0" max="1000"
+                       class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
+            </div>
+        </div>
+    </form>
+
+    <x-slot name="footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" form="addCustomFieldForm" class="btn btn-primary">
+            <i class="bi bi-plus-circle me-2"></i>Add Field
+        </button>
+    </x-slot>
+</x-ui.modal>
+
 <!-- Edit Customization Modal -->
 <x-ui.modal id="editCustomizationModal" title="Edit Customization Option" size="md" centered>
     <form id="editCustomizationForm" method="POST">
@@ -172,6 +254,41 @@
     </x-slot>
 </x-ui.modal>
 
+<x-ui.modal id="editCustomFieldModal" title="Edit Custom Text Field" size="md" centered>
+    <form id="editCustomFieldForm" method="POST">
+        @csrf
+        @method('PUT')
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium mb-2">Field Label *</label>
+                <input type="text" name="field_label" id="edit_field_label" required
+                       class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-2">Placeholder</label>
+                <input type="text" name="placeholder" id="edit_placeholder"
+                       class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
+            </div>
+            <div class="flex items-center justify-between">
+                <label class="text-sm font-medium">Required?</label>
+                <input type="checkbox" name="is_required" id="edit_is_required" value="1" class="h-4 w-4 rounded">
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-2">Sort Order</label>
+                <input type="number" name="sort_order" id="edit_sort_order" value="0" min="0" max="1000"
+                       class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
+            </div>
+        </div>
+    </form>
+
+    <x-slot name="footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" form="editCustomFieldForm" class="btn btn-primary">
+            <i class="bi bi-check-circle me-2"></i>Update Field
+        </button>
+    </x-slot>
+</x-ui.modal>
+
 <!-- Confirmation Modal -->
 <x-modals.confirm-action />
 
@@ -192,6 +309,50 @@ function editCustomization(optionId, optionType, optionName, priceModifier) {
     // Show modal
     const modal = new bootstrap.Modal(document.getElementById('editCustomizationModal'));
     modal.show();
+}
+
+function editCustomField(fieldId, fieldLabel, placeholder, isRequired, sortOrder) {
+    document.getElementById('edit_field_label').value = fieldLabel;
+    document.getElementById('edit_placeholder').value = placeholder;
+    document.getElementById('edit_is_required').checked = Boolean(isRequired);
+    document.getElementById('edit_sort_order').value = sortOrder;
+
+    const form = document.getElementById('editCustomFieldForm');
+    form.action = `{{ route('business.custom-fields.update', [$service->service_id, ':fieldId']) }}`.replace(':fieldId', fieldId);
+
+    const modal = new bootstrap.Modal(document.getElementById('editCustomFieldModal'));
+    modal.show();
+}
+
+function deleteCustomField(fieldId, fieldLabel) {
+    showConfirmModal({
+        title: 'Delete Custom Text Field',
+        message: `Are you sure you want to delete the "${fieldLabel}" field? This action cannot be undone.`,
+        confirmText: 'Delete Field',
+        variant: 'danger',
+        callback: async () => {
+            try {
+                const response = await fetch(`{{ route('business.custom-fields.delete', [$service->service_id, ':fieldId']) }}`.replace(':fieldId', fieldId), {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+
+                if (response.ok) {
+                    showToast('Custom field deleted successfully!', 'success');
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    throw new Error('Failed to delete field');
+                }
+            } catch (error) {
+                console.error('Delete error:', error);
+                showToast('Failed to delete custom field. Please try again.', 'error');
+                return false;
+            }
+        }
+    });
 }
 
 function deleteCustomization(optionId, optionName) {

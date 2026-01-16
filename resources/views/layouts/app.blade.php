@@ -155,7 +155,9 @@
                             <span class="me-3 text-muted">
                                 <i class="bi bi-person-circle me-2"></i>
                                 {{ Auth::user()->username ?? Auth::user()->name ?? 'Account' }}
-                                @php($roleType = Auth::user()->getUserRoleType())
+                                @php
+                                    $roleType = Auth::user()->getUserRoleType();
+                                @endphp
                                 @if(!empty($roleType))
                                     <span class="badge bg-primary ms-2">{{ ucfirst($roleType) }}</span>
                                 @endif
@@ -233,10 +235,5 @@
     </script>
     
     @stack('scripts')
-    
-    <!-- Include Chatbot Component -->
-    @if(auth()->check())
-        @include('components.chatbot')
-    @endif
 </body>
 </html>

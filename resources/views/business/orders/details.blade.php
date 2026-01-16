@@ -45,6 +45,20 @@
                                     </div>
                                 </div>
                             @endif
+
+                            @if(isset($item->custom_field_values) && $item->custom_field_values->isNotEmpty())
+                                <div class="mt-2 pt-2 border-t border-border">
+                                    <p class="text-sm font-medium mb-1">Additional Information:</p>
+                                    <div class="space-y-1 text-sm text-muted-foreground">
+                                        @foreach($item->custom_field_values as $field)
+                                            <div class="flex gap-2">
+                                                <span class="font-medium text-foreground">{{ $field->label }}:</span>
+                                                <span class="break-words">{{ $field->value }}</span>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            @endif
                         </div>
                     @endforeach
                 </div>
@@ -108,7 +122,7 @@
                                                     Approve
                                                 </button>
                                             </form>
-                                            <button onclick="openRejectModal('{{ $file->file_id }}')" 
+                                            <button type="button" onclick="openRejectDesignFileModal('{{ $file->file_id }}')" 
                                                     class="px-3 py-1 text-sm bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90">
                                                 Reject
                                             </button>
@@ -177,49 +191,49 @@
                 </div>
             </div>
 
-            <!-- Order Actions -->
-            @if(($currentStatusName ?? null) === 'Pending')
+            <!-- Linear Status Actions -->
             <div class="bg-card border border-border rounded-xl shadow-card p-6">
-                <h3 class="font-bold mb-4">Order Actions</h3>
-                <form action="{{ route('business.orders.confirm', $order->purchase_order_id) }}" method="POST" class="js-confirm-order">
-                    @csrf
-                    <button type="submit" class="w-full px-4 py-2 bg-success text-white font-medium rounded-md hover:opacity-90 transition-smooth">
-                        Confirm Order
-                    </button>
-                </form>
-            </div>
-            @endif
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="font-bold">Next Action</h3>
+                    <span class="text-sm text-muted-foreground">Current: {{ $currentStatusName ?? 'Pending' }}</span>
+                </div>
 
-            <!-- Update Status -->
-            <div class="bg-card border border-border rounded-xl shadow-card p-6">
-                <h3 class="font-bold mb-4">Update Order Status</h3>
-                <form action="{{ route('business.orders.update-status', $order->purchase_order_id) }}" method="POST">
-                    @csrf
-                    <div class="space-y-4">
-                        <div>
-                            <label class="block text-sm font-medium mb-2">New Status</label>
-                            <select name="status_id" required
-                                    class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
-                                <option value="">Select status</option>
-                                @foreach($statuses as $status)
-                                    <option value="{{ $status->status_id }}">{{ $status->status_name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium mb-2">Remarks (Optional)</label>
-                            <textarea name="remarks" rows="3" 
-                                      class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"></textarea>
-                        </div>
-                        <button type="submit" class="w-full px-4 py-2 bg-primary text-primary-foreground font-medium rounded-md hover:shadow-glow transition-smooth">
-                            Update Status
+                @if(!empty($businessActions))
+                    <div class="space-y-3">
+                        @foreach($businessActions as $action)
+                            <button type="button"
+                                    class="w-full px-4 py-2 font-medium rounded-md transition-smooth
+                                        @if($action['name'] === 'Cancelled') bg-destructive text-destructive-foreground hover:bg-destructive/90
+                                        @elseif($action['name'] === 'Confirmed') bg-success text-white hover:opacity-90
+                                        @elseif($action['name'] === 'In Progress') bg-primary text-primary-foreground hover:shadow-glow
+                                        @elseif($action['name'] === 'Ready for Pickup' || $action['name'] === 'Delivered') bg-amber-500 text-white hover:opacity-90
+                                        @else bg-primary text-primary-foreground hover:shadow-glow @endif"
+                                    onclick="openOrderStatusActionModal('{{ $order->purchase_order_id }}', '{{ $action['id'] }}', @json($action['name']))">
+                                {{ $action['name'] }}
+                            </button>
+                        @endforeach
+                    </div>
+                @else
+                    <p class="text-sm text-muted-foreground">Waiting for customer confirmation.</p>
+                @endif
+
+                @if(($currentStatusName ?? null) === 'Pending')
+                    <div class="mt-4 border-t border-border pt-4">
+                        <p class="text-sm font-medium mb-2">Need to undo?</p>
+                        <button type="button"
+                                class="w-full px-4 py-2 bg-destructive text-destructive-foreground font-medium rounded-md hover:bg-destructive/90 transition-smooth"
+                                onclick="openOrderStatusActionModal('{{ $order->purchase_order_id }}', '{{ $statusIds['Cancelled'] ?? '' }}', 'Cancelled')">
+                            Cancel Order
                         </button>
                     </div>
-                </form>
+                @endif
             </div>
         </div>
     </div>
 </div>
+
+<x-modals.reject-design-file />
+<x-modals.order-status-action />
 
 @push('scripts')
 <script>
@@ -235,45 +249,41 @@
             if (ok) form.submit();
         });
     });
+
+    function openRejectDesignFileModal(fileId) {
+        const modalEl = document.getElementById('rejectDesignFileModal');
+        const formEl = document.getElementById('rejectDesignFileForm');
+        if (!modalEl || !formEl) return;
+
+        formEl.action = `{{ route('business.design-files.reject', ':fileId') }}`.replace(':fileId', fileId);
+
+        const modal = new bootstrap.Modal(modalEl);
+        modal.show();
+    }
+
+    window.openRejectDesignFileModal = openRejectDesignFileModal;
+
+    function openOrderStatusActionModal(orderId, statusId, statusName) {
+        const modalEl = document.getElementById('orderStatusActionModal');
+        const formEl = document.getElementById('orderStatusActionForm');
+        const statusIdEl = document.getElementById('orderStatusActionStatusId');
+        const statusNameEl = document.getElementById('orderStatusActionStatusName');
+        const remarksEl = document.getElementById('orderStatusActionRemarks');
+        const submitEl = document.getElementById('orderStatusActionSubmit');
+
+        if (!modalEl || !formEl || !statusIdEl || !statusNameEl || !remarksEl || !submitEl) return;
+
+        formEl.action = `{{ route('business.orders.update-status', ':orderId') }}`.replace(':orderId', orderId);
+        statusIdEl.value = statusId;
+        statusNameEl.textContent = statusName || 'Update';
+        remarksEl.value = '';
+        submitEl.textContent = statusName || 'Update';
+
+        const modal = new bootstrap.Modal(modalEl);
+        modal.show();
+    }
+
+    window.openOrderStatusActionModal = openOrderStatusActionModal;
 </script>
 @endpush
-
-<!-- Reject Modal -->
-<div id="rejectModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-    <div class="bg-card rounded-xl shadow-card-hover max-w-md w-full p-6">
-        <h3 class="text-xl font-bold mb-4">Reject Design File</h3>
-        <form id="rejectForm" method="POST">
-            @csrf
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium mb-2">Rejection Reason</label>
-                    <textarea name="rejection_reason" required rows="4" 
-                              class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"></textarea>
-                </div>
-                <div class="flex gap-3">
-                    <button type="button" onclick="closeRejectModal()" 
-                            class="flex-1 px-4 py-2 border border-input rounded-md hover:bg-secondary">
-                        Cancel
-                    </button>
-                    <button type="submit" 
-                            class="flex-1 px-4 py-2 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90">
-                        Reject File
-                    </button>
-                </div>
-            </div>
-        </form>
-    </div>
-</div>
-
-<script>
-function openRejectModal(fileId) {
-    const form = document.getElementById('rejectForm');
-    form.action = `/business/design-files/${fileId}/reject`;
-    document.getElementById('rejectModal').classList.remove('hidden');
-}
-
-function closeRejectModal() {
-    document.getElementById('rejectModal').classList.add('hidden');
-}
-</script>
 @endsection

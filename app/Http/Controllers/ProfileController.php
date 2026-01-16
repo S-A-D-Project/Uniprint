@@ -43,10 +43,18 @@ class ProfileController extends Controller
 
             // Get user's enterprise information (if business user)
             if ($roleInfo && $roleInfo->user_role_type === 'business_user') {
-                $enterprise = DB::table('staff')
-                    ->join('enterprises', 'staff.enterprise_id', '=', 'enterprises.enterprise_id')
-                    ->where('staff.user_id', $userId)
-                    ->first();
+                if (\Illuminate\Support\Facades\Schema::hasColumn('enterprises', 'owner_user_id')) {
+                    $enterprise = DB::table('enterprises')
+                        ->where('owner_user_id', $userId)
+                        ->first();
+                }
+
+                if (! $enterprise && \Illuminate\Support\Facades\Schema::hasTable('staff')) {
+                    $enterprise = DB::table('staff')
+                        ->join('enterprises', 'staff.enterprise_id', '=', 'enterprises.enterprise_id')
+                        ->where('staff.user_id', $userId)
+                        ->first();
+                }
             }
         } catch (\Exception $e) {
             Log::error('Profile View Error (role/enterprise)', [

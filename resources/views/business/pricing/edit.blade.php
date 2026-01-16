@@ -79,11 +79,12 @@
                            class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
                 </div>
 
-                <div class="flex items-center gap-3">
-                    <input type="checkbox" name="is_active" id="is_active" value="1" {{ $rule->is_active ? 'checked' : '' }}
-                           class="h-4 w-4 text-primary rounded focus:ring-2 focus:ring-ring">
-                    <label for="is_active" class="text-sm font-medium">Active</label>
-                </div>
+                <x-ui.form.checkbox
+                    name="is_active"
+                    id="is_active"
+                    :checked="old('is_active', $rule->is_active)"
+                    label="Active"
+                />
 
                 <div class="flex gap-3 pt-4">
                     <a href="{{ route('business.pricing.index') }}" 

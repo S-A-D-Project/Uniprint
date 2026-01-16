@@ -234,7 +234,7 @@ function bindPusherToConversation(conversationId){
     state.channel=null;
   }
 
-  const channelName='conversation.'+conversationId;
+  const channelName='private-conversation.'+conversationId;
   state.channel=state.pusher.subscribe(channelName);
 
   state.channel.bind('new-message',(data)=>{

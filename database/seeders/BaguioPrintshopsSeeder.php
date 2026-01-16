@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class BaguioPrintshopsSeeder extends Seeder
@@ -213,7 +214,7 @@ class BaguioPrintshopsSeeder extends Seeder
                 'user_id' => $businessUserId,
                 'name' => $enterprise['name'] . ' Manager',
                 'email' => $businessUserEmail,
-                'position' => 'Shop Manager',
+                'position' => 'Owner',
                 'department' => 'Management',
                 'created_at' => $now,
                 'updated_at' => $now,
@@ -266,15 +267,24 @@ class BaguioPrintshopsSeeder extends Seeder
         $enterpriseIndex = 0;
         foreach ($enterprises as $enterprise) {
             if (isset($insertedUserIds[$enterpriseIndex])) {
-                // Create a staff record linking the business user to the enterprise
-                DB::table('staff')->insertOrIgnore([
-                    'staff_id' => Str::uuid(),
-                    'user_id' => $insertedUserIds[$enterpriseIndex],
-                    'enterprise_id' => $enterprise['enterprise_id'],
-                    'position' => 'Manager',
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ]);
+                // Create a staff record linking the business user to the enterprise (legacy/backward compatible)
+                if (Schema::hasTable('staff')) {
+                    DB::table('staff')->insertOrIgnore([
+                        'staff_id' => Str::uuid(),
+                        'user_id' => $insertedUserIds[$enterpriseIndex],
+                        'enterprise_id' => $enterprise['enterprise_id'],
+                        'position' => 'Owner',
+                        'department' => 'Management',
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ]);
+                }
+
+                if (Schema::hasColumn('enterprises', 'owner_user_id')) {
+                    DB::table('enterprises')
+                        ->where('enterprise_id', $enterprise['enterprise_id'])
+                        ->update(['owner_user_id' => $insertedUserIds[$enterpriseIndex]]);
+                }
             }
             $enterpriseIndex++;
         }

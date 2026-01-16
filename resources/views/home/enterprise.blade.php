@@ -132,7 +132,7 @@
         <div class="card-body text-center p-5">
             <h3 class="mb-3">Ready to Order?</h3>
             <p class="lead mb-4">Create a free account to place orders with {{ $enterprise->enterprise_name }}</p>
-            <a href="{{ route('register') }}" class="btn btn-light btn-lg">
+            <a href="{{ route('login', ['tab' => 'signup']) }}" class="btn btn-light btn-lg">
                 Sign Up Free <i class="bi bi-arrow-right ms-2"></i>
             </a>
         </div>

@@ -236,11 +236,11 @@
     <section class="py-20 gradient-hero text-white">
         <div class="container mx-auto px-4 text-center">
             <h2 class="text-white mb-4">Ready to Start Printing?</h2>
-            <p class="text-xl text-white/80 mb-8 max-w-2xl mx-auto">
+            <p class="text-xl text-white/90 max-w-3xl mx-auto mb-10">
                 Join thousands of satisfied customers who trust UniPrint for their printing needs
             </p>
             <div class="flex flex-col sm:flex-row gap-4 justify-center">
-                <a href="{{ route('register') }}" class="inline-flex items-center justify-center gap-2 px-8 py-4 text-lg font-semibold bg-white text-primary rounded-lg hover:bg-white/90 transition-smooth">
+                <a href="{{ route('login', ['tab' => 'signup']) }}" class="inline-flex items-center justify-center gap-2 px-8 py-4 text-lg font-semibold bg-white text-primary rounded-lg hover:bg-white/90 transition-smooth">
                     Get Started Free
                     <i data-lucide="user-plus" class="h-5 w-5"></i>
                 </a>

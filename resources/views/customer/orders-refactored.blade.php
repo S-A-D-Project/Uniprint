@@ -139,10 +139,18 @@
                         @endif
                     </div>
                     <div class="flex items-center gap-2">
-                        <a href="{{ route('customer.order-details', $order->purchase_order_id) }}" 
+                        <a href="{{ route('customer.order.details', $order->purchase_order_id) }}" 
                            class="customer-button-secondary text-sm px-4 py-2">
                             View Details
                         </a>
+                        @if(($order->status_name ?? 'Pending') === 'Pending')
+                        <form action="{{ route('customer.orders.cancel', $order->purchase_order_id) }}" method="POST" onsubmit="return confirm('Cancel this order?');">
+                            @csrf
+                            <button type="submit" class="customer-button-secondary text-sm px-4 py-2 text-red-600 border-red-200 hover:bg-red-50">
+                                Cancel Order
+                            </button>
+                        </form>
+                        @endif
                         @if(in_array($order->status_name, ['Pending', 'In Progress']))
                         <button onclick="trackOrder('{{ $order->purchase_order_id }}')" 
                                 class="customer-button-primary text-sm px-4 py-2">

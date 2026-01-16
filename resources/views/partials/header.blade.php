@@ -21,14 +21,8 @@
                 AI Design
             </a>
             @if(session('user_id'))
-                <a href="{{ route('customer.marketplace') }}" class="text-sm font-medium text-foreground hover:text-primary transition-smooth">
-                    Service Marketplace
-                </a>
                 <a href="{{ route('customer.orders') }}" class="text-sm font-medium text-foreground hover:text-primary transition-smooth">
                     My Orders
-                </a>
-                <a href="{{ route('chat.direct') }}" class="text-sm font-medium text-foreground hover:text-primary transition-smooth">
-                    Direct Chat
                 </a>
             @endif
         </nav>
@@ -71,17 +65,9 @@
                                     <i data-lucide="layout-dashboard" class="h-5 w-5"></i>
                                     Dashboard
                                 </a>
-                                <a href="{{ route('customer.marketplace') }}" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent transition-smooth">
-                                    <i data-lucide="shopping-bag" class="h-5 w-5"></i>
-                                    Service Marketplace
-                                </a>
                                 <a href="{{ route('customer.orders') }}" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent transition-smooth">
                                     <i data-lucide="package" class="h-5 w-5"></i>
                                     My Orders
-                                </a>
-                                <a href="{{ route('chat.direct') }}" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent transition-smooth">
-                                    <i data-lucide="users" class="h-5 w-5"></i>
-                                    Direct Chat
                                 </a>
                                 <a href="{{ route('customer.saved-services') }}" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent transition-smooth">
                                     <i data-lucide="heart" class="h-5 w-5"></i>
@@ -103,10 +89,6 @@
                                 <a href="{{ route('login') }}" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent transition-smooth">
                                     <i data-lucide="log-in" class="h-5 w-5"></i>
                                     Sign In
-                                </a>
-                                <a href="{{ route('register') }}" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent transition-smooth">
-                                    <i data-lucide="user-plus" class="h-5 w-5"></i>
-                                    Create Account
                                 </a>
                             @endif
                         </nav>
@@ -130,10 +112,22 @@
                 </a>
 
                 <!-- Notifications -->
-                <button class="inline-flex items-center justify-center h-10 w-10 rounded-md hover:bg-accent hover:text-accent-foreground transition-smooth relative">
+                @php
+                    $unreadNotificationsCount = \Illuminate\Support\Facades\Schema::hasTable('order_notifications')
+                        ? \Illuminate\Support\Facades\DB::table('order_notifications')
+                            ->where('recipient_id', session('user_id'))
+                            ->where('is_read', false)
+                            ->count()
+                        : 0;
+                @endphp
+                <a href="{{ route('customer.notifications') }}" class="inline-flex items-center justify-center h-10 w-10 rounded-md hover:bg-accent hover:text-accent-foreground transition-smooth relative" aria-label="Notifications">
                     <i data-lucide="bell" class="h-5 w-5"></i>
-                    <span class="absolute -top-1 -right-1 bg-destructive text-white text-xs font-bold rounded-full h-4 w-4 flex items-center justify-center">3</span>
-                </button>
+                    @if($unreadNotificationsCount > 0)
+                        <span class="absolute -top-1 -right-1 bg-destructive text-white text-xs font-bold rounded-full h-4 min-w-4 px-1 flex items-center justify-center">
+                            {{ $unreadNotificationsCount > 9 ? '9+' : $unreadNotificationsCount }}
+                        </span>
+                    @endif
+                </a>
 
                 <!-- Profile Icon with Avatar -->
                 <div class="relative" x-data="{ open: false }">
@@ -195,14 +189,6 @@
                             <div>
                                 <div class="font-medium">Sign In</div>
                                 <div class="text-xs text-muted-foreground">Access your account</div>
-                            </div>
-                        </a>
-                        <div class="border-t border-border"></div>
-                        <a href="{{ route('register') }}" class="flex items-center gap-2 px-4 py-3 text-sm hover:bg-accent transition-smooth">
-                            <i data-lucide="user-plus" class="h-4 w-4 text-success"></i>
-                            <div>
-                                <div class="font-medium">Create Account</div>
-                                <div class="text-xs text-muted-foreground">Join UniPrint today</div>
                             </div>
                         </a>
                         <div class="border-t border-border"></div>

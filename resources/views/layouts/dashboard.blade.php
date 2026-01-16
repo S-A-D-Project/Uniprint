@@ -134,9 +134,6 @@
         lucide.createIcons();
     </script>
 
-    <!-- Include Help Widget -->
-    @include('components.help-widget')
-
     @stack('scripts')
 </body>
 </html>

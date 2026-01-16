@@ -51,6 +51,8 @@ class SavedServiceController extends Controller
             'quantity' => 'required|integer|min:1|max:100',
             'customizations' => 'nullable|array',
             'customizations.*' => 'uuid',
+            'custom_fields' => 'nullable|array',
+            'custom_fields.*' => 'nullable|string|max:500',
             'notes' => 'nullable|string|max:500',
         ]);
 
@@ -74,6 +76,7 @@ class SavedServiceController extends Controller
                 $request->service_id,
                 $request->quantity,
                 $request->customizations ?? [],
+                $request->custom_fields ?? [],
                 $request->notes
             );
             

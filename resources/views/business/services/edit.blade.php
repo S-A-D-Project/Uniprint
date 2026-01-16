@@ -72,22 +72,38 @@
                 <div>
                     <label class="block text-sm font-medium mb-2">Allowed Payment Methods</label>
                     <div class="flex items-center gap-4">
-                        <label class="flex items-center gap-2">
-                            <input type="checkbox" name="allowed_payment_methods[]" value="gcash" {{ in_array('gcash', old('allowed_payment_methods', $allowedPaymentMethods)) ? 'checked' : '' }}>
-                            <span>GCash</span>
-                        </label>
-                        <label class="flex items-center gap-2">
-                            <input type="checkbox" name="allowed_payment_methods[]" value="cash" {{ in_array('cash', old('allowed_payment_methods', $allowedPaymentMethods)) ? 'checked' : '' }}>
-                            <span>Cash</span>
-                        </label>
+                        <x-ui.form.checkbox
+                            name="allowed_payment_methods[]"
+                            id="pm_gcash"
+                            value="gcash"
+                            :checked="in_array('gcash', old('allowed_payment_methods', $allowedPaymentMethods))"
+                            label="GCash"
+                        />
+                        <x-ui.form.checkbox
+                            name="allowed_payment_methods[]"
+                            id="pm_cash"
+                            value="cash"
+                            :checked="in_array('cash', old('allowed_payment_methods', $allowedPaymentMethods))"
+                            label="Cash"
+                        />
                     </div>
                 </div>
 
-                <div class="flex items-center gap-3">
-                    <input type="checkbox" name="is_active" id="is_active" value="1" {{ $service->is_active ? 'checked' : '' }}
-                           class="h-4 w-4 text-primary rounded focus:ring-2 focus:ring-ring">
-                    <label for="is_active" class="text-sm font-medium">Active</label>
-                </div>
+                <x-ui.form.checkbox
+                    name="is_active"
+                    id="is_active"
+                    :checked="old('is_active', $service->is_active)"
+                    label="Active"
+                />
+
+                @if(\Illuminate\Support\Facades\Schema::hasColumn('services', 'requires_file_upload'))
+                    <x-ui.form.checkbox
+                        name="requires_file_upload"
+                        id="requires_file_upload"
+                        :checked="old('requires_file_upload', !empty($service->requires_file_upload))"
+                        label="Requires File Upload"
+                    />
+                @endif
 
                 <div class="flex gap-3 pt-4">
                     <a href="{{ route('business.services.index') }}" 

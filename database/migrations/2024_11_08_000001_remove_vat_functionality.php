@@ -14,13 +14,39 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (Schema::hasColumn('enterprises', 'vat_type_id')) {
-            Schema::table('enterprises', function (Blueprint $table) {
-                if (DB::connection()->getDriverName() !== 'sqlite') {
-                    $table->dropForeign(['vat_type_id']);
+        if (Schema::hasTable('enterprises') && Schema::hasColumn('enterprises', 'vat_type_id')) {
+            $driver = DB::connection()->getDriverName();
+            if ($driver === 'sqlite') {
+                // SQLite: drop foreign key using raw PRAGMA
+                DB::statement('PRAGMA foreign_keys = OFF;');
+                try {
+                    // Recreate table without vat_type_id column
+                    DB::statement('CREATE TABLE enterprises_new (
+                        enterprise_id TEXT PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        address TEXT NULL,
+                        contact_person TEXT NULL,
+                        contact_number TEXT NULL,
+                        tin_no TEXT NULL,
+                        created_at TEXT NULL,
+                        updated_at TEXT NULL
+                    )');
+
+                    DB::statement('INSERT INTO enterprises_new (enterprise_id, name, address, contact_person, contact_number, tin_no, created_at, updated_at)
+                        SELECT enterprise_id, name, address, contact_person, contact_number, tin_no, created_at, updated_at
+                        FROM enterprises');
+
+                    DB::statement('DROP TABLE enterprises;');
+                    DB::statement('ALTER TABLE enterprises_new RENAME TO enterprises;');
+                } finally {
+                    DB::statement('PRAGMA foreign_keys = ON;');
                 }
-                $table->dropColumn('vat_type_id');
-            });
+            } else {
+                Schema::table('enterprises', function (Blueprint $table) {
+                    $table->dropForeign(['vat_type_id']);
+                    $table->dropColumn('vat_type_id');
+                });
+            }
         }
 
         // Drop the vat_types table entirely

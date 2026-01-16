@@ -574,7 +574,7 @@
         <div class="container text-center">
             <h2>Ready to Get Started?</h2>
             <p class="lead mb-4">Join thousands of satisfied customers using UniPrint</p>
-            <a href="{{ route('register') }}" class="btn btn-hero-primary btn-lg px-5">
+            <a href="{{ route('login', ['tab' => 'signup']) }}" class="btn btn-hero-primary btn-lg px-5">
                 Create Free Account <i class="bi bi-arrow-right ms-2"></i>
             </a>
         </div>
@@ -602,7 +602,7 @@
                     <h6 class="mb-3">Account</h6>
                     <ul class="list-unstyled">
                         <li class="mb-2"><a href="{{ route('login') }}">Login</a></li>
-                        <li class="mb-2"><a href="{{ route('register') }}">Sign Up</a></li>
+                        <li class="mb-2"><a href="{{ route('login', ['tab' => 'signup']) }}">Sign Up</a></li>
                     </ul>
                 </div>
                 <div class="col-md-4 mb-4">

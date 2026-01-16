@@ -40,7 +40,10 @@ class HomeController extends Controller
                 }
 
                 if ($roleType === 'business_user') {
-                    $hasEnterprise = DB::table('staff')->where('user_id', $userId)->exists();
+                    $hasEnterprise = DB::table('enterprises')->where('owner_user_id', $userId)->exists();
+                    if (! $hasEnterprise) {
+                        $hasEnterprise = DB::table('staff')->where('user_id', $userId)->exists();
+                    }
                     if (! $hasEnterprise) {
                         return redirect()->route('business.onboarding');
                     }
@@ -136,12 +139,19 @@ class HomeController extends Controller
         $query = \App\Models\Enterprise::query()
             ->where('is_active', true);
 
+        $driver = DB::connection()->getDriverName();
+
         if (request()->filled('category')) {
             $query->where('category', request('category'));
         }
 
         if (request()->filled('search')) {
-            $query->where('name', 'ILIKE', '%' . request('search') . '%');
+            $needle = '%' . request('search') . '%';
+            if ($driver === 'pgsql') {
+                $query->where('name', 'ILIKE', $needle);
+            } else {
+                $query->where('name', 'LIKE', $needle);
+            }
         }
 
         $enterprises = $query
@@ -171,6 +181,8 @@ class HomeController extends Controller
         $query = Enterprise::where('is_active', true)
             ->withCount('services');
 
+        $driver = DB::connection()->getDriverName();
+
         // Filter by category
         if ($request->filled('category')) {
             $query->where('category', $request->category);
@@ -178,7 +190,12 @@ class HomeController extends Controller
 
         // Search by name (column is 'name')
         if ($request->filled('search')) {
-            $query->where('name', 'ILIKE', '%' . $request->search . '%');
+            $needle = '%' . $request->search . '%';
+            if ($driver === 'pgsql') {
+                $query->where('name', 'ILIKE', $needle);
+            } else {
+                $query->where('name', 'LIKE', $needle);
+            }
         }
 
         // Sort

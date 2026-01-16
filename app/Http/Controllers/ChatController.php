@@ -10,6 +10,8 @@ use App\Services\PusherService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class ChatController extends Controller
 {
@@ -18,6 +20,53 @@ class ChatController extends Controller
     public function __construct(PusherService $pusherService)
     {
         $this->pusherService = $pusherService;
+    }
+
+    /**
+     * Resolve the business owner user_id for an enterprise.
+     * Used by customer order pages to open chat even if the business is offline.
+     */
+    public function resolveEnterpriseOwner(Request $request)
+    {
+        $request->validate([
+            'enterprise_id' => 'required|uuid'
+        ]);
+
+        $enterpriseId = $request->enterprise_id;
+
+        $businessUserId = null;
+
+        if (Schema::hasColumn('enterprises', 'owner_user_id')) {
+            $businessUserId = DB::table('enterprises')
+                ->where('enterprise_id', $enterpriseId)
+                ->value('owner_user_id');
+        }
+
+        if (! $businessUserId && Schema::hasTable('staff')) {
+            $businessUserId = DB::table('staff')
+                ->where('enterprise_id', $enterpriseId)
+                ->orderByRaw("CASE WHEN position = 'Owner' THEN 0 ELSE 1 END")
+                ->value('user_id');
+        }
+
+        if (! $businessUserId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This print shop does not have a registered owner account yet.'
+            ], 404);
+        }
+
+        if ($this->getUserRoleType($businessUserId) !== 'business_user') {
+            return response()->json([
+                'success' => false,
+                'message' => 'This print shop owner account is not configured correctly.'
+            ], 400);
+        }
+
+        return response()->json([
+            'success' => true,
+            'business_user_id' => $businessUserId,
+        ]);
     }
 
     private function getUserRoleType(string $userId): ?string
@@ -72,31 +121,57 @@ class ChatController extends Controller
     }
 
     /**
-     * Direct chat between Sarah Customer and Business User (No Database)
+     * Start (or open) a 1:1 conversation between the current customer and a printshop (enterprise).
+     * Only the customer and the enterprise owner (staff.position = Owner) will be participants.
      */
-    public function directChat()
+    public function startEnterpriseChat(string $enterpriseId)
     {
-        $user = Auth::user();
-        
-        // Simple direct chat without database queries - just use Pusher
-        // Define static user data for the chat
-        $currentUserData = [
-            'user_id' => $user->user_id,
-            'name' => $user->name,
-            'role' => 'current_user'
-        ];
-        
-        // Static other user data (will be determined by frontend)
-        $otherUserData = [
-            'user_id' => 'other_user',
-            'name' => 'Chat Partner',
-            'role' => 'other_user'
-        ];
-        
-        // Static conversation ID for direct chat
-        $conversationId = 'sarah-business-direct-chat';
-        
-        return view('chat.direct-simple', compact('currentUserData', 'otherUserData', 'conversationId'));
+        $currentUser = Auth::user();
+
+        if ($this->getUserRoleType($currentUser->user_id) !== 'customer') {
+            return redirect()->route('chat.index');
+        }
+
+        $businessUserId = null;
+
+        if (\Illuminate\Support\Facades\Schema::hasColumn('enterprises', 'owner_user_id')) {
+            $businessUserId = DB::table('enterprises')
+                ->where('enterprise_id', $enterpriseId)
+                ->value('owner_user_id');
+        }
+
+        if (! $businessUserId && \Illuminate\Support\Facades\Schema::hasTable('staff')) {
+            $businessUserId = DB::table('staff')
+                ->where('enterprise_id', $enterpriseId)
+                ->orderByRaw("CASE WHEN position = 'Owner' THEN 0 ELSE 1 END")
+                ->value('user_id');
+        }
+
+        if (! $businessUserId) {
+            return redirect()->route('enterprises.show', $enterpriseId)
+                ->with('error', 'This print shop does not have a registered owner account yet.');
+        }
+
+        // Ensure the other participant is actually a business user
+        if ($this->getUserRoleType($businessUserId) !== 'business_user') {
+            return redirect()->route('enterprises.show', $enterpriseId)
+                ->with('error', 'This print shop owner account is not configured correctly.');
+        }
+
+        $conversation = Conversation::firstOrCreate(
+            [
+                'customer_id' => $currentUser->user_id,
+                'business_id' => $businessUserId,
+            ],
+            [
+                'status' => 'active',
+                'initiated_by' => 'customer',
+                'initiated_at' => now(),
+                'last_message_at' => now(),
+            ]
+        );
+
+        return redirect()->route('chat.index', ['conversation' => $conversation->conversation_id]);
     }
 
     /**
@@ -220,55 +295,6 @@ class ChatController extends Controller
      */
     public function sendMessage(Request $request)
     {
-        // Check if this is the direct chat (no database)
-        if ($request->input('conversation_id') === 'sarah-business-direct-chat') {
-            $request->validate([
-                'conversation_id' => 'required|string',
-                'message_text' => 'required|string|max:1000',
-                'message_type' => 'nullable|in:text,image,file,system',
-                'sender_id' => 'required|string',
-                'sender_name' => 'required|string',
-                'message_id' => 'required|string',
-                'timestamp' => 'required|string'
-            ]);
-
-            try {
-                // Broadcast message via Pusher for direct chat
-                $messageData = [
-                    'message_id' => $request->message_id,
-                    'sender_id' => $request->sender_id,
-                    'sender_name' => $request->sender_name,
-                    'message_text' => $request->message_text,
-                    'timestamp' => $request->timestamp,
-                    'conversation_id' => $request->conversation_id
-                ];
-
-                // Use Pusher to broadcast the message
-                $pusher = new \Pusher\Pusher(
-                    config('broadcasting.connections.pusher.key'),
-                    config('broadcasting.connections.pusher.secret'),
-                    config('broadcasting.connections.pusher.app_id'),
-                    config('broadcasting.connections.pusher.options')
-                );
-
-                $channelName = 'direct-chat.' . $request->conversation_id;
-                $pusher->trigger($channelName, 'new-message', $messageData);
-
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Message broadcasted successfully',
-                    'data' => $messageData
-                ]);
-
-            } catch (\Exception $e) {
-                \Log::error('Direct chat broadcast error: ' . $e->getMessage());
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Failed to broadcast message: ' . $e->getMessage()
-                ], 500);
-            }
-        }
-
         $request->validate([
             'conversation_id' => 'required|uuid|exists:conversations,conversation_id',
             'message_text' => 'required|string|max:1000',
@@ -521,9 +547,9 @@ class ChatController extends Controller
             $user = Auth::user();
             
             // Verify user has access to the channel
-            if (strpos($channelName, 'conversation.') === 0 || strpos($channelName, 'presence-conversation.') === 0) {
+            if (strpos($channelName, 'private-conversation.') === 0 || strpos($channelName, 'presence-conversation.') === 0) {
                 // Extract conversation ID from channel name
-                $conversationId = str_replace(['conversation.', 'presence-conversation.'], '', $channelName);
+                $conversationId = str_replace(['private-conversation.', 'presence-conversation.'], '', $channelName);
                 $conversation = Conversation::find($conversationId);
                 
                 if (!$conversation) {
@@ -552,7 +578,7 @@ class ChatController extends Controller
             return response()->json(['error' => 'Authorization failed'], 403);
             
         } catch (\Exception $e) {
-            \Log::error('Pusher auth error: ' . $e->getMessage());
+            Log::error('Pusher auth error: ' . $e->getMessage());
             return response()->json(['error' => 'Server error'], 500);
         }
     }

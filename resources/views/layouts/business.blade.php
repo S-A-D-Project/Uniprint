@@ -175,13 +175,6 @@
                         <i data-lucide="settings" class="h-5 w-5"></i>
                         Settings
                     </a>
-                    
-                    <a href="{{ route('chat.direct') }}" 
-                       class="nav-link flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-smooth {{ request()->routeIs('chat.direct') ? 'active' : 'text-sidebar-foreground' }}">
-                        <i data-lucide="users" class="h-5 w-5"></i>
-                        Direct Chat
-                        <span class="ml-auto bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs px-2 py-1 rounded-full">Customer</span>
-                    </a>
                 </nav>
                 
                 <!-- User Info -->

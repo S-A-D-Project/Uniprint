@@ -81,13 +81,14 @@ class SavedServiceCollection
     /**
      * Add item to saved services
      */
-    public function addItem($serviceId, $quantity = 1, $customizations = [], $specialInstructions = null)
+    public function addItem($serviceId, $quantity = 1, $customizations = [], $customFields = [], $specialInstructions = null)
     {
         $service = SavedService::saveService(
             $this->userId,
             $serviceId,
             $quantity,
             $customizations,
+            $customFields,
             $specialInstructions
         );
         

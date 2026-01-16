@@ -36,6 +36,20 @@
                                 {{ $service->enterprise->name ?? 'Unknown Shop' }}
                             </a>
                         </div>
+
+                        <div>
+                            @if(session('user_id'))
+                                <a href="{{ route('chat.enterprise', $service->enterprise_id) }}" class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground font-medium rounded-md hover:shadow-glow transition-smooth">
+                                    <i data-lucide="message-circle" class="h-4 w-4"></i>
+                                    Message this shop
+                                </a>
+                            @else
+                                <a href="{{ route('login', ['tab' => 'signup']) }}" class="inline-flex items-center justify-center gap-2 px-4 py-2 border border-input rounded-md hover:bg-secondary transition-smooth">
+                                    <i data-lucide="log-in" class="h-4 w-4"></i>
+                                    Sign in to message
+                                </a>
+                            @endif
+                        </div>
                         <div>
                             <h1 class="text-3xl font-bold mb-2">{{ $service->service_name }}</h1>
                             <p class="text-lg text-muted-foreground">{{ $service->description ?? 'Professional printing service' }}</p>
@@ -149,90 +163,6 @@
                                 <div id="uploaded-files-list" class="space-y-2 hidden">
                                     <h5 class="font-medium text-gray-900 text-sm">Uploaded Files:</h5>
                                     <div id="files-container"></div>
-                                </div>
-                            </div>
-
-                            <!-- Rush Pickup Options -->
-                            <div class="pt-4 border-t border-border mb-4">
-                                <h4 class="text-lg font-semibold mb-3 flex items-center gap-2">
-                                    <i data-lucide="clock" class="h-5 w-5 text-primary"></i>
-                                    Pickup Timeline
-                                </h4>
-                                
-                                <div class="space-y-3" id="service-rush-options">
-                                    <!-- Standard Pickup -->
-                                    <label class="relative cursor-pointer block">
-                                        <input type="radio" name="service_rush_option" value="standard" checked class="sr-only peer" data-fee="0">
-                                        <div class="border border-gray-200 rounded-lg p-3 transition-all peer-checked:border-primary peer-checked:bg-primary/5 hover:border-gray-300">
-                                            <div class="flex items-center justify-between">
-                                                <div class="flex items-center gap-2">
-                                                    <i data-lucide="calendar" class="h-4 w-4 text-blue-600"></i>
-                                                    <div>
-                                                        <h5 class="font-medium text-gray-900 text-sm">Standard (2-3 days)</h5>
-                                                        <p class="text-xs text-gray-600">Ready for pickup</p>
-                                                    </div>
-                                                </div>
-                                                <span class="text-sm font-bold text-green-600">FREE</span>
-                                            </div>
-                                        </div>
-                                    </label>
-
-                                    <!-- Express Pickup -->
-                                    <label class="relative cursor-pointer block">
-                                        <input type="radio" name="service_rush_option" value="express" class="sr-only peer" data-fee="50">
-                                        <div class="border border-gray-200 rounded-lg p-3 transition-all peer-checked:border-primary peer-checked:bg-primary/5 hover:border-gray-300">
-                                            <div class="flex items-center justify-between">
-                                                <div class="flex items-center gap-2">
-                                                    <i data-lucide="zap" class="h-4 w-4 text-orange-600"></i>
-                                                    <div>
-                                                        <h5 class="font-medium text-gray-900 text-sm">Express (1 day)</h5>
-                                                        <p class="text-xs text-gray-600">Next business day</p>
-                                                    </div>
-                                                </div>
-                                                <span class="text-sm font-bold text-orange-600">+₱50</span>
-                                            </div>
-                                        </div>
-                                    </label>
-
-                                    <!-- Rush Pickup -->
-                                    <label class="relative cursor-pointer block">
-                                        <input type="radio" name="service_rush_option" value="rush" class="sr-only peer" data-fee="100">
-                                        <div class="border border-gray-200 rounded-lg p-3 transition-all peer-checked:border-primary peer-checked:bg-primary/5 hover:border-gray-300">
-                                            <div class="flex items-center justify-between">
-                                                <div class="flex items-center gap-2">
-                                                    <i data-lucide="flame" class="h-4 w-4 text-red-600"></i>
-                                                    <div>
-                                                        <h5 class="font-medium text-gray-900 text-sm flex items-center gap-1">
-                                                            Rush (4-6 hrs)
-                                                            <span class="bg-red-100 text-red-800 text-xs px-1 py-0.5 rounded">URGENT</span>
-                                                        </h5>
-                                                        <p class="text-xs text-gray-600">Same day pickup</p>
-                                                    </div>
-                                                </div>
-                                                <span class="text-sm font-bold text-red-600">+₱100</span>
-                                            </div>
-                                        </div>
-                                    </label>
-
-                                    <!-- Same Day Pickup -->
-                                    <label class="relative cursor-pointer block">
-                                        <input type="radio" name="service_rush_option" value="same_day" class="sr-only peer" data-fee="200">
-                                        <div class="border border-gray-200 rounded-lg p-3 transition-all peer-checked:border-primary peer-checked:bg-primary/5 hover:border-gray-300">
-                                            <div class="flex items-center justify-between">
-                                                <div class="flex items-center gap-2">
-                                                    <i data-lucide="rocket" class="h-4 w-4 text-purple-600"></i>
-                                                    <div>
-                                                        <h5 class="font-medium text-gray-900 text-sm flex items-center gap-1">
-                                                            Same Day (2-3 hrs)
-                                                            <span class="bg-purple-100 text-purple-800 text-xs px-1 py-0.5 rounded">PREMIUM</span>
-                                                        </h5>
-                                                        <p class="text-xs text-gray-600">Ultra-fast pickup</p>
-                                                    </div>
-                                                </div>
-                                                <span class="text-sm font-bold text-purple-600">+₱200</span>
-                                            </div>
-                                        </div>
-                                    </label>
                                 </div>
                             </div>
 

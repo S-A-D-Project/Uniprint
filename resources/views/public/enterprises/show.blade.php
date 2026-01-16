@@ -5,6 +5,16 @@
 @section('content')
     <div class="min-h-screen bg-background">
         <main class="container mx-auto px-4 py-8">
+            <div class="mb-6">
+                <div class="flex items-center gap-2 text-sm text-muted-foreground">
+                    <a href="{{ route('home') }}" class="hover:text-primary">Home</a>
+                    <i data-lucide="chevron-right" class="h-4 w-4"></i>
+                    <a href="{{ route('enterprises.index') }}" class="hover:text-primary">Shops</a>
+                    <i data-lucide="chevron-right" class="h-4 w-4"></i>
+                    <span class="text-foreground">{{ $enterprise->name }}</span>
+                </div>
+            </div>
+
             <!-- Back Button -->
             <a href="{{ route('enterprises.index') }}" class="inline-flex items-center gap-2 text-sm mb-6 hover:underline">
                 <i data-lucide="arrow-left" class="h-4 w-4"></i>
@@ -36,9 +46,23 @@
                             </div>
                         </div>
                     </div>
-                    <div class="flex items-center gap-1 bg-primary/10 px-3 py-2 rounded-lg">
-                        <i data-lucide="star" class="h-5 w-5 fill-primary text-primary"></i>
-                        <span class="text-lg font-semibold">4.8</span>
+                    <div class="flex flex-col items-end gap-3">
+                        <div class="flex items-center gap-1 bg-primary/10 px-3 py-2 rounded-lg">
+                            <i data-lucide="star" class="h-5 w-5 fill-primary text-primary"></i>
+                            <span class="text-lg font-semibold">4.8</span>
+                        </div>
+
+                        @if(session('user_id'))
+                            <a href="{{ route('chat.enterprise', $enterprise->enterprise_id) }}" class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground font-medium rounded-md hover:shadow-glow transition-smooth">
+                                <i data-lucide="message-circle" class="h-4 w-4"></i>
+                                Message this shop
+                            </a>
+                        @else
+                            <a href="{{ route('login', ['tab' => 'signup']) }}" class="inline-flex items-center justify-center gap-2 px-4 py-2 border border-input rounded-md hover:bg-secondary transition-smooth">
+                                <i data-lucide="log-in" class="h-4 w-4"></i>
+                                Sign in to message
+                            </a>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -51,7 +75,22 @@
 
             <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                 @forelse($services as $service)
-                    <div class="bg-card border border-border rounded-xl shadow-card hover:shadow-card-hover transition-smooth overflow-hidden group">
+                    @php
+                        $roleRow = null;
+                        if (session('user_id')) {
+                            $roleRow = \Illuminate\Support\Facades\DB::table('roles')
+                                ->join('role_types', 'roles.role_type_id', '=', 'role_types.role_type_id')
+                                ->where('roles.user_id', session('user_id'))
+                                ->select('role_types.user_role_type')
+                                ->first();
+                        }
+                        $isCustomer = ($roleRow?->user_role_type ?? null) === 'customer';
+                        $serviceUrl = $isCustomer
+                            ? route('customer.service.details', $service->service_id)
+                            : route('services.show', $service->service_id);
+                    @endphp
+
+                    <a href="{{ $serviceUrl }}" class="block bg-card border border-border rounded-xl shadow-card hover:shadow-card-hover transition-smooth overflow-hidden group cursor-pointer">
                         <!-- Service Image / Placeholder -->
                         @if(!empty($service->image_path))
                             <div class="w-full h-48 bg-secondary overflow-hidden">
@@ -84,21 +123,8 @@
                                 ₱{{ number_format($service->base_price, 2) }}
                                 <span class="text-sm font-normal text-muted-foreground">starting from</span>
                             </div>
-
-                            <div class="flex gap-2">
-                                <a href="{{ route('services.show', $service->service_id) }}" 
-                                   class="flex-1 text-center px-4 py-2 border border-input rounded-md hover:bg-accent hover:text-accent-foreground transition-smooth">
-                                    View Details
-                                </a>
-                                <button type="button" 
-                                        class="flex-1 px-4 py-2 bg-primary text-primary-foreground font-medium rounded-md hover:shadow-glow transition-smooth"
-                                        onclick="window.location.href='{{ route('services.show', $service->service_id) }}'">
-                                    <i data-lucide="shopping-cart" class="h-4 w-4 mr-2"></i>
-                                    Order Now
-                                </button>
-                            </div>
                         </div>
-                    </div>
+                    </a>
                 @empty
                     <div class="col-span-full text-center py-12">
                         <i data-lucide="printer" class="h-16 w-16 mx-auto mb-4 text-muted-foreground"></i>

@@ -16,13 +16,24 @@ class BusinessController extends Controller
     private function getUserEnterprise()
     {
         $userId = session('user_id');
-        
-        // Get the enterprise linked to this business user via staff table
-        $enterprise = DB::table('staff')
-            ->join('enterprises', 'staff.enterprise_id', '=', 'enterprises.enterprise_id')
-            ->where('staff.user_id', $userId)
-            ->select('enterprises.*')
-            ->first();
+
+        $enterprise = null;
+
+        if (Schema::hasColumn('enterprises', 'owner_user_id')) {
+            $enterprise = DB::table('enterprises')
+                ->where('owner_user_id', $userId)
+                ->select('enterprises.*')
+                ->first();
+        }
+
+        if (! $enterprise && Schema::hasTable('staff')) {
+            // Legacy fallback: enterprise linked via staff table
+            $enterprise = DB::table('staff')
+                ->join('enterprises', 'staff.enterprise_id', '=', 'enterprises.enterprise_id')
+                ->where('staff.user_id', $userId)
+                ->select('enterprises.*')
+                ->first();
+        }
         
         if (!$enterprise) {
             redirect()->route('business.onboarding')->send();
@@ -30,6 +41,40 @@ class BusinessController extends Controller
         }
         
         return $enterprise;
+    }
+
+    /**
+     * Resolve next allowed status buttons for business actions
+     */
+    private function getBusinessStatusActions(?string $currentStatusName, $statusIds)
+    {
+        $current = $currentStatusName ?? 'Pending';
+
+        $allowed = [
+            'Pending' => ['Confirmed', 'Cancelled'],
+            'Confirmed' => ['In Progress', 'Cancelled'],
+            'In Progress' => ['Ready for Pickup', 'Delivered'],
+            'Ready for Pickup' => [],
+            'Delivered' => [],
+            'Shipped' => ['Delivered'],
+            'Completed' => [],
+            'Cancelled' => [],
+        ];
+
+        $next = $allowed[$current] ?? [];
+
+        // Map to id list
+        $actions = [];
+        foreach ($next as $statusName) {
+            if (isset($statusIds[$statusName])) {
+                $actions[] = [
+                    'name' => $statusName,
+                    'id' => $statusIds[$statusName],
+                ];
+            }
+        }
+
+        return $actions;
     }
 
     /**
@@ -270,6 +315,25 @@ class BusinessController extends Controller
             abort(404);
         }
 
+        $requiresFiles = false;
+        if (Schema::hasColumn('services', 'requires_file_upload')) {
+            $requiresFiles = DB::table('order_items')
+                ->join('services', 'order_items.service_id', '=', 'services.service_id')
+                ->where('order_items.purchase_order_id', $id)
+                ->where('services.requires_file_upload', true)
+                ->exists();
+        }
+
+        if ($requiresFiles) {
+            $hasFiles = DB::table('order_design_files')
+                ->where('purchase_order_id', $id)
+                ->exists();
+
+            if (! $hasFiles) {
+                return redirect()->back()->with('error', 'This order requires a design file upload before it can be confirmed.');
+            }
+        }
+
         // Get order items
         $orderItems = DB::table('order_items')
             ->join('services', 'order_items.service_id', '=', 'services.service_id')
@@ -279,6 +343,28 @@ class BusinessController extends Controller
 
         // Get customizations for each item
         foreach ($orderItems as $item) {
+            $rawFields = $item->custom_fields ?? null;
+            if (is_string($rawFields)) {
+                $rawFields = json_decode($rawFields, true);
+            } elseif (is_object($rawFields)) {
+                $rawFields = (array) $rawFields;
+            }
+            $rawFields = is_array($rawFields) ? $rawFields : [];
+
+            $fieldDefs = DB::table('service_custom_fields')
+                ->where('service_id', $item->service_id)
+                ->orderBy('sort_order')
+                ->orderBy('field_label')
+                ->get();
+
+            $item->custom_field_values = collect($fieldDefs)
+                ->filter(fn($f) => isset($rawFields[$f->field_id]) && trim((string) $rawFields[$f->field_id]) !== '')
+                ->map(fn($f) => (object) [
+                    'label' => $f->field_label,
+                    'value' => $rawFields[$f->field_id],
+                ])
+                ->values();
+
             $item->customizations = DB::table('order_item_customizations')
                 ->join('customization_options', 'order_item_customizations.option_id', '=', 'customization_options.option_id')
                 ->where('order_item_customizations.order_item_id', $item->item_id)
@@ -310,7 +396,10 @@ class BusinessController extends Controller
             ->orderBy('order_status_history.timestamp', 'desc')
             ->value('statuses.status_name');
 
-        return view('business.orders.details', compact('order', 'orderItems', 'statusHistory', 'designFiles', 'statuses', 'currentStatusName', 'enterprise', 'userName'));
+        $statusIds = $statuses->pluck('status_id', 'status_name');
+        $businessActions = $this->getBusinessStatusActions($currentStatusName, $statusIds);
+
+        return view('business.orders.details', compact('order', 'orderItems', 'statusHistory', 'designFiles', 'statuses', 'statusIds', 'currentStatusName', 'enterprise', 'userName', 'businessActions'));
     }
 
     public function confirmOrder($id)
@@ -415,6 +504,56 @@ class BusinessController extends Controller
             ->select('statuses.status_name')
             ->first();
 
+        $currentStatusName = $oldStatus?->status_name ?? 'Pending';
+
+        $statusLookup = DB::table('statuses')->pluck('status_name', 'status_id');
+        $newStatusName = $statusLookup[$request->status_id] ?? null;
+
+        if (! $newStatusName) {
+            return redirect()->back()->with('error', 'Selected status is not configured.');
+        }
+
+        $requiresFiles = false;
+        if (Schema::hasColumn('services', 'requires_file_upload')) {
+            $requiresFiles = DB::table('order_items')
+                ->join('services', 'order_items.service_id', '=', 'services.service_id')
+                ->where('order_items.purchase_order_id', $id)
+                ->where('services.requires_file_upload', true)
+                ->exists();
+        }
+
+        if ($requiresFiles && $newStatusName !== 'Cancelled') {
+            $hasFiles = DB::table('order_design_files')
+                ->where('purchase_order_id', $id)
+                ->exists();
+
+            if (! $hasFiles) {
+                return redirect()->back()->with('error', 'This order requires design files from the customer before you can proceed.');
+            }
+        }
+
+        // Prevent business from marking as Completed; this is for customers.
+        if ($newStatusName === 'Completed') {
+            return redirect()->back()->with('error', 'Customers must confirm completion.');
+        }
+
+        $allowedTransitions = [
+            'Pending' => ['Confirmed', 'Cancelled'],
+            'Confirmed' => ['In Progress', 'Cancelled'],
+            'In Progress' => ['Ready for Pickup', 'Delivered'],
+            'Ready for Pickup' => [],
+            'Delivered' => [],
+            'Shipped' => ['Delivered'],
+            'Completed' => [],
+            'Cancelled' => [],
+        ];
+
+        $allowedNext = $allowedTransitions[$currentStatusName] ?? [];
+
+        if (! in_array($newStatusName, $allowedNext, true)) {
+            return redirect()->back()->with('error', "Cannot move order from {$currentStatusName} to {$newStatusName}.");
+        }
+
         // Create status history entry
         DB::table('order_status_history')->insert([
             'approval_id' => Str::uuid(),
@@ -435,11 +574,6 @@ class BusinessController extends Controller
                 'updated_at' => now(),
             ]);
 
-        // Get new status name
-        $newStatus = DB::table('statuses')->where('status_id', $request->status_id)->first();
-        $oldStatusName = $oldStatus?->status_name ?? 'Unknown';
-        $newStatusName = $newStatus?->status_name ?? 'Unknown';
-
         // Send notification to customer
         DB::table('order_notifications')->insert([
             'notification_id' => Str::uuid(),
@@ -454,12 +588,12 @@ class BusinessController extends Controller
         ]);
 
         // Log audit
-        $this->logAudit('update', 'order_status', $id, "Order status changed from {$oldStatusName} to {$newStatusName}", 
-            ['status' => $oldStatusName],
+        $this->logAudit('update', 'order_status', $id, "Order status changed from {$currentStatusName} to {$newStatusName}", 
+            ['status' => $currentStatusName],
             ['status' => $newStatusName, 'remarks' => $request->remarks]
         );
 
-        return redirect()->back()->with('success', 'Order status updated successfully');
+        return redirect()->back()->with('success', "Order moved to {$newStatusName}");
     }
 
     // =====================================================
@@ -500,6 +634,10 @@ class BusinessController extends Controller
             'is_active' => 'boolean',
         ];
 
+        if (Schema::hasColumn('services', 'requires_file_upload')) {
+            $rules['requires_file_upload'] = 'boolean';
+        }
+
         if (Schema::hasColumn('services', 'fulfillment_type')) {
             $rules['fulfillment_type'] = 'required|in:pickup,delivery,both';
         }
@@ -535,6 +673,7 @@ class BusinessController extends Controller
             'allowed_payment_methods' => $allowedPaymentMethodsJson,
             'base_price' => $request->base_price,
             'is_active' => $request->has('is_active'),
+            'requires_file_upload' => $request->has('requires_file_upload'),
             'created_at' => now(),
             'updated_at' => now(),
         ];
@@ -549,6 +688,10 @@ class BusinessController extends Controller
 
         if (!Schema::hasColumn('services', 'allowed_payment_methods')) {
             unset($insert['allowed_payment_methods']);
+        }
+
+        if (!Schema::hasColumn('services', 'requires_file_upload')) {
+            unset($insert['requires_file_upload']);
         }
 
         DB::table('services')->insert($insert);
@@ -586,6 +729,10 @@ class BusinessController extends Controller
             'is_active' => 'boolean',
         ];
 
+        if (Schema::hasColumn('services', 'requires_file_upload')) {
+            $rules['requires_file_upload'] = 'boolean';
+        }
+
         if (Schema::hasColumn('services', 'fulfillment_type')) {
             $rules['fulfillment_type'] = 'required|in:pickup,delivery,both';
         }
@@ -618,6 +765,7 @@ class BusinessController extends Controller
             'is_active' => $request->has('is_active'),
             'fulfillment_type' => $request->fulfillment_type,
             'allowed_payment_methods' => $allowedPaymentMethodsJson,
+            'requires_file_upload' => $request->has('requires_file_upload'),
             'updated_at' => now(),
         ];
 
@@ -627,6 +775,10 @@ class BusinessController extends Controller
 
         if (!Schema::hasColumn('services', 'allowed_payment_methods')) {
             unset($update['allowed_payment_methods']);
+        }
+
+        if (!Schema::hasColumn('services', 'requires_file_upload')) {
+            unset($update['requires_file_upload']);
         }
 
         if ($request->hasFile('image') && Schema::hasColumn('services', 'image_path')) {
@@ -647,6 +799,57 @@ class BusinessController extends Controller
         );
 
         return redirect()->route('business.services.index')->with('success', 'Service updated successfully');
+    }
+
+    public function updateServiceUploadSettings(Request $request, $id)
+    {
+        if (! Schema::hasColumn('services', 'requires_file_upload')) {
+            return redirect()->back()->with('error', 'File upload settings are not available. Please run migrations.');
+        }
+
+        $request->validate([
+            'requires_file_upload' => 'nullable|boolean',
+        ]);
+
+        $enterprise = $this->getUserEnterprise();
+
+        $service = DB::table('services')
+            ->where('service_id', $id)
+            ->where('enterprise_id', $enterprise->enterprise_id)
+            ->first();
+
+        if (! $service) {
+            abort(404);
+        }
+
+        $requires = $request->has('requires_file_upload');
+
+        DB::table('services')
+            ->where('service_id', $id)
+            ->where('enterprise_id', $enterprise->enterprise_id)
+            ->update([
+                'requires_file_upload' => $requires,
+                'updated_at' => now(),
+            ]);
+
+        $this->logAudit(
+            'update',
+            'service',
+            $id,
+            'Updated service file upload settings',
+            ['requires_file_upload' => (bool) ($service->requires_file_upload ?? false)],
+            ['requires_file_upload' => $requires]
+        );
+
+        if ($request->expectsJson() || $request->header('X-Requested-With') === 'XMLHttpRequest') {
+            return response()->json([
+                'ok' => true,
+                'service_id' => $id,
+                'requires_file_upload' => $requires,
+            ]);
+        }
+
+        return redirect()->back()->with('success', 'File upload settings updated.');
     }
 
     public function toggleServiceStatus($id)
@@ -720,7 +923,131 @@ class BusinessController extends Controller
             ->orderBy('option_name')
             ->get();
 
-        return view('business.customizations.index', compact('service', 'customizations', 'enterprise', 'userName'));
+        $customFields = collect();
+        if (Schema::hasTable('service_custom_fields')) {
+            $customFields = DB::table('service_custom_fields')
+                ->where('service_id', $serviceId)
+                ->orderBy('sort_order')
+                ->orderBy('field_label')
+                ->get();
+        }
+
+        return view('business.customizations.index', compact('service', 'customizations', 'customFields', 'enterprise', 'userName'));
+    }
+
+    public function storeCustomField(Request $request, $serviceId)
+    {
+        $request->validate([
+            'field_label' => 'required|string|max:150',
+            'placeholder' => 'nullable|string|max:255',
+            'is_required' => 'nullable|boolean',
+            'sort_order' => 'nullable|integer|min:0|max:1000',
+        ]);
+
+        $enterprise = $this->getUserEnterprise();
+
+        $service = DB::table('services')
+            ->where('service_id', $serviceId)
+            ->where('enterprise_id', $enterprise->enterprise_id)
+            ->first();
+
+        if (!$service) {
+            abort(404);
+        }
+
+        $fieldId = Str::uuid();
+
+        DB::table('service_custom_fields')->insert([
+            'field_id' => $fieldId,
+            'service_id' => $serviceId,
+            'field_label' => $request->field_label,
+            'placeholder' => $request->placeholder,
+            'is_required' => (bool) $request->input('is_required', false),
+            'sort_order' => (int) $request->input('sort_order', 0),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->logAudit('create', 'service_custom_fields', $fieldId, "Created custom text field: {$request->field_label} for service {$service->service_name}", null, $request->all());
+
+        return redirect()->back()->with('success', 'Custom field created successfully');
+    }
+
+    public function updateCustomField(Request $request, $serviceId, $fieldId)
+    {
+        $request->validate([
+            'field_label' => 'required|string|max:150',
+            'placeholder' => 'nullable|string|max:255',
+            'is_required' => 'nullable|boolean',
+            'sort_order' => 'nullable|integer|min:0|max:1000',
+        ]);
+
+        $enterprise = $this->getUserEnterprise();
+
+        $service = DB::table('services')
+            ->where('service_id', $serviceId)
+            ->where('enterprise_id', $enterprise->enterprise_id)
+            ->first();
+
+        if (!$service) {
+            abort(404);
+        }
+
+        $oldField = DB::table('service_custom_fields')
+            ->where('field_id', $fieldId)
+            ->where('service_id', $serviceId)
+            ->first();
+
+        if (!$oldField) {
+            abort(404);
+        }
+
+        DB::table('service_custom_fields')
+            ->where('field_id', $fieldId)
+            ->where('service_id', $serviceId)
+            ->update([
+                'field_label' => $request->field_label,
+                'placeholder' => $request->placeholder,
+                'is_required' => (bool) $request->input('is_required', false),
+                'sort_order' => (int) $request->input('sort_order', 0),
+                'updated_at' => now(),
+            ]);
+
+        $this->logAudit('update', 'service_custom_fields', $fieldId, "Updated custom text field: {$request->field_label}", (array) $oldField, $request->all());
+
+        return redirect()->back()->with('success', 'Custom field updated successfully');
+    }
+
+    public function deleteCustomField($serviceId, $fieldId)
+    {
+        $enterprise = $this->getUserEnterprise();
+
+        $service = DB::table('services')
+            ->where('service_id', $serviceId)
+            ->where('enterprise_id', $enterprise->enterprise_id)
+            ->first();
+
+        if (!$service) {
+            abort(404);
+        }
+
+        $field = DB::table('service_custom_fields')
+            ->where('field_id', $fieldId)
+            ->where('service_id', $serviceId)
+            ->first();
+
+        if (!$field) {
+            abort(404);
+        }
+
+        DB::table('service_custom_fields')
+            ->where('field_id', $fieldId)
+            ->where('service_id', $serviceId)
+            ->delete();
+
+        $this->logAudit('delete', 'service_custom_fields', $fieldId, "Deleted custom text field: {$field->field_label}", (array) $field, null);
+
+        return redirect()->back()->with('success', 'Custom field deleted successfully');
     }
 
     public function storeCustomization(Request $request, $serviceId)

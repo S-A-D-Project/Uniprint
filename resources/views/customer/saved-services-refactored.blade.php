@@ -48,16 +48,16 @@
 <!-- Saved Services Grid -->
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
     @forelse($savedServices as $savedService)
-    <div class="bg-white rounded-lg shadow-sm overflow-hidden customer-card" data-service-id="{{ $savedService->service_id }}">
+    <div class="bg-white rounded-lg shadow-sm overflow-hidden customer-card relative cursor-pointer" data-service-id="{{ $savedService->service_id }}" onclick="viewServiceDetails('{{ $savedService->service_id }}')">
         <!-- Selection Checkbox -->
         <div class="absolute top-3 left-3 z-10">
             <input type="checkbox" class="service-checkbox rounded text-primary focus:ring-primary" 
-                   value="{{ $savedService->service_id }}" onchange="updateSelectionCount()">
+                   value="{{ $savedService->service_id }}" onchange="updateSelectionCount()" onclick="event.stopPropagation()">
         </div>
 
         <!-- Remove Button -->
         <div class="absolute top-3 right-3 z-10">
-            <button onclick="removeSavedService('{{ $savedService->service_id }}')" 
+            <button onclick="event.preventDefault(); event.stopPropagation(); removeSavedService('{{ $savedService->service_id }}')" 
                     class="w-8 h-8 bg-white/90 hover:bg-white rounded-full flex items-center justify-center text-gray-600 hover:text-red-600 transition-colors">
                 <i data-lucide="x" class="h-4 w-4"></i>
             </button>
@@ -117,18 +117,6 @@
             </div>
             @endif
 
-            <!-- Action Buttons -->
-            <div class="flex gap-2">
-                <button onclick="viewServiceDetails('{{ $savedService->service_id }}')" 
-                        class="flex-1 customer-button-secondary text-sm px-3 py-2">
-                    View Details
-                </button>
-                <button onclick="orderService('{{ $savedService->service_id }}')" 
-                        class="flex-1 customer-button-primary text-sm px-3 py-2">
-                    Order Now
-                </button>
-            </div>
-
             <!-- Save Date -->
             <div class="mt-3 pt-3 border-t border-gray-100">
                 <p class="text-xs text-gray-500">
@@ -141,9 +129,9 @@
     @empty
     <!-- Empty State -->
     <div class="col-span-full">
-        <div class="bg-white rounded-lg shadow-sm p-12 text-center">
-            <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <i data-lucide="heart" class="h-8 w-8 text-gray-400"></i>
+        <div class="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow cursor-pointer" onclick="window.location.href='{{ route('customer.dashboard') }}'">
+            <div class="aspect-video bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
+                <i data-lucide="printer" class="h-12 w-12 text-primary"></i>
             </div>
             <h3 class="text-lg font-medium text-gray-900 mb-2">No saved services yet</h3>
             <p class="text-gray-600 mb-6">Save your favorite printing services for quick access later</p>
@@ -310,11 +298,11 @@ function addSelectedToCart() {
 }
 
 function viewServiceDetails(serviceId) {
-    window.location.href = `/services/${serviceId}`;
+    window.location.href = `/customer/services/${serviceId}`;
 }
 
 function orderService(serviceId) {
-    window.location.href = `/services/${serviceId}`;
+    window.location.href = `/customer/services/${serviceId}`;
 }
 
 // Initialize

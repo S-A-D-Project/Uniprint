@@ -101,10 +101,12 @@
             </div>
 
             @if(property_exists($enterprise, 'is_active') || isset($enterprise->is_active))
-                <div class="flex items-center gap-2">
-                    <input type="checkbox" id="is_active" name="is_active" value="1" {{ old('is_active', $enterprise->is_active ?? true) ? 'checked' : '' }}>
-                    <label for="is_active" class="text-sm font-medium">Shop is active</label>
-                </div>
+                <x-ui.form.checkbox
+                    name="is_active"
+                    id="is_active"
+                    :checked="old('is_active', $enterprise->is_active ?? true)"
+                    label="Shop is active"
+                />
             @endif
 
             <div class="pt-2">

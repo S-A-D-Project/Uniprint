@@ -42,6 +42,11 @@ class StatusesSeeder extends Seeder
                 'description' => 'Order has been delivered to customer'
             ],
             [
+                'status_id' => '9c42d52c-43a6-4d1e-92ec-3c9c9c8a8a43',
+                'status_name' => 'Completed',
+                'description' => 'Order has been received/confirmed by the customer'
+            ],
+            [
                 'status_id' => '33f26616-fa21-4a68-a746-92d479e4336a',
                 'status_name' => 'Cancelled',
                 'description' => 'Order has been cancelled'
