@@ -344,11 +344,11 @@ class BusinessChat {
         
         document.getElementById('customer-avatar').textContent = participant.name.charAt(0).toUpperCase();
         document.getElementById('customer-name').textContent = participant.name;
-        document.getElementById('customer-status').textContent = 'Online'; // TODO: Implement real status
+        document.getElementById('customer-status').textContent = '—'; // TODO: Implement real status
         
         // Update online indicator
         const indicator = document.getElementById('online-indicator');
-        indicator.className = 'w-2 h-2 rounded-full bg-green-400'; // TODO: Dynamic status
+        indicator.className = 'w-2 h-2 rounded-full bg-gray-400'; // TODO: Dynamic status
     }
 
     async loadMessages(conversationId) {

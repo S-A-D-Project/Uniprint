@@ -87,7 +87,7 @@
                     <p class="text-xs text-muted-foreground mt-1">Lower numbers execute first</p>
                 </div>
 
-                <x-ui.form.checkbox
+                <x-ui.form.switch
                     name="is_active"
                     id="is_active"
                     :checked="old('is_active', 1)"

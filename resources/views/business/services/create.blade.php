@@ -164,21 +164,35 @@
                                         <i data-lucide="settings" class="h-4 w-4 me-1"></i>
                                         Service Settings
                                     </h6>
-                                    <div class="form-check form-switch">
-                                        <input class="form-check-input" type="checkbox" name="is_active" id="is_active" value="1" checked>
-                                        <label class="form-check-label fw-semibold" for="is_active">
-                                            Service is Active
-                                        </label>
-                                        <div class="form-text">Active services are visible to customers</div>
-                                    </div>
+                                    <x-ui.form.switch
+                                        name="is_active"
+                                        id="is_active"
+                                        :checked="old('is_active', true)"
+                                        label="Service is Active"
+                                        help="Active services are visible to customers"
+                                    />
+
+                                    @if(\Illuminate\Support\Facades\Schema::hasColumn('services', 'file_upload_enabled'))
+                                        <div class="mt-3">
+                                            <x-ui.form.switch
+                                                name="file_upload_enabled"
+                                                id="file_upload_enabled"
+                                                :checked="old('file_upload_enabled', false)"
+                                                label="Enable File Upload"
+                                                help="If enabled, customers can upload design files for this service."
+                                            />
+                                        </div>
+                                    @endif
 
                                     @if(\Illuminate\Support\Facades\Schema::hasColumn('services', 'requires_file_upload'))
-                                        <div class="form-check form-switch mt-3">
-                                            <input class="form-check-input" type="checkbox" name="requires_file_upload" id="requires_file_upload" value="1" {{ old('requires_file_upload') ? 'checked' : '' }}>
-                                            <label class="form-check-label fw-semibold" for="requires_file_upload">
-                                                Requires File Upload
-                                            </label>
-                                            <div class="form-text">If enabled, customers must upload design files for this service.</div>
+                                        <div class="mt-3">
+                                            <x-ui.form.switch
+                                                name="requires_file_upload"
+                                                id="requires_file_upload"
+                                                :checked="old('requires_file_upload', false)"
+                                                label="Require File Upload"
+                                                help="If enabled, customers must upload design files for this service."
+                                            />
                                         </div>
                                     @endif
                                 </div>

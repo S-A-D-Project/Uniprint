@@ -143,6 +143,14 @@
                                 $requiresFileUpload = \Illuminate\Support\Facades\Schema::hasColumn('services', 'requires_file_upload')
                                     ? !empty($service->requires_file_upload)
                                     : false;
+
+                                $uploadEnabled = \Illuminate\Support\Facades\Schema::hasColumn('services', 'file_upload_enabled')
+                                    ? !empty($service->file_upload_enabled)
+                                    : $requiresFileUpload;
+
+                                if ($requiresFileUpload) {
+                                    $uploadEnabled = true;
+                                }
                             @endphp
 
                             <div class="border border-border rounded-lg p-4 bg-secondary/30">
@@ -162,31 +170,34 @@
                                 <p class="text-sm text-muted-foreground mb-3">
                                     @if($requiresFileUpload)
                                         This service requires design files. Upload them here so the shop can start processing immediately.
-                                    @else
+                                    @elseif($uploadEnabled)
                                         You can upload design files now (optional) or later from the order details page.
+                                    @else
+                                        File uploads are not enabled for this service.
                                     @endif
                                 </p>
 
-                                <div class="space-y-3">
-                                    <div>
-                                        <label class="block text-sm font-medium mb-2" for="design_files">Upload design files</label>
-                                        <input
-                                            type="file"
-                                            id="design_files"
-                                            name="design_files[]"
-                                            multiple
-                                            accept=".jpg,.jpeg,.png,.pdf,.ai,.psd,.eps,.svg"
-                                            class="w-full px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-                                            {{ $requiresFileUpload ? 'required' : '' }}
-                                        />
-                                        <p class="text-xs text-muted-foreground mt-1">Accepted: JPG, PNG, PDF, AI, PSD, EPS, SVG. Max 50MB each.</p>
-                                    </div>
+                                @if($uploadEnabled)
+                                    <div class="space-y-3">
+                                        <div>
+                                            <x-ui.form.file-dropzone
+                                                name="design_files[]"
+                                                id="design_files"
+                                                label="Upload design files"
+                                                :required="$requiresFileUpload"
+                                                :multiple="true"
+                                                accept=".jpg,.jpeg,.png,.pdf,.ai,.psd,.eps,.svg"
+                                                help="Accepted: JPG, PNG, PDF, AI, PSD, EPS, SVG. Max 50MB each."
+                                                buttonText="Choose Files"
+                                            />
+                                        </div>
 
-                                    <div>
-                                        <label class="block text-sm font-medium mb-2" for="design_notes">Notes (optional)</label>
-                                        <textarea name="design_notes" id="design_notes" rows="2" class="w-full px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring resize-none" placeholder="Any notes for the shop about these files..."></textarea>
+                                        <div>
+                                            <label class="block text-sm font-medium mb-2" for="design_notes">Notes (optional)</label>
+                                            <textarea name="design_notes" id="design_notes" rows="2" class="w-full px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring resize-none" placeholder="Any notes for the shop about these files..."></textarea>
+                                        </div>
                                     </div>
-                                </div>
+                                @endif
 
                                 <div class="flex flex-wrap gap-2">
                                     <a href="{{ route('customer.design-assets') }}"

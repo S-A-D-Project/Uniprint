@@ -79,7 +79,7 @@
                            class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
                 </div>
 
-                <x-ui.form.checkbox
+                <x-ui.form.switch
                     name="is_active"
                     id="is_active"
                     :checked="old('is_active', $rule->is_active)"

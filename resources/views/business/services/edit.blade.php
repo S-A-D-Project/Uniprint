@@ -89,19 +89,28 @@
                     </div>
                 </div>
 
-                <x-ui.form.checkbox
+                <x-ui.form.switch
                     name="is_active"
                     id="is_active"
                     :checked="old('is_active', $service->is_active)"
                     label="Active"
                 />
 
+                @if(\Illuminate\Support\Facades\Schema::hasColumn('services', 'file_upload_enabled'))
+                    <x-ui.form.switch
+                        name="file_upload_enabled"
+                        id="file_upload_enabled"
+                        :checked="old('file_upload_enabled', !empty($service->file_upload_enabled))"
+                        label="Enable File Upload"
+                    />
+                @endif
+
                 @if(\Illuminate\Support\Facades\Schema::hasColumn('services', 'requires_file_upload'))
-                    <x-ui.form.checkbox
+                    <x-ui.form.switch
                         name="requires_file_upload"
                         id="requires_file_upload"
                         :checked="old('requires_file_upload', !empty($service->requires_file_upload))"
-                        label="Requires File Upload"
+                        label="Require File Upload"
                     />
                 @endif
 

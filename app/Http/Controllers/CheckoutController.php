@@ -10,6 +10,8 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use App\Models\SavedService;
+use App\Models\Service;
+use App\Models\CustomizationOption;
 
 class CheckoutController extends Controller
 {
@@ -35,53 +37,103 @@ class CheckoutController extends Controller
         }
 
         try {
+            $service = Service::with('customFields')->findOrFail($request->service_id);
+
+            $customizations = is_array($request->customizations ?? null) ? array_values(array_unique($request->customizations)) : [];
+            sort($customizations);
+
+            $customFields = is_array($request->custom_fields ?? null) ? $request->custom_fields : [];
+            $customFields = array_filter($customFields, fn($v) => $v !== null);
+            foreach ($customFields as $k => $v) {
+                if (!is_string($k)) {
+                    unset($customFields[$k]);
+                    continue;
+                }
+                $customFields[$k] = is_string($v) ? trim($v) : '';
+                if ($customFields[$k] === '') {
+                    unset($customFields[$k]);
+                }
+            }
+            ksort($customFields);
+
+            // Validate required custom fields
+            $missing = [];
+            foreach ($service->customFields->where('is_required', true) as $field) {
+                if (empty($customFields[$field->field_id] ?? null)) {
+                    $missing[] = $field->field_label;
+                }
+            }
+            if (!empty($missing)) {
+                return redirect()->back()->with('error', 'Please fill in required fields: ' . implode(', ', $missing));
+            }
+
+            // Resolve upload flags (backward compatible)
             $requiresFileUpload = false;
+            $uploadEnabled = false;
             if (Schema::hasColumn('services', 'requires_file_upload')) {
-                $requiresFileUpload = (bool) DB::table('services')
-                    ->where('service_id', $request->service_id)
-                    ->value('requires_file_upload');
+                $requiresFileUpload = (bool) $service->requires_file_upload;
+                if (Schema::hasColumn('services', 'file_upload_enabled')) {
+                    $uploadEnabled = (bool) $service->file_upload_enabled;
+                } else {
+                    $uploadEnabled = $requiresFileUpload;
+                }
+            }
+
+            if ($requiresFileUpload) {
+                $uploadEnabled = true;
             }
 
             if ($requiresFileUpload && !$request->hasFile('design_files')) {
                 return redirect()->back()->with('error', 'This service requires design files. Please upload at least one file to proceed.');
             }
 
-            $savedService = SavedService::saveService(
-                $userId,
-                $request->service_id,
-                $request->quantity,
-                $request->customizations ?? [],
-                $request->custom_fields ?? [],
-                $request->notes
-            );
+            // Price calculation
+            $unitPrice = (float) $service->base_price;
+            if (!empty($customizations)) {
+                $customizationCost = CustomizationOption::whereIn('option_id', $customizations)->sum('price_modifier');
+                $unitPrice += (float) $customizationCost;
+            }
+            $qty = (int) $request->quantity;
+            $totalPrice = $unitPrice * $qty;
 
-            if (
-                $savedService &&
-                $request->hasFile('design_files') &&
-                Schema::hasTable('saved_service_design_files')
-            ) {
+            // Handle direct-uploaded files (stored under checkout_direct/{user})
+            $directFiles = [];
+            if ($uploadEnabled && $request->hasFile('design_files')) {
                 foreach ((array) $request->file('design_files') as $file) {
                     if (!$file) {
                         continue;
                     }
 
                     $fileName = time() . '_' . $file->getClientOriginalName();
-                    $filePath = $file->storeAs('design_files/saved_services/' . $savedService->saved_service_id, $fileName, 'public');
+                    $filePath = $file->storeAs('design_files/checkout_direct/' . $userId, $fileName, 'public');
 
-                    DB::table('saved_service_design_files')->insert([
-                        'id' => Str::uuid(),
-                        'saved_service_id' => $savedService->saved_service_id,
-                        'user_id' => $userId,
+                    $directFiles[] = [
                         'file_name' => $fileName,
                         'file_path' => $filePath,
                         'file_type' => $file->getClientOriginalExtension(),
                         'file_size' => $file->getSize(),
                         'design_notes' => $request->input('design_notes'),
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ]);
+                    ];
                 }
             }
+
+            // Store direct checkout item in session (no saved_services)
+            session()->forget(['checkout_saved_service_ids']);
+            session([
+                'checkout_mode' => 'direct',
+                'checkout_direct_item' => [
+                    'service_id' => $service->service_id,
+                    'quantity' => $qty,
+                    'customizations' => $customizations,
+                    'custom_fields' => $customFields,
+                    'notes' => $request->notes,
+                    'unit_price' => $unitPrice,
+                    'total_price' => $totalPrice,
+                    'requires_file_upload' => $requiresFileUpload,
+                    'file_upload_enabled' => $uploadEnabled,
+                ],
+                'checkout_direct_design_files' => $directFiles,
+            ]);
 
             return redirect()->route('checkout.index');
         } catch (\InvalidArgumentException $e) {
@@ -107,7 +159,71 @@ class CheckoutController extends Controller
             return redirect()->route('login')->with('error', 'Please login to checkout');
         }
 
-        // Get saved services instead of cart
+        // Direct checkout (single item) takes precedence
+        if (session('checkout_mode') === 'direct' && is_array(session('checkout_direct_item'))) {
+            $item = session('checkout_direct_item');
+
+            $serviceData = DB::table('services')
+                ->join('enterprises', 'services.enterprise_id', '=', 'enterprises.enterprise_id')
+                ->where('services.service_id', $item['service_id'])
+                ->select('services.*', 'enterprises.name as enterprise_name', 'enterprises.enterprise_id')
+                ->first();
+
+            if (!$serviceData) {
+                session()->forget(['checkout_mode', 'checkout_direct_item', 'checkout_direct_design_files']);
+                return redirect()->route('customer.orders')->with('error', 'Service not found.');
+            }
+
+            $customizations = [];
+            if (!empty($item['customizations'])) {
+                foreach ($item['customizations'] as $optionId) {
+                    $option = DB::table('customization_options')->where('option_id', $optionId)->first();
+                    if ($option) {
+                        $customizations[] = $option;
+                    }
+                }
+            }
+
+            $cartItems = [[
+                'key' => 'direct',
+                'service' => $serviceData,
+                'service_id' => $item['service_id'],
+                'quantity' => (int) $item['quantity'],
+                'unit_price' => (float) $item['unit_price'],
+                'total' => (float) $item['total_price'],
+                'customizations' => $customizations,
+                'special_instructions' => $item['notes'] ?? null,
+            ]];
+
+            $subtotal = (float) $item['total_price'];
+            $tax = $subtotal * 0.12;
+            $total = $subtotal + $tax;
+
+            $user = DB::table('users')->where('user_id', $userId)->first();
+
+            $availablePaymentMethods = ['gcash', 'cash'];
+            $availableFulfillmentMethods = ['pickup', 'delivery'];
+
+            // filter allowed methods using the single service
+            if (Schema::hasColumn('services', 'allowed_payment_methods') && !empty($serviceData->allowed_payment_methods)) {
+                $decoded = json_decode($serviceData->allowed_payment_methods, true);
+                if (is_array($decoded) && !empty($decoded)) {
+                    $availablePaymentMethods = array_values(array_intersect($availablePaymentMethods, $decoded));
+                }
+            }
+
+            if (Schema::hasColumn('services', 'fulfillment_type') && !empty($serviceData->fulfillment_type)) {
+                $supported = $serviceData->fulfillment_type === 'pickup'
+                    ? ['pickup']
+                    : ($serviceData->fulfillment_type === 'delivery' ? ['delivery'] : ['pickup', 'delivery']);
+
+                $availableFulfillmentMethods = array_values(array_intersect($availableFulfillmentMethods, $supported));
+            }
+
+            return view('checkout.index', compact('cartItems', 'subtotal', 'tax', 'total', 'user', 'availablePaymentMethods', 'availableFulfillmentMethods'));
+        }
+
+        // Fallback: saved services checkout (existing behavior)
         $savedServices = SavedService::getUserServices($userId);
 
         $selectedIds = session('checkout_saved_service_ids');
@@ -132,7 +248,6 @@ class CheckoutController extends Controller
             
             if (!$serviceData) continue;
             
-            $enterpriseId = $serviceData->enterprise_id;
             $itemPrice = $savedService->unit_price;
             $itemTotal = $savedService->total_price;
             $subtotal += $itemTotal;
@@ -229,22 +344,39 @@ class CheckoutController extends Controller
             return response()->json(['success' => false, 'message' => 'Please login to checkout'], 401);
         }
 
-        // Get saved services instead of cart
-        $savedServices = SavedService::getUserServices($userId);
+        $direct = session('checkout_mode') === 'direct' && is_array(session('checkout_direct_item'));
+        $selectedIds = null;
 
-        $selectedIds = session('checkout_saved_service_ids');
-        if (is_array($selectedIds) && !empty($selectedIds)) {
-            $savedServices = $savedServices->whereIn('saved_service_id', $selectedIds)->values();
-        }
-        
-        if ($savedServices->isEmpty()) {
-            return response()->json(['success' => false, 'message' => 'No saved services found'], 400);
+        if ($direct) {
+            $item = session('checkout_direct_item');
+            $savedServices = collect([(object) [
+                'saved_service_id' => null,
+                'service_id' => $item['service_id'],
+                'quantity' => $item['quantity'],
+                'unit_price' => $item['unit_price'],
+                'total_price' => $item['total_price'],
+                'customizations' => $item['customizations'] ?? [],
+                'custom_fields' => $item['custom_fields'] ?? [],
+                'special_instructions' => $item['notes'] ?? null,
+            ]]);
+        } else {
+            // Get saved services instead of cart
+            $savedServices = SavedService::getUserServices($userId);
+
+            $selectedIds = session('checkout_saved_service_ids');
+            if (is_array($selectedIds) && !empty($selectedIds)) {
+                $savedServices = $savedServices->whereIn('saved_service_id', $selectedIds)->values();
+            }
+            
+            if ($savedServices->isEmpty()) {
+                return response()->json(['success' => false, 'message' => 'No saved services found'], 400);
+            }
         }
 
         DB::beginTransaction();
         
         try {
-            // Process saved services and create order
+            // Process saved services or direct item and create order(s)
             $ordersByEnterprise = [];
             
             foreach ($savedServices as $savedService) {
@@ -270,11 +402,13 @@ class CheckoutController extends Controller
 
                 $savedServiceIds = [];
                 foreach ($items as $savedService) {
-                    $savedServiceIds[] = $savedService->saved_service_id;
+                    if (!empty($savedService->saved_service_id)) {
+                        $savedServiceIds[] = $savedService->saved_service_id;
+                    }
                 }
 
                 $tempDesignFiles = collect();
-                if (Schema::hasTable('saved_service_design_files')) {
+                if (!$direct && Schema::hasTable('saved_service_design_files') && !empty($savedServiceIds)) {
                     $tempDesignFiles = DB::table('saved_service_design_files')
                         ->where('user_id', $userId)
                         ->whereIn('saved_service_id', $savedServiceIds)
@@ -286,11 +420,21 @@ class CheckoutController extends Controller
                     $serviceData = DB::table('services')->where('service_id', $savedService->service_id)->first();
 
                     if (Schema::hasColumn('services', 'requires_file_upload') && !empty($serviceData?->requires_file_upload)) {
-                        if (Schema::hasTable('saved_service_design_files') && $tempDesignFiles->where('saved_service_id', $savedService->saved_service_id)->count() === 0) {
-                            return response()->json([
-                                'success' => false,
-                                'message' => 'One or more services require design files. Please upload the required files before checkout.'
-                            ], 422);
+                        if ($direct) {
+                            $directFiles = collect(session('checkout_direct_design_files', []));
+                            if ($directFiles->count() === 0) {
+                                return response()->json([
+                                    'success' => false,
+                                    'message' => 'This service requires design files. Please upload the required files before checkout.'
+                                ], 422);
+                            }
+                        } else {
+                            if (Schema::hasTable('saved_service_design_files') && $tempDesignFiles->where('saved_service_id', $savedService->saved_service_id)->count() === 0) {
+                                return response()->json([
+                                    'success' => false,
+                                    'message' => 'One or more services require design files. Please upload the required files before checkout.'
+                                ], 422);
+                            }
                         }
                     }
 
@@ -332,20 +476,29 @@ class CheckoutController extends Controller
                     }
                     
                     $subtotal += $itemTotal;
+
+                    $itemInsert = [
+                        'item_id' => Str::uuid(),
+                        'purchase_order_id' => $orderId,
+                        'service_id' => $savedService->service_id,
+                        'item_description' => $serviceData->service_name,
+                        'quantity' => $savedService->quantity,
+                        'unit_price' => $itemPrice,
+                        'total_cost' => $itemTotal,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
+
+                    if (Schema::hasColumn('order_items', 'custom_fields')) {
+                        $customFieldsValue = $savedService->custom_fields ?? null;
+                        if (is_array($customFieldsValue)) {
+                            $customFieldsValue = empty($customFieldsValue) ? null : json_encode($customFieldsValue);
+                        }
+                        $itemInsert['custom_fields'] = $customFieldsValue;
+                    }
                     
                     $orderItems[] = [
-                        'item' => [
-                            'item_id' => Str::uuid(),
-                            'purchase_order_id' => $orderId,
-                            'service_id' => $savedService->service_id,
-                            'custom_fields' => $savedService->custom_fields ?? null,
-                            'item_description' => $serviceData->service_name,
-                            'quantity' => $savedService->quantity,
-                            'unit_price' => $itemPrice,
-                            'total_cost' => $itemTotal,
-                            'created_at' => now(),
-                            'updated_at' => now(),
-                        ],
+                        'item' => $itemInsert,
                         'customizations' => $customizationsData,
                     ];
                 }
@@ -465,44 +618,74 @@ class CheckoutController extends Controller
                 }
 
                 // Attach uploaded design files (from saved service temp uploads) to the created order
-                if (
-                    Schema::hasTable('saved_service_design_files') &&
-                    Schema::hasTable('order_design_files')
-                ) {
-                    $version = DB::table('order_design_files')
-                        ->where('purchase_order_id', $orderId)
-                        ->count();
+                if (Schema::hasTable('order_design_files')) {
+                    if ($direct) {
+                        $directFiles = collect(session('checkout_direct_design_files', []));
+                        $version = DB::table('order_design_files')
+                            ->where('purchase_order_id', $orderId)
+                            ->count();
 
-                    foreach ($tempDesignFiles as $tmp) {
-                        $version++;
-                        $targetName = $version . '_' . basename($tmp->file_name);
-                        $targetPath = 'design_files/' . $orderId . '/' . $targetName;
+                        foreach ($directFiles as $tmp) {
+                            $version++;
+                            $targetName = $version . '_' . basename($tmp['file_name']);
+                            $targetPath = 'design_files/' . $orderId . '/' . $targetName;
 
-                        if (Storage::disk('public')->exists($tmp->file_path)) {
-                            Storage::disk('public')->makeDirectory('design_files/' . $orderId);
-                            Storage::disk('public')->move($tmp->file_path, $targetPath);
+                            if (Storage::disk('public')->exists($tmp['file_path'])) {
+                                Storage::disk('public')->makeDirectory('design_files/' . $orderId);
+                                Storage::disk('public')->move($tmp['file_path'], $targetPath);
+                            }
+
+                            DB::table('order_design_files')->insert([
+                                'file_id' => Str::uuid(),
+                                'purchase_order_id' => $orderId,
+                                'uploaded_by' => $userId,
+                                'file_name' => $targetName,
+                                'file_path' => $targetPath,
+                                'file_type' => $tmp['file_type'],
+                                'file_size' => $tmp['file_size'],
+                                'design_notes' => $tmp['design_notes'] ?? null,
+                                'version' => $version,
+                                'is_approved' => false,
+                                'created_at' => now(),
+                                'updated_at' => now(),
+                            ]);
+                        }
+                    } elseif (Schema::hasTable('saved_service_design_files')) {
+                        $version = DB::table('order_design_files')
+                            ->where('purchase_order_id', $orderId)
+                            ->count();
+
+                        foreach ($tempDesignFiles as $tmp) {
+                            $version++;
+                            $targetName = $version . '_' . basename($tmp->file_name);
+                            $targetPath = 'design_files/' . $orderId . '/' . $targetName;
+
+                            if (Storage::disk('public')->exists($tmp->file_path)) {
+                                Storage::disk('public')->makeDirectory('design_files/' . $orderId);
+                                Storage::disk('public')->move($tmp->file_path, $targetPath);
+                            }
+
+                            DB::table('order_design_files')->insert([
+                                'file_id' => Str::uuid(),
+                                'purchase_order_id' => $orderId,
+                                'uploaded_by' => $userId,
+                                'file_name' => $targetName,
+                                'file_path' => $targetPath,
+                                'file_type' => $tmp->file_type,
+                                'file_size' => $tmp->file_size,
+                                'design_notes' => $tmp->design_notes,
+                                'version' => $version,
+                                'is_approved' => false,
+                                'created_at' => now(),
+                                'updated_at' => now(),
+                            ]);
                         }
 
-                        DB::table('order_design_files')->insert([
-                            'file_id' => Str::uuid(),
-                            'purchase_order_id' => $orderId,
-                            'uploaded_by' => $userId,
-                            'file_name' => $targetName,
-                            'file_path' => $targetPath,
-                            'file_type' => $tmp->file_type,
-                            'file_size' => $tmp->file_size,
-                            'design_notes' => $tmp->design_notes,
-                            'version' => $version,
-                            'is_approved' => false,
-                            'created_at' => now(),
-                            'updated_at' => now(),
-                        ]);
+                        DB::table('saved_service_design_files')
+                            ->where('user_id', $userId)
+                            ->whereIn('saved_service_id', $savedServiceIds)
+                            ->delete();
                     }
-
-                    DB::table('saved_service_design_files')
-                        ->where('user_id', $userId)
-                        ->whereIn('saved_service_id', $savedServiceIds)
-                        ->delete();
                 }
                 
                 $createdOrders[] = [
@@ -514,14 +697,18 @@ class CheckoutController extends Controller
             
             DB::commit();
             
-            // Clear saved services after successful order
-            if (is_array($selectedIds) && !empty($selectedIds)) {
-                SavedService::where('user_id', $userId)
-                    ->whereIn('saved_service_id', $selectedIds)
-                    ->delete();
-                session()->forget('checkout_saved_service_ids');
+            if ($direct) {
+                session()->forget(['checkout_mode', 'checkout_direct_item', 'checkout_direct_design_files']);
             } else {
-                SavedService::clearServices($userId);
+                // Clear saved services after successful order
+                if (is_array($selectedIds) && !empty($selectedIds)) {
+                    SavedService::where('user_id', $userId)
+                        ->whereIn('saved_service_id', $selectedIds)
+                        ->delete();
+                    session()->forget('checkout_saved_service_ids');
+                } else {
+                    SavedService::clearServices($userId);
+                }
             }
             
             return response()->json([

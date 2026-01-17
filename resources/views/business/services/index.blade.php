@@ -16,6 +16,7 @@
 
     @php
         $hasRequiresFileUpload = \Illuminate\Support\Facades\Schema::hasColumn('services', 'requires_file_upload');
+        $hasUploadEnabled = \Illuminate\Support\Facades\Schema::hasColumn('services', 'file_upload_enabled');
     @endphp
 
     <!-- Services Grid -->
@@ -76,7 +77,7 @@
                         @if($hasRequiresFileUpload)
                             <button type="button"
                                     class="px-3 py-2 text-sm border border-input rounded-md hover:bg-secondary transition-smooth"
-                                    onclick="openServiceUploadSettings('{{ $service->service_id }}', @json($service->service_name), {{ !empty($service->requires_file_upload) ? 'true' : 'false' }})">
+                                    onclick="openServiceUploadSettings('{{ $service->service_id }}', @json($service->service_name), {{ !empty($service->file_upload_enabled ?? false) ? 'true' : 'false' }}, {{ !empty($service->requires_file_upload) ? 'true' : 'false' }})">
                                 Files
                             </button>
                         @endif
@@ -128,16 +129,18 @@
 
 @push('scripts')
 <script>
-function openServiceUploadSettings(serviceId, serviceName, requiresFileUpload) {
+function openServiceUploadSettings(serviceId, serviceName, fileUploadEnabled, requiresFileUpload) {
     const modalEl = document.getElementById('serviceUploadSettingsModal');
     if (!modalEl) return;
 
     const nameEl = document.getElementById('serviceUploadSettingsName');
-    const checkboxEl = document.getElementById('serviceUploadSettingsRequires');
+    const enabledEl = document.getElementById('serviceUploadSettingsEnabled');
+    const requiresEl = document.getElementById('serviceUploadSettingsRequires');
     const formEl = document.getElementById('serviceUploadSettingsForm');
 
     if (nameEl) nameEl.textContent = serviceName || 'Service';
-    if (checkboxEl) checkboxEl.checked = Boolean(requiresFileUpload);
+    if (enabledEl) enabledEl.checked = Boolean(fileUploadEnabled);
+    if (requiresEl) requiresEl.checked = Boolean(requiresFileUpload);
     if (formEl) {
         formEl.action = `{{ route('business.services.upload-settings', ':id') }}`.replace(':id', serviceId);
     }

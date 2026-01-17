@@ -634,6 +634,10 @@ class BusinessController extends Controller
             'is_active' => 'boolean',
         ];
 
+        if (Schema::hasColumn('services', 'file_upload_enabled')) {
+            $rules['file_upload_enabled'] = 'boolean';
+        }
+
         if (Schema::hasColumn('services', 'requires_file_upload')) {
             $rules['requires_file_upload'] = 'boolean';
         }
@@ -673,10 +677,15 @@ class BusinessController extends Controller
             'allowed_payment_methods' => $allowedPaymentMethodsJson,
             'base_price' => $request->base_price,
             'is_active' => $request->has('is_active'),
+            'file_upload_enabled' => $request->has('file_upload_enabled'),
             'requires_file_upload' => $request->has('requires_file_upload'),
             'created_at' => now(),
             'updated_at' => now(),
         ];
+
+        if (Schema::hasColumn('services', 'file_upload_enabled') && $insert['requires_file_upload']) {
+            $insert['file_upload_enabled'] = true;
+        }
 
         if (!Schema::hasColumn('services', 'image_path')) {
             unset($insert['image_path']);
@@ -688,6 +697,10 @@ class BusinessController extends Controller
 
         if (!Schema::hasColumn('services', 'allowed_payment_methods')) {
             unset($insert['allowed_payment_methods']);
+        }
+
+        if (!Schema::hasColumn('services', 'file_upload_enabled')) {
+            unset($insert['file_upload_enabled']);
         }
 
         if (!Schema::hasColumn('services', 'requires_file_upload')) {
@@ -729,6 +742,10 @@ class BusinessController extends Controller
             'is_active' => 'boolean',
         ];
 
+        if (Schema::hasColumn('services', 'file_upload_enabled')) {
+            $rules['file_upload_enabled'] = 'boolean';
+        }
+
         if (Schema::hasColumn('services', 'requires_file_upload')) {
             $rules['requires_file_upload'] = 'boolean';
         }
@@ -765,9 +782,14 @@ class BusinessController extends Controller
             'is_active' => $request->has('is_active'),
             'fulfillment_type' => $request->fulfillment_type,
             'allowed_payment_methods' => $allowedPaymentMethodsJson,
+            'file_upload_enabled' => $request->has('file_upload_enabled'),
             'requires_file_upload' => $request->has('requires_file_upload'),
             'updated_at' => now(),
         ];
+
+        if (Schema::hasColumn('services', 'file_upload_enabled') && $update['requires_file_upload']) {
+            $update['file_upload_enabled'] = true;
+        }
 
         if (!Schema::hasColumn('services', 'fulfillment_type')) {
             unset($update['fulfillment_type']);
@@ -775,6 +797,10 @@ class BusinessController extends Controller
 
         if (!Schema::hasColumn('services', 'allowed_payment_methods')) {
             unset($update['allowed_payment_methods']);
+        }
+
+        if (!Schema::hasColumn('services', 'file_upload_enabled')) {
+            unset($update['file_upload_enabled']);
         }
 
         if (!Schema::hasColumn('services', 'requires_file_upload')) {
@@ -808,6 +834,7 @@ class BusinessController extends Controller
         }
 
         $request->validate([
+            'file_upload_enabled' => 'nullable|boolean',
             'requires_file_upload' => 'nullable|boolean',
         ]);
 
@@ -823,28 +850,46 @@ class BusinessController extends Controller
         }
 
         $requires = $request->has('requires_file_upload');
+        $enabled = Schema::hasColumn('services', 'file_upload_enabled') ? $request->has('file_upload_enabled') : $requires;
+
+        if ($requires) {
+            $enabled = true;
+        }
+
+        $update = [
+            'requires_file_upload' => $requires,
+            'updated_at' => now(),
+        ];
+
+        if (Schema::hasColumn('services', 'file_upload_enabled')) {
+            $update['file_upload_enabled'] = $enabled;
+        }
 
         DB::table('services')
             ->where('service_id', $id)
             ->where('enterprise_id', $enterprise->enterprise_id)
-            ->update([
-                'requires_file_upload' => $requires,
-                'updated_at' => now(),
-            ]);
+            ->update($update);
 
         $this->logAudit(
             'update',
             'service',
             $id,
             'Updated service file upload settings',
-            ['requires_file_upload' => (bool) ($service->requires_file_upload ?? false)],
-            ['requires_file_upload' => $requires]
+            [
+                'file_upload_enabled' => (bool) ($service->file_upload_enabled ?? false),
+                'requires_file_upload' => (bool) ($service->requires_file_upload ?? false),
+            ],
+            [
+                'file_upload_enabled' => $enabled,
+                'requires_file_upload' => $requires,
+            ]
         );
 
         if ($request->expectsJson() || $request->header('X-Requested-With') === 'XMLHttpRequest') {
             return response()->json([
                 'ok' => true,
                 'service_id' => $id,
+                'file_upload_enabled' => $enabled,
                 'requires_file_upload' => $requires,
             ]);
         }

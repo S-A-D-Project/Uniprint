@@ -50,13 +50,19 @@ class ServiceMarketplaceApiController extends Controller
                 'e.address as location',
                 DB::raw("'printing' as service_type"),
                 DB::raw('false as is_featured'),
-                DB::raw("'/placeholder-service.jpg' as image_url")
+                Schema::hasColumn('services', 'image_path')
+                    ? DB::raw("CASE WHEN s.image_path IS NULL OR s.image_path = '' THEN NULL ELSE '/storage/' || s.image_path END as image_url")
+                    : DB::raw('NULL as image_url')
             ];
             
             if ($reviewsTableExists) {
                 $selectFields[] = DB::raw('COALESCE(AVG(r.rating), 0) as rating');
                 $selectFields[] = DB::raw('COUNT(r.review_id) as review_count');
-                $query->groupBy('s.service_id', 's.service_name', 's.description', 's.base_price', 'e.name', 'e.address');
+                $groupBy = ['s.service_id', 's.service_name', 's.description', 's.base_price', 'e.name', 'e.address'];
+                if (Schema::hasColumn('services', 'image_path')) {
+                    $groupBy[] = 's.image_path';
+                }
+                $query->groupBy($groupBy);
             } else {
                 $selectFields[] = DB::raw('0 as rating');
                 $selectFields[] = DB::raw('0 as review_count');
@@ -82,9 +88,9 @@ class ServiceMarketplaceApiController extends Controller
                 return [
                     'service_id' => $service->service_id,
                     'title' => $service->title,
-                    'description' => $service->description ?: 'Professional service with quality assurance and fast delivery.',
+                    'description' => $service->description ?? '',
                     'price' => number_format($service->price, 2),
-                    'original_price' => $service->price > 100 ? number_format($service->price * 1.2, 2) : null,
+                    'original_price' => null,
                     'provider_name' => $service->provider_name,
                     'location' => $service->location ?: 'Online',
                     'rating' => round($service->rating, 1),
@@ -210,15 +216,27 @@ class ServiceMarketplaceApiController extends Controller
                 's.base_price as price',
                 'e.name as provider_name',
                 'e.address as location',
+                'e.address as address',
                 'e.contact_number as phone',
-                DB::raw("'contact@example.com' as email"),
-                DB::raw("'/placeholder-service.jpg' as image_url")
+                Schema::hasColumn('enterprises', 'email')
+                    ? 'e.email as email'
+                    : DB::raw('NULL as email'),
+                Schema::hasColumn('services', 'image_path')
+                    ? DB::raw("CASE WHEN s.image_path IS NULL OR s.image_path = '' THEN NULL ELSE '/storage/' || s.image_path END as image_url")
+                    : DB::raw('NULL as image_url')
             ];
             
             if ($reviewsTableExists) {
                 $selectFields[] = DB::raw('COALESCE(AVG(r.rating), 0) as rating');
                 $selectFields[] = DB::raw('COUNT(r.review_id) as review_count');
-                $query->groupBy('s.service_id', 's.service_name', 's.description', 's.base_price', 'e.name', 'e.address', 'e.contact_number');
+                $groupBy = ['s.service_id', 's.service_name', 's.description', 's.base_price', 'e.name', 'e.address', 'e.contact_number'];
+                if (Schema::hasColumn('enterprises', 'email')) {
+                    $groupBy[] = 'e.email';
+                }
+                if (Schema::hasColumn('services', 'image_path')) {
+                    $groupBy[] = 's.image_path';
+                }
+                $query->groupBy($groupBy);
             } else {
                 $selectFields[] = DB::raw('0 as rating');
                 $selectFields[] = DB::raw('0 as review_count');
@@ -244,7 +262,9 @@ class ServiceMarketplaceApiController extends Controller
                     's.service_name as title',
                     's.base_price as price',
                     'e.name as provider_name',
-                    DB::raw("'/placeholder-service.jpg' as image_url")
+                    Schema::hasColumn('services', 'image_path')
+                        ? DB::raw("CASE WHEN s.image_path IS NULL OR s.image_path = '' THEN NULL ELSE '/storage/' || s.image_path END as image_url")
+                        : DB::raw('NULL as image_url')
                 ])
                 ->get();
 
@@ -252,7 +272,7 @@ class ServiceMarketplaceApiController extends Controller
             $formattedService = [
                 'service_id' => $service->service_id,
                 'title' => $service->title,
-                'description' => $service->description ?: 'Professional service with quality assurance and fast delivery. We provide high-quality printing solutions tailored to your needs.',
+                'description' => $service->description,
                 'price' => number_format($service->price, 2),
                 'provider_name' => $service->provider_name,
                 'location' => $service->location ?: 'Online',

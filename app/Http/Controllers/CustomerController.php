@@ -120,14 +120,23 @@ class CustomerController extends Controller
             ->where('order_items.purchase_order_id', $id);
 
         $hasRequiresFileUploadColumn = \Illuminate\Support\Facades\Schema::hasColumn('services', 'requires_file_upload');
+        $hasFileUploadEnabledColumn = \Illuminate\Support\Facades\Schema::hasColumn('services', 'file_upload_enabled');
 
-        $orderItems = $hasRequiresFileUploadColumn
-            ? $itemsQuery->select('order_items.*', 'services.service_name', 'services.requires_file_upload')->get()
-            : $itemsQuery->select('order_items.*', 'services.service_name')->get();
+        if ($hasRequiresFileUploadColumn && $hasFileUploadEnabledColumn) {
+            $orderItems = $itemsQuery->select('order_items.*', 'services.service_name', 'services.requires_file_upload', 'services.file_upload_enabled')->get();
+        } elseif ($hasRequiresFileUploadColumn) {
+            $orderItems = $itemsQuery->select('order_items.*', 'services.service_name', 'services.requires_file_upload')->get();
+        } else {
+            $orderItems = $itemsQuery->select('order_items.*', 'services.service_name')->get();
+        }
 
         $requiresFileUpload = $hasRequiresFileUploadColumn
             ? $orderItems->contains(fn($item) => !empty($item->requires_file_upload))
             : false;
+
+        $fileUploadEnabled = $hasFileUploadEnabledColumn
+            ? $orderItems->contains(fn($item) => !empty($item->file_upload_enabled) || !empty($item->requires_file_upload))
+            : $requiresFileUpload;
 
         // Get customizations for each item
         foreach ($orderItems as $item) {
@@ -186,7 +195,7 @@ class CustomerController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
-        return view('customer.order-details', compact('order', 'orderItems', 'statusHistory', 'transaction', 'designFiles', 'userName', 'currentStatusName', 'requiresFileUpload'));
+        return view('customer.order-details', compact('order', 'orderItems', 'statusHistory', 'transaction', 'designFiles', 'userName', 'currentStatusName', 'requiresFileUpload', 'fileUploadEnabled'));
     }
 
     public function confirmCompletion($id)
@@ -357,6 +366,34 @@ class CustomerController extends Controller
 
         if (!$order) {
             abort(404);
+        }
+
+        $hasFileUploadEnabledColumn = \Illuminate\Support\Facades\Schema::hasColumn('services', 'file_upload_enabled');
+        $hasRequiresFileUploadColumn = \Illuminate\Support\Facades\Schema::hasColumn('services', 'requires_file_upload');
+
+        if ($hasFileUploadEnabledColumn || $hasRequiresFileUploadColumn) {
+            $query = DB::table('order_items')
+                ->join('services', 'order_items.service_id', '=', 'services.service_id')
+                ->where('order_items.purchase_order_id', $orderId);
+
+            $enabledForOrder = false;
+
+            if ($hasFileUploadEnabledColumn) {
+                $enabledForOrder = $query
+                    ->where(function ($q) {
+                        $q->where('services.file_upload_enabled', true)
+                          ->orWhere('services.requires_file_upload', true);
+                    })
+                    ->exists();
+            } elseif ($hasRequiresFileUploadColumn) {
+                $enabledForOrder = $query
+                    ->where('services.requires_file_upload', true)
+                    ->exists();
+            }
+
+            if (!$enabledForOrder) {
+                return redirect()->back()->with('error', 'File uploads are not enabled for this order.');
+            }
         }
 
         $currentStatusName = DB::table('order_status_history')

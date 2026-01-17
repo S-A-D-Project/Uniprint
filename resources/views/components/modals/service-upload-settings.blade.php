@@ -1,5 +1,6 @@
 @php
     $hasRequiresFileUpload = \Illuminate\Support\Facades\Schema::hasColumn('services', 'requires_file_upload');
+    $hasUploadEnabled = \Illuminate\Support\Facades\Schema::hasColumn('services', 'file_upload_enabled');
 @endphp
 
 @if($hasRequiresFileUpload)
@@ -12,13 +13,31 @@
                     <div class="font-semibold" id="serviceUploadSettingsName">—</div>
                 </div>
 
-                <div class="flex items-center justify-between">
-                    <div>
-                        <div class="text-sm font-medium">Requires File Upload</div>
-                        <div class="text-xs text-muted-foreground">If enabled, customers must upload design files before you can proceed.</div>
+                @if($hasUploadEnabled)
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <div class="text-sm font-medium">Enable File Upload</div>
+                            <div class="text-xs text-muted-foreground">If enabled, customers can upload design files for this service.</div>
+                        </div>
+                        <x-ui.form.switch name="file_upload_enabled" id="serviceUploadSettingsEnabled" :checked="false" />
                     </div>
-                    <input type="checkbox" name="requires_file_upload" id="serviceUploadSettingsRequires" value="1" class="h-4 w-4 rounded">
-                </div>
+
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <div class="text-sm font-medium">Require File Upload</div>
+                            <div class="text-xs text-muted-foreground">If enabled, customers must upload design files before you can proceed.</div>
+                        </div>
+                        <x-ui.form.switch name="requires_file_upload" id="serviceUploadSettingsRequires" :checked="false" />
+                    </div>
+                @else
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <div class="text-sm font-medium">Requires File Upload</div>
+                            <div class="text-xs text-muted-foreground">If enabled, customers must upload design files before you can proceed.</div>
+                        </div>
+                        <x-ui.form.switch name="requires_file_upload" id="serviceUploadSettingsRequires" :checked="false" />
+                    </div>
+                @endif
             </div>
         </form>
 

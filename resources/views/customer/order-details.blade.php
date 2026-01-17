@@ -170,6 +170,12 @@
                 @endif
             </div>
             <div class="card-body">
+                @if(empty($fileUploadEnabled))
+                    <div class="alert alert-secondary mb-3">
+                        File uploads are not enabled for this order.
+                    </div>
+                @endif
+
                 @if(!empty($requiresFileUpload) && (!isset($designFiles) || $designFiles->count() === 0))
                     <div class="alert alert-warning">
                         <strong><i class="bi bi-exclamation-triangle-fill me-1"></i>Action needed:</strong>
@@ -213,21 +219,30 @@
                     <p class="text-muted mb-3">No design files uploaded yet.</p>
                 @endif
 
-                <form action="{{ route('customer.orders.upload-design', $order->purchase_order_id) }}" method="POST" enctype="multipart/form-data" class="border rounded p-3">
-                    @csrf
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">Upload a design file</label>
-                        <input type="file" name="design_file" class="form-control" required>
-                        <div class="form-text">Accepted: JPG, PNG, PDF, AI, PSD, EPS. Max 50MB.</div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">Notes (optional)</label>
-                        <textarea name="design_notes" class="form-control" rows="2" placeholder="Any notes for the shop about this file..."></textarea>
-                    </div>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-cloud-upload me-2"></i>Upload
-                    </button>
-                </form>
+                @if(!empty($fileUploadEnabled))
+                    <form action="{{ route('customer.orders.upload-design', $order->purchase_order_id) }}" method="POST" enctype="multipart/form-data" class="border rounded p-3">
+                        @csrf
+                        <div class="mb-3">
+                            <x-ui.form.file-dropzone
+                                name="design_file"
+                                id="design_file"
+                                label="Upload a design file"
+                                :required="true"
+                                :multiple="false"
+                                accept=".jpg,.jpeg,.png,.pdf,.ai,.psd,.eps"
+                                help="Accepted: JPG, PNG, PDF, AI, PSD, EPS. Max 50MB."
+                                buttonText="Choose File"
+                            />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Notes (optional)</label>
+                            <textarea name="design_notes" class="form-control" rows="2" placeholder="Any notes for the shop about this file..."></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-cloud-upload me-2"></i>Upload
+                        </button>
+                    </form>
+                @endif
             </div>
         </div>
 

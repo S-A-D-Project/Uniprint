@@ -101,7 +101,7 @@
             </div>
 
             @if(property_exists($enterprise, 'is_active') || isset($enterprise->is_active))
-                <x-ui.form.checkbox
+                <x-ui.form.switch
                     name="is_active"
                     id="is_active"
                     :checked="old('is_active', $enterprise->is_active ?? true)"

@@ -43,10 +43,28 @@
 
                 <!-- User Actions -->
                 <div class="flex items-center gap-3">
-                    <button class="relative p-2 text-gray-600 hover:text-gray-900 transition-colors">
-                        <i data-lucide="bell" class="h-5 w-5"></i>
-                        <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-                    </button>
+                    @php
+                        $unreadNotificationsCount = 0;
+                        if (session('user_id') && \Illuminate\Support\Facades\Schema::hasTable('order_notifications')) {
+                            $unreadNotificationsCount = \Illuminate\Support\Facades\DB::table('order_notifications')
+                                ->where('recipient_id', session('user_id'))
+                                ->where('is_read', false)
+                                ->count();
+                        }
+                    @endphp
+
+                    @if(session('user_id'))
+                        <a href="{{ route('customer.notifications') }}" class="relative p-2 text-gray-600 hover:text-gray-900 transition-colors" aria-label="Notifications">
+                            <i data-lucide="bell" class="h-5 w-5"></i>
+                            @if($unreadNotificationsCount > 0)
+                                <span class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 min-w-5 px-1 flex items-center justify-center">{{ $unreadNotificationsCount }}</span>
+                            @endif
+                        </a>
+                    @else
+                        <a href="{{ route('login') }}" class="relative p-2 text-gray-600 hover:text-gray-900 transition-colors" aria-label="Login for notifications">
+                            <i data-lucide="bell" class="h-5 w-5"></i>
+                        </a>
+                    @endif
                     <a href="{{ route('saved-services.index') }}" class="relative p-2 text-gray-600 hover:text-gray-900 transition-colors">
                         <i data-lucide="heart" class="h-5 w-5"></i>
                         <span class="saved-services-badge absolute -top-1 -right-1 bg-orange-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center" style="display: none;">0</span>
@@ -562,9 +580,10 @@ class ServiceMarketplace {
         return `
             <div class="service-card bg-white rounded-lg overflow-hidden cursor-pointer" onclick="viewServiceDetail('${service.service_id}')">
                 <div class="relative">
-                    <img src="${service.image_url || '/placeholder-service.jpg'}" 
-                         alt="${service.title}" 
-                         class="service-image w-full h-48 object-cover">
+                    ${service.image_url
+                        ? `<img src="${service.image_url}" alt="${service.title}" class="service-image w-full h-48 object-cover">`
+                        : `<div class="service-image w-full h-48 bg-gray-100 flex items-center justify-center"><i data-lucide="image" class="h-10 w-10 text-gray-400"></i></div>`
+                    }
                     ${service.is_featured ? '<span class="absolute top-2 left-2 bg-orange-500 text-white px-2 py-1 text-xs rounded-full font-medium">Featured</span>' : ''}
                     <button onclick="toggleFavorite(event, '${service.service_id}')" class="absolute top-2 right-2 bg-white rounded-full p-2 shadow-md hover:bg-gray-100 transition-colors">
                         <i data-lucide="heart" class="h-4 w-4 text-gray-600"></i>
@@ -579,8 +598,10 @@ class ServiceMarketplace {
                     </div>
                     <div class="flex items-center gap-2 mb-3">
                         <div class="rating-stars flex items-center">
-                            ${this.createStarRating(service.rating)}
-                            <span class="text-xs text-gray-600 ml-1">(${service.review_count})</span>
+                            ${service.review_count > 0
+                                ? `${this.createStarRating(service.rating)}<span class="text-xs text-gray-600 ml-1">(${service.review_count})</span>`
+                                : `<span class="text-xs text-gray-500">No reviews</span>`
+                            }
                         </div>
                         ${service.service_type === 'online' ? '<span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Online</span>' : ''}
                         ${service.service_type === 'delivery' ? '<span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Delivery</span>' : ''}
@@ -606,9 +627,10 @@ class ServiceMarketplace {
             <div class="service-list-item bg-white rounded-lg p-4 border border-gray-200 cursor-pointer" onclick="viewServiceDetail('${service.service_id}')">
                 <div class="flex gap-4">
                     <div class="relative flex-shrink-0">
-                        <img src="${service.image_url || '/placeholder-service.jpg'}" 
-                             alt="${service.title}" 
-                             class="w-24 h-24 rounded-lg object-cover">
+                        ${service.image_url
+                            ? `<img src="${service.image_url}" alt="${service.title}" class="w-24 h-24 rounded-lg object-cover">`
+                            : `<div class="w-24 h-24 rounded-lg bg-gray-100 flex items-center justify-center"><i data-lucide="image" class="h-6 w-6 text-gray-400"></i></div>`
+                        }
                         ${service.is_featured ? '<span class="absolute top-1 left-1 bg-orange-500 text-white px-1 py-0.5 text-xs rounded font-medium">Featured</span>' : ''}
                     </div>
                     <div class="flex-1">
@@ -623,8 +645,10 @@ class ServiceMarketplace {
                         </div>
                         <div class="flex items-center gap-3 mb-2">
                             <div class="rating-stars flex items-center">
-                                ${this.createStarRating(service.rating)}
-                                <span class="text-sm text-gray-600 ml-1">(${service.review_count})</span>
+                                ${service.review_count > 0
+                                    ? `${this.createStarRating(service.rating)}<span class="text-sm text-gray-600 ml-1">(${service.review_count})</span>`
+                                    : `<span class="text-sm text-gray-500">No reviews</span>`
+                                }
                             </div>
                             <div class="flex items-center gap-1 text-sm text-gray-500">
                                 <i data-lucide="map-pin" class="h-4 w-4"></i>
@@ -761,20 +785,24 @@ function closeServiceModal() {
     document.getElementById('service-modal').classList.add('hidden');
 }
 
-function createServiceDetailModal(service) {
-    return `
+function renderServiceModal(service) {
+    const content = document.getElementById('service-modal-content');
+    content.innerHTML = `
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div>
-                <img src="${service.image_url || '/placeholder-service.jpg'}" 
-                     alt="${service.title}" 
-                     class="w-full rounded-lg">
+                ${service.image_url
+                    ? `<img src="${service.image_url}" alt="${service.title}" class="w-full rounded-lg">`
+                    : `<div class="w-full rounded-lg bg-gray-100 flex items-center justify-center" style="min-height: 220px;"><i data-lucide="image" class="h-12 w-12 text-gray-400"></i></div>`
+                }
             </div>
             <div>
                 <h2 class="text-2xl font-bold text-gray-900 mb-2">${service.title}</h2>
                 <div class="flex items-center gap-4 mb-4">
                     <div class="rating-stars flex items-center">
-                        ${window.marketplace.createStarRating(service.rating)}
-                        <span class="text-sm text-gray-600 ml-1">(${service.review_count} reviews)</span>
+                        ${service.review_count > 0
+                            ? `${window.marketplace.createStarRating(service.rating)}<span class="text-sm text-gray-600 ml-1">(${service.review_count} reviews)</span>`
+                            : `<span class="text-sm text-gray-500">No reviews</span>`
+                        }
                     </div>
                     <div class="flex items-center gap-1 text-sm text-gray-500">
                         <i data-lucide="map-pin" class="h-4 w-4"></i>
