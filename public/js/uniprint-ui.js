@@ -16,6 +16,8 @@
 
   let modalRoot;
   let toastRoot;
+  let loadingOverlay;
+  let loadingCount = 0;
 
   function ensureRoots() {
     if (!modalRoot) {
@@ -26,6 +28,55 @@
       toastRoot = el('div', { class: 'up-toast-root', 'aria-live': 'polite', 'aria-relevant': 'additions' });
       document.body.appendChild(toastRoot);
     }
+    if (!loadingOverlay) {
+      const spinner = el('div', { class: 'up-loading-spinner' });
+      const title = el('div', { class: 'up-loading-title', text: 'Processing…' });
+      const message = el('div', { class: 'up-loading-message', text: 'Please wait' });
+      const card = el('div', { class: 'up-loading-card' }, [spinner, title, message]);
+      loadingOverlay = el('div', { class: 'up-loading-overlay', role: 'status', 'aria-live': 'polite' }, [card]);
+      loadingOverlay.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+      document.body.appendChild(loadingOverlay);
+    }
+  }
+
+  function setButtonLoading(button, loading, options = {}) {
+    if (!button) return;
+    if (loading) {
+      if (!button.dataset.upOrigHtml) button.dataset.upOrigHtml = button.innerHTML;
+      const text = options.text || 'Working…';
+      button.disabled = true;
+      button.classList.add('opacity-75', 'cursor-not-allowed');
+      button.innerHTML = `<span class="up-inline-spinner" aria-hidden="true"></span><span>${text}</span>`;
+      return;
+    }
+
+    if (button.dataset.upOrigHtml) {
+      button.innerHTML = button.dataset.upOrigHtml;
+      delete button.dataset.upOrigHtml;
+    }
+    button.disabled = false;
+    button.classList.remove('opacity-75', 'cursor-not-allowed');
+  }
+
+  function showLoading(options = {}) {
+    ensureRoots();
+    loadingCount += 1;
+    const title = loadingOverlay.querySelector('.up-loading-title');
+    const message = loadingOverlay.querySelector('.up-loading-message');
+    if (title) title.textContent = options.title || 'Processing…';
+    if (message) message.textContent = options.message || 'Please wait';
+    loadingOverlay.classList.add('up-loading-overlay--show');
+    document.documentElement.classList.add('up-no-scroll');
+  }
+
+  function hideLoading() {
+    loadingCount = Math.max(0, loadingCount - 1);
+    if (loadingCount !== 0) return;
+    if (loadingOverlay) loadingOverlay.classList.remove('up-loading-overlay--show');
+    document.documentElement.classList.remove('up-no-scroll');
   }
 
   function showModal({
@@ -182,7 +233,34 @@
 
   window.UniPrintUI = UniPrintUI;
 
+  UniPrintUI.setButtonLoading = setButtonLoading;
+  UniPrintUI.loading = {
+    show: showLoading,
+    hide: hideLoading,
+  };
+
   document.addEventListener('DOMContentLoaded', function () {
-    // reserved
+    document.addEventListener(
+      'submit',
+      function (e) {
+        const form = e.target;
+        if (!(form instanceof HTMLFormElement)) return;
+
+        if (form.hasAttribute('data-up-global-loader')) {
+          showLoading({
+            title: form.getAttribute('data-up-loader-title') || 'Processing…',
+            message: form.getAttribute('data-up-loader-message') || 'Please wait',
+          });
+        }
+
+        if (form.hasAttribute('data-up-button-loader')) {
+          const submitBtn = form.querySelector('button[type="submit"], input[type="submit"]');
+          if (submitBtn && submitBtn.tagName.toLowerCase() === 'button') {
+            setButtonLoading(submitBtn, true, { text: submitBtn.getAttribute('data-up-loading-text') || 'Working…' });
+          }
+        }
+      },
+      true
+    );
   });
 })();

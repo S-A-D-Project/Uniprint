@@ -30,8 +30,12 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         try {
+            $request->merge([
+                'username' => is_string($request->input('username')) ? trim($request->input('username')) : $request->input('username'),
+            ]);
+
             $request->validate([
-                'username' => 'required|string|max:100|regex:/^[a-zA-Z0-9_\-\.]+$/',
+                'username' => 'required|string|max:100',
                 'password' => 'required|string|min:8|max:255',
             ]);
 

@@ -108,6 +108,8 @@
     </style>
     
     <script src="https://unpkg.com/lucide@latest"></script>
+
+    <link rel="stylesheet" href="{{ asset('css/uniprint-ui.css') }}">
 </head>
 <body class="min-h-screen bg-background font-sans antialiased">
     <div class="flex min-h-screen">
@@ -303,7 +305,9 @@
             }
         });
     </script>
-    
+
+    <script src="{{ asset('js/uniprint-ui.js') }}"></script>
+
     @stack('scripts')
 </body>
 </html>

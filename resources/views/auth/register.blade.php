@@ -20,6 +20,8 @@
 
     <!-- TailwindCSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+
+    <link rel="stylesheet" href="{{ asset('css/uniprint-ui.css') }}">
     
     <!-- Custom TailwindCSS Configuration -->
     <script>
@@ -94,7 +96,7 @@
         </div>
 
         <div class="bg-card border border-border rounded-xl shadow-card-hover p-6">
-            <form method="POST" action="{{ route('register') }}">
+            <form method="POST" action="{{ route('register') }}" data-up-button-loader>
                 @csrf
                 <div class="space-y-4">
                     <div class="space-y-2">
@@ -155,7 +157,7 @@
                         @enderror
                     </div>
                     
-                    <button type="submit" class="w-full px-4 py-2 bg-primary text-primary-foreground font-medium rounded-md hover:shadow-glow transition-smooth">
+                    <button type="submit" data-up-loading-text="Creating account..." class="w-full px-4 py-2 bg-primary text-primary-foreground font-medium rounded-md hover:shadow-glow transition-smooth">
                         Create Account
                     </button>
                     
@@ -206,6 +208,8 @@
     <script>
         lucide.createIcons();
     </script>
+
+    <script src="{{ asset('js/uniprint-ui.js') }}"></script>
     <script>
         function getSelectedRoleType() {
             const checked = document.querySelector('input[name="role_type"]:checked');

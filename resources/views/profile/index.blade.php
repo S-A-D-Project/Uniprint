@@ -335,8 +335,12 @@ if (profileForm) profileForm.addEventListener('submit', async function(e) {
     
     const btn = document.getElementById('save-profile-btn');
     const originalText = btn ? btn.innerHTML : '';
-    btn.disabled = true;
-    btn.innerHTML = 'Saving...';
+    if (window.UniPrintUI && typeof UniPrintUI.setButtonLoading === 'function') {
+        UniPrintUI.setButtonLoading(btn, true, { text: 'Saving...' });
+    } else {
+        btn.disabled = true;
+        btn.innerHTML = 'Saving...';
+    }
     
     try {
         const formData = new FormData(this);
@@ -363,8 +367,12 @@ if (profileForm) profileForm.addEventListener('submit', async function(e) {
         console.error('Error:', error);
         showToast('Network error. Please try again.', 'error');
     } finally {
-        btn.disabled = false;
-        btn.innerHTML = originalText;
+        if (window.UniPrintUI && typeof UniPrintUI.setButtonLoading === 'function') {
+            UniPrintUI.setButtonLoading(btn, false);
+        } else {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
     }
 });
 
@@ -375,8 +383,12 @@ if (passwordForm) passwordForm.addEventListener('submit', async function(e) {
     
     const btn = document.getElementById('update-password-btn');
     const originalText = btn ? btn.innerHTML : '';
-    btn.disabled = true;
-    btn.innerHTML = 'Updating...';
+    if (window.UniPrintUI && typeof UniPrintUI.setButtonLoading === 'function') {
+        UniPrintUI.setButtonLoading(btn, true, { text: 'Updating...' });
+    } else {
+        btn.disabled = true;
+        btn.innerHTML = 'Updating...';
+    }
     
     try {
         const formData = new FormData(this);
@@ -404,8 +416,12 @@ if (passwordForm) passwordForm.addEventListener('submit', async function(e) {
         console.error('Error:', error);
         showToast('Network error. Please try again.', 'error');
     } finally {
-        btn.disabled = false;
-        btn.innerHTML = originalText;
+        if (window.UniPrintUI && typeof UniPrintUI.setButtonLoading === 'function') {
+            UniPrintUI.setButtonLoading(btn, false);
+        } else {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
     }
 });
 

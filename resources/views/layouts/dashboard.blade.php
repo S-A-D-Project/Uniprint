@@ -105,6 +105,8 @@
     
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
+
+    <link rel="stylesheet" href="{{ asset('css/uniprint-ui.css') }}">
     
     @stack('styles')
 </head>
@@ -133,6 +135,8 @@
     <script>
         lucide.createIcons();
     </script>
+
+    <script src="{{ asset('js/uniprint-ui.js') }}"></script>
 
     @stack('scripts')
 </body>

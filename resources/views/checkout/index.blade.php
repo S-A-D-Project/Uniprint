@@ -13,7 +13,7 @@
     <p class="text-gray-600 text-lg">Complete your order and choose payment method</p>
 </div>
 
-<form id="checkout-form" class="space-y-8">
+<form id="checkout-form" class="space-y-8" data-up-global-loader data-up-loader-title="Placing your order…" data-up-loader-message="Processing checkout. Please wait.">
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <!-- Checkout Form -->
         <div class="lg:col-span-2 space-y-6">
@@ -532,6 +532,10 @@ document.getElementById('checkout-form').addEventListener('submit', async functi
     // Show loading state
     btn.disabled = true;
     btn.innerHTML = '<div class="flex items-center gap-2"><i data-lucide="loader-2" class="h-5 w-5 animate-spin"></i><span>Processing Order...</span></div>';
+
+    if (window.UniPrintUI && UniPrintUI.loading && typeof UniPrintUI.loading.show === 'function') {
+        UniPrintUI.loading.show({ title: 'Placing your order…', message: 'Processing checkout. Please wait.' });
+    }
     
     try {
         const formData = new FormData(this);
@@ -570,6 +574,10 @@ document.getElementById('checkout-form').addEventListener('submit', async functi
     } catch (error) {
         console.error('Checkout error:', error);
         alert('Error: ' + error.message);
+
+        if (window.UniPrintUI && UniPrintUI.loading && typeof UniPrintUI.loading.hide === 'function') {
+            UniPrintUI.loading.hide();
+        }
         
         // Reset button
         btn.disabled = false;
