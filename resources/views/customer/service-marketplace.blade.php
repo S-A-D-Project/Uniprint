@@ -54,12 +54,12 @@
                     @endphp
 
                     @if(session('user_id'))
-                        <a href="{{ route('customer.notifications') }}" class="relative p-2 text-gray-600 hover:text-gray-900 transition-colors" aria-label="Notifications">
+                        <button type="button" onclick="window.dispatchEvent(new Event('open-notifications'))" class="relative p-2 text-gray-600 hover:text-gray-900 transition-colors" aria-label="Notifications">
                             <i data-lucide="bell" class="h-5 w-5"></i>
                             @if($unreadNotificationsCount > 0)
                                 <span class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 min-w-5 px-1 flex items-center justify-center">{{ $unreadNotificationsCount }}</span>
                             @endif
-                        </a>
+                        </button>
                     @else
                         <a href="{{ route('login') }}" class="relative p-2 text-gray-600 hover:text-gray-900 transition-colors" aria-label="Login for notifications">
                             <i data-lucide="bell" class="h-5 w-5"></i>

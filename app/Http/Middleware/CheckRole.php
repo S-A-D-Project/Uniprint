@@ -26,7 +26,12 @@ class CheckRole
             ->where('roles.user_id', $userId)
             ->first();
 
-        if (!$userRole || $userRole->user_role_type !== $role) {
+        $allowedRoles = array_values(array_filter(array_map('trim', preg_split('/[|,]/', $role) ?: [])));
+        if (!$allowedRoles) {
+            $allowedRoles = [$role];
+        }
+
+        if (!$userRole || !in_array($userRole->user_role_type, $allowedRoles, true)) {
             abort(403, 'Unauthorized action.');
         }
 

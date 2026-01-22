@@ -202,7 +202,10 @@ $breadcrumbs = [
                         </td>
                         <td class="p-4">
                             <div class="flex items-center gap-2">
-                                <a href="{{ route('admin.enterprises.details', $enterprise->enterprise_id) }}" class="p-2 hover:bg-secondary rounded-md transition-colors" title="View Details">
+                                <a href="{{ route('admin.enterprises.details', $enterprise->enterprise_id) }}"
+                                   class="p-2 hover:bg-secondary rounded-md transition-colors js-enterprise-details"
+                                   title="View Details"
+                                   data-enterprise-details-url="{{ route('admin.enterprises.details', $enterprise->enterprise_id) }}">
                                     <i data-lucide="eye" class="h-4 w-4"></i>
                                 </a>
                                 <a href="{{ route('admin.services', ['enterprise_id' => $enterprise->enterprise_id]) }}" class="p-2 hover:bg-secondary rounded-md transition-colors" title="Manage Services">
@@ -281,10 +284,116 @@ $breadcrumbs = [
     </div>
 </div>
 @endif
+
+<x-ui.modal id="enterpriseDetailsModal" title="Enterprise Details" size="xl" scrollable>
+    <div id="enterpriseDetailsModalBody" class="min-h-[200px]"></div>
+</x-ui.modal>
 @endsection
 
 @push('scripts')
 <script>
+function openEnterpriseDetailsModal(url) {
+    const modalEl = document.getElementById('enterpriseDetailsModal');
+    const bodyEl = document.getElementById('enterpriseDetailsModalBody');
+    if (!modalEl || !bodyEl) return;
+
+    modalEl.dataset.currentDetailsUrl = url;
+    bodyEl.innerHTML = '<div class="p-4 text-muted">Loading...</div>';
+
+    const modal = new bootstrap.Modal(modalEl);
+    modal.show();
+
+    fetch(url, {
+        method: 'GET',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'text/html'
+        }
+    })
+    .then(async (res) => {
+        if (!res.ok) throw new Error('Failed to load');
+        return await res.text();
+    })
+    .then((html) => {
+        bodyEl.innerHTML = html || '<div class="p-4 text-muted">No content</div>';
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+    })
+    .catch((err) => {
+        console.error(err);
+        bodyEl.innerHTML = '<div class="p-4 text-danger">Failed to load enterprise details.</div>';
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.js-enterprise-details').forEach((a) => {
+        a.addEventListener('click', function (e) {
+            e.preventDefault();
+            const url = a.getAttribute('data-enterprise-details-url') || a.getAttribute('href');
+            if (!url) return;
+            openEnterpriseDetailsModal(url);
+        });
+    });
+
+    const modalEl = document.getElementById('enterpriseDetailsModal');
+    const bodyEl = document.getElementById('enterpriseDetailsModalBody');
+    if (!modalEl || !bodyEl) return;
+
+    bodyEl.addEventListener('click', function (e) {
+        const link = e.target.closest('a');
+        if (!link) return;
+
+        const href = link.getAttribute('href');
+        if (href && href === `{{ route('admin.enterprises') }}`) {
+            e.preventDefault();
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            if (modal) modal.hide();
+        }
+    });
+
+    bodyEl.addEventListener('submit', async function (e) {
+        const form = e.target;
+        if (!(form instanceof HTMLFormElement)) return;
+
+        e.preventDefault();
+
+        const url = form.getAttribute('action');
+        if (!url) return;
+
+        try {
+            const res = await fetch(url, {
+                method: (form.getAttribute('method') || 'POST').toUpperCase(),
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                },
+                body: new FormData(form)
+            });
+
+            const data = await res.json().catch(() => null);
+            if (!res.ok || !data || data.success !== true) {
+                throw new Error(data?.message || 'Request failed');
+            }
+
+            if (window.UniPrintUI && typeof window.UniPrintUI.toast === 'function') {
+                window.UniPrintUI.toast(data.message || 'Updated.', { variant: 'success' });
+            }
+
+            const currentUrl = modalEl.dataset.currentDetailsUrl;
+            if (currentUrl) {
+                openEnterpriseDetailsModal(currentUrl);
+            }
+        } catch (err) {
+            console.error(err);
+            if (window.UniPrintUI && typeof window.UniPrintUI.toast === 'function') {
+                window.UniPrintUI.toast('Failed to update enterprise.', { variant: 'danger' });
+            }
+        }
+    });
+});
+
 // Enterprise management functionality
 class EnterpriseManager {
     constructor() {

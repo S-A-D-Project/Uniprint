@@ -344,6 +344,15 @@
                         <i data-lucide="bar-chart-3" class="h-5 w-5"></i>
                         <span>Reports</span>
                     </a>
+
+                    @if (\Illuminate\Support\Facades\Route::has('admin.audit-logs'))
+                        <a href="{{ route('admin.audit-logs') }}" 
+                           class="nav-link {{ request()->routeIs('admin.audit-logs') ? 'active' : '' }}"
+                           aria-label="Audit Logs">
+                            <i data-lucide="clipboard-list" class="h-5 w-5"></i>
+                            <span>Audit Logs</span>
+                        </a>
+                    @endif
                     
                     <div class="pt-4 mt-4 border-t border-sidebar-hover">
                         <p class="px-4 mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">

@@ -79,24 +79,11 @@ class CustomerDashboardController extends Controller
             
             Log::info('Saved services loaded', ['user_id' => $userId, 'count' => $savedServices->count()]);
             
-            // Get total spending
-            $totalSpending = DB::table('customer_orders')
-                ->where('customer_id', $userId)
-                ->whereIn('status_id', function($query) {
-                    $query->select('status_id')
-                        ->from('statuses')
-                        ->whereIn('status_name', ['Delivered', 'Ready for Pickup']);
-                })
-                ->sum('total');
-            
-            Log::info('Total spending calculated', ['user_id' => $userId, 'total_spending' => $totalSpending]);
-            
             return view('customer.dashboard', compact(
                 'user',
                 'recentOrders',
                 'orderStats',
-                'savedServices',
-                'totalSpending'
+                'savedServices'
             ));
             
         } catch (\Illuminate\Database\QueryException $e) {

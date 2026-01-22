@@ -120,14 +120,88 @@
                             ->count()
                         : 0;
                 @endphp
-                <a href="{{ route('customer.notifications') }}" class="inline-flex items-center justify-center h-10 w-10 rounded-md hover:bg-accent hover:text-accent-foreground transition-smooth relative" aria-label="Notifications">
-                    <i data-lucide="bell" class="h-5 w-5"></i>
-                    @if($unreadNotificationsCount > 0)
-                        <span class="absolute -top-1 -right-1 bg-destructive text-white text-xs font-bold rounded-full h-4 min-w-4 px-1 flex items-center justify-center">
-                            {{ $unreadNotificationsCount > 9 ? '9+' : $unreadNotificationsCount }}
-                        </span>
-                    @endif
-                </a>
+                <div x-data="notificationsModal()" class="relative">
+                    <button type="button"
+                            @click="open()"
+                            class="inline-flex items-center justify-center h-10 w-10 rounded-md hover:bg-accent hover:text-accent-foreground transition-smooth relative"
+                            aria-label="Notifications"
+                            data-notifications-url="{{ route('customer.notifications') }}"
+                            data-notification-read-url-template="{{ route('customer.notifications.read', ['id' => '___ID___']) }}">
+                        <i data-lucide="bell" class="h-5 w-5"></i>
+                        @if($unreadNotificationsCount > 0)
+                            <span class="absolute -top-1 -right-1 bg-destructive text-white text-xs font-bold rounded-full h-4 min-w-4 px-1 flex items-center justify-center"
+                                  x-ref="badge">
+                                {{ $unreadNotificationsCount > 9 ? '9+' : $unreadNotificationsCount }}
+                            </span>
+                        @endif
+                    </button>
+
+                    <div x-show="isOpen" x-transition.opacity
+                         class="fixed inset-0 z-50"
+                         style="display: none;">
+                        <div class="absolute inset-0 bg-black/40" @click="close()"></div>
+
+                        <div class="absolute right-4 top-20 w-[92vw] max-w-lg bg-popover border border-border rounded-xl shadow-card-hover overflow-hidden">
+                            <div class="px-4 py-3 border-b border-border flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                    <i data-lucide="bell" class="h-5 w-5 text-muted-foreground"></i>
+                                    <h3 class="text-sm font-semibold">Notifications</h3>
+                                </div>
+                                <button type="button" class="p-2 rounded-md hover:bg-accent" @click="close()" aria-label="Close notifications">
+                                    <i data-lucide="x" class="h-4 w-4"></i>
+                                </button>
+                            </div>
+
+                            <div class="max-h-[70vh] overflow-auto">
+                                <template x-if="loading">
+                                    <div class="p-6 text-sm text-muted-foreground">Loading...</div>
+                                </template>
+
+                                <template x-if="!loading && items.length === 0">
+                                    <div class="p-8 text-center">
+                                        <i data-lucide="bell-off" class="h-12 w-12 mx-auto mb-3 text-muted-foreground"></i>
+                                        <div class="text-sm font-semibold">No notifications</div>
+                                        <div class="text-xs text-muted-foreground mt-1">You're all caught up.</div>
+                                    </div>
+                                </template>
+
+                                <template x-for="item in items" :key="item.notification_id">
+                                    <div class="p-4 border-b border-border flex gap-3">
+                                        <div class="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
+                                             :class="iconBg(item.notification_type)">
+                                            <i :data-lucide="iconName(item.notification_type)" class="h-5 w-5" :class="iconColor(item.notification_type)"></i>
+                                        </div>
+
+                                        <div class="flex-1 min-w-0">
+                                            <div class="flex items-start justify-between gap-3">
+                                                <div class="min-w-0">
+                                                    <div class="flex items-center gap-2">
+                                                        <div class="text-sm font-semibold truncate" x-text="item.title"></div>
+                                                        <span class="inline-block w-2 h-2 bg-primary rounded-full" x-show="!item.is_read"></span>
+                                                    </div>
+                                                    <div class="text-xs text-muted-foreground mt-1" x-text="item.message"></div>
+                                                    <div class="text-[11px] text-muted-foreground mt-2" x-text="formatTime(item.created_at)"></div>
+                                                </div>
+
+                                                <button type="button"
+                                                        class="px-3 py-1 text-xs border border-input rounded-md hover:bg-secondary"
+                                                        x-show="!item.is_read"
+                                                        @click="markRead(item)">
+                                                    Mark Read
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+
+                            <div class="px-4 py-3 border-t border-border flex items-center justify-between">
+                                <a href="{{ route('customer.notifications') }}" class="text-xs text-muted-foreground hover:text-foreground transition-smooth">View all</a>
+                                <button type="button" class="text-xs text-muted-foreground hover:text-foreground transition-smooth" @click="refresh()">Refresh</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
                 <!-- Profile Icon with Avatar -->
                 <div class="relative" x-data="{ open: false }">
@@ -202,4 +276,126 @@
         </div>
     </div>
 </header>
+
+<script>
+    function notificationsModal() {
+        return {
+            isOpen: false,
+            loading: false,
+            items: [],
+            unreadCount: null,
+            init() {
+                window.addEventListener('open-notifications', () => {
+                    this.open();
+                });
+            },
+            open() {
+                this.isOpen = true;
+                this.refresh();
+                this.$nextTick(() => {
+                    if (typeof lucide !== 'undefined') {
+                        lucide.createIcons();
+                    }
+                });
+            },
+            close() {
+                this.isOpen = false;
+            },
+            notificationsUrl() {
+                return this.$el.querySelector('[data-notifications-url]')?.getAttribute('data-notifications-url');
+            },
+            readUrl(notificationId) {
+                const tpl = this.$el.querySelector('[data-notification-read-url-template]')?.getAttribute('data-notification-read-url-template');
+                return tpl ? tpl.replace('___ID___', notificationId) : null;
+            },
+            async refresh() {
+                const url = this.notificationsUrl();
+                if (!url) return;
+                this.loading = true;
+                try {
+                    const res = await fetch(url, {
+                        headers: {
+                            'Accept': 'application/json'
+                        }
+                    });
+                    const data = await res.json();
+                    if (data && data.success) {
+                        this.items = Array.isArray(data.notifications) ? data.notifications : [];
+                        this.unreadCount = typeof data.unread_count === 'number' ? data.unread_count : null;
+                        this.updateBadge();
+                    }
+                } catch (e) {
+                } finally {
+                    this.loading = false;
+                    this.$nextTick(() => {
+                        if (typeof lucide !== 'undefined') {
+                            lucide.createIcons();
+                        }
+                    });
+                }
+            },
+            async markRead(item) {
+                const url = this.readUrl(item.notification_id);
+                if (!url) return;
+                try {
+                    const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+                    const res = await fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json',
+                            ...(token ? { 'X-CSRF-TOKEN': token } : {})
+                        },
+                        body: JSON.stringify({})
+                    });
+                    const data = await res.json();
+                    if (data && data.success) {
+                        item.is_read = true;
+                        if (typeof this.unreadCount === 'number') {
+                            this.unreadCount = Math.max(0, this.unreadCount - 1);
+                        }
+                        this.updateBadge();
+                        this.$nextTick(() => {
+                            if (typeof lucide !== 'undefined') {
+                                lucide.createIcons();
+                            }
+                        });
+                    }
+                } catch (e) {
+                }
+            },
+            updateBadge() {
+                const el = this.$refs.badge;
+                if (!el) return;
+                if (typeof this.unreadCount !== 'number') return;
+                if (this.unreadCount <= 0) {
+                    el.remove();
+                    return;
+                }
+                el.textContent = this.unreadCount > 9 ? '9+' : String(this.unreadCount);
+            },
+            iconName(type) {
+                if (type === 'status_change') return 'bell';
+                if (type === 'file_upload') return 'file';
+                return 'message-square';
+            },
+            iconBg(type) {
+                if (type === 'status_change') return 'bg-primary/10';
+                if (type === 'file_upload') return 'bg-success/10';
+                return 'bg-accent/10';
+            },
+            iconColor(type) {
+                if (type === 'status_change') return 'text-primary';
+                if (type === 'file_upload') return 'text-success';
+                return 'text-accent';
+            },
+            formatTime(ts) {
+                if (!ts) return '';
+                const d = new Date(ts);
+                if (Number.isNaN(d.getTime())) return String(ts);
+                return d.toLocaleString();
+            }
+        };
+    }
+</script>
 

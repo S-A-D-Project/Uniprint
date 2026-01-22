@@ -12,10 +12,6 @@
                     <h1 class="text-4xl font-bold mb-2">Welcome back, {{ $user->name }}!</h1>
                     <p class="text-white/80">Your printing dashboard - manage orders and explore services</p>
                 </div>
-                <div class="text-right">
-                    <p class="text-sm text-white/70">Total Spending</p>
-                    <p class="text-3xl font-bold">₱{{ number_format($totalSpending, 2) }}</p>
-                </div>
             </div>
         </div>
     </div>

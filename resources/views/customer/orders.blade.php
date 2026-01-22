@@ -16,6 +16,28 @@ use Illuminate\Support\Facades\DB;
     <p class="text-gray-600 text-lg">Track and manage your orders</p>
 </div>
 
+@php
+    $activeTab = $tab ?? 'all';
+    $tabLinks = [
+        'all' => ['label' => 'All', 'url' => route('customer.orders', ['tab' => 'all'])],
+        'to_confirm' => ['label' => 'To Confirm', 'url' => route('customer.orders', ['tab' => 'to_confirm'])],
+        'processing' => ['label' => 'Processing', 'url' => route('customer.orders', ['tab' => 'processing'])],
+        'final_process' => ['label' => 'Final Process', 'url' => route('customer.orders', ['tab' => 'final_process'])],
+        'completed' => ['label' => 'Completed', 'url' => route('customer.orders', ['tab' => 'completed'])],
+    ];
+@endphp
+
+<div class="mb-6">
+    <div class="inline-flex flex-wrap gap-2 bg-white p-2 rounded-lg shadow-sm">
+        @foreach($tabLinks as $key => $tabItem)
+            <a href="{{ $tabItem['url'] }}"
+               class="px-4 py-2 rounded-md text-sm font-medium transition-colors {{ $activeTab === $key ? 'bg-primary text-white' : 'text-gray-700 hover:bg-gray-100' }}">
+                {{ $tabItem['label'] }}
+            </a>
+        @endforeach
+    </div>
+</div>
+
     <!-- Order Statistics -->
     @php
         $orderStats = [
@@ -190,7 +212,7 @@ use Illuminate\Support\Facades\DB;
                         </div>
 
                         <a href="{{ route('customer.order.details', $order->purchase_order_id) }}" 
-                           class="customer-button-primary w-full text-center">
+                           class="customer-button-primary w-full text-center js-customer-order-details">
                             <i data-lucide="eye" class="h-4 w-4 mr-2"></i>View Details
                         </a>
 
@@ -226,6 +248,10 @@ use Illuminate\Support\Facades\DB;
     </div>
     @endif
 </div>
+
+<x-ui.modal id="customerOrderDetailsModal" title="Order Details" size="xl" scrollable>
+    <div id="customerOrderDetailsModalBody" class="min-h-[200px]"></div>
+</x-ui.modal>
 
 <!-- Chat Modal -->
 <div id="chatModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 hidden">
@@ -300,6 +326,54 @@ use Illuminate\Support\Facades\DB;
 
 @push('scripts')
 <script>
+function openCustomerOrderDetailsModal(url) {
+    const modalEl = document.getElementById('customerOrderDetailsModal');
+    const bodyEl = document.getElementById('customerOrderDetailsModalBody');
+    if (!modalEl || !bodyEl) {
+        window.location.href = url;
+        return;
+    }
+
+    bodyEl.innerHTML = '<div class="py-5 text-center text-muted">Loading…</div>';
+
+    let bsModal = window.modal_customerOrderDetailsModal;
+    if (!bsModal && typeof bootstrap !== 'undefined') {
+        bsModal = new bootstrap.Modal(modalEl);
+        window.modal_customerOrderDetailsModal = bsModal;
+    }
+
+    if (bsModal) {
+        bsModal.show();
+    }
+
+    fetch(url, {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'text/html'
+        }
+    })
+        .then((res) => {
+            if (!res.ok) throw new Error('Failed to load order details');
+            return res.text();
+        })
+        .then((html) => {
+            bodyEl.innerHTML = html;
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+        })
+        .catch((err) => {
+            bodyEl.innerHTML = `<div class="alert alert-danger mb-0">${escapeHtml(err.message || 'Failed to load order details')}</div>`;
+        });
+}
+
+document.addEventListener('click', function (e) {
+    const link = e.target.closest('a.js-customer-order-details');
+    if (!link) return;
+    e.preventDefault();
+    openCustomerOrderDetailsModal(link.getAttribute('href'));
+});
+
 // Chat functionality variables
 let currentConversationId = null;
 let currentBusinessId = null;

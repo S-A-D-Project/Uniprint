@@ -66,14 +66,19 @@ class ProfileController extends Controller
 
         try {
             // Get order statistics
-            $orderStats = DB::table('customer_orders')
+            $totalOrders = DB::table('customer_orders')
                 ->where('customer_id', $userId)
-                ->selectRaw('
-                    COUNT(*) as total_orders,
-                    SUM(total) as total_spent,
-                    COUNT(CASE WHEN created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) THEN 1 END) as recent_orders
-                ')
-                ->first();
+                ->count();
+
+            $recentOrdersCount = DB::table('customer_orders')
+                ->where('customer_id', $userId)
+                ->where('created_at', '>=', now()->subDays(30))
+                ->count();
+
+            $orderStats = (object) [
+                'total_orders' => $totalOrders,
+                'recent_orders' => $recentOrdersCount,
+            ];
         } catch (\Exception $e) {
             Log::error('Profile View Error (orderStats)', [
                 'user_id' => $userId,

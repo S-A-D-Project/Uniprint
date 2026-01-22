@@ -89,7 +89,12 @@ $breadcrumbs = [
                     </td>
                     <td>
                         <div class="flex items-center gap-2">
-                            <x-admin.button size="sm" variant="ghost" icon="eye" href="{{ route('admin.users.details', $user->user_id) }}" />
+                            <x-admin.button size="sm"
+                                           variant="ghost"
+                                           icon="eye"
+                                           href="{{ route('admin.users.details', $user->user_id) }}"
+                                           class="js-user-details"
+                                           data-user-details-url="{{ route('admin.users.details', $user->user_id) }}" />
                         </div>
                     </td>
                 </tr>
@@ -115,10 +120,116 @@ $breadcrumbs = [
     </x-slot:customFooter>
     @endif
 </x-admin.card>
+
+<x-ui.modal id="userDetailsModal" title="User Details" size="xl" scrollable>
+    <div id="userDetailsModalBody" class="min-h-[200px]"></div>
+</x-ui.modal>
 @endsection
 
 @push('scripts')
 <script>
     lucide.createIcons();
+
+    function openUserDetailsModal(url) {
+        const modalEl = document.getElementById('userDetailsModal');
+        const bodyEl = document.getElementById('userDetailsModalBody');
+        if (!modalEl || !bodyEl) return;
+
+        modalEl.dataset.currentDetailsUrl = url;
+        bodyEl.innerHTML = '<div class="p-4 text-muted">Loading...</div>';
+
+        const modal = new bootstrap.Modal(modalEl);
+        modal.show();
+
+        fetch(url, {
+            method: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'text/html'
+            }
+        })
+        .then(async (res) => {
+            if (!res.ok) throw new Error('Failed to load');
+            return await res.text();
+        })
+        .then((html) => {
+            bodyEl.innerHTML = html || '<div class="p-4 text-muted">No content</div>';
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+        })
+        .catch((err) => {
+            console.error(err);
+            bodyEl.innerHTML = '<div class="p-4 text-danger">Failed to load user details.</div>';
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.js-user-details').forEach((a) => {
+            a.addEventListener('click', function (e) {
+                e.preventDefault();
+                const url = a.getAttribute('data-user-details-url') || a.getAttribute('href');
+                if (!url) return;
+                openUserDetailsModal(url);
+            });
+        });
+
+        const modalEl = document.getElementById('userDetailsModal');
+        const bodyEl = document.getElementById('userDetailsModalBody');
+        if (!modalEl || !bodyEl) return;
+
+        bodyEl.addEventListener('click', function (e) {
+            const link = e.target.closest('a');
+            if (!link) return;
+
+            const href = link.getAttribute('href');
+            if (href && href === `{{ route('admin.users') }}`) {
+                e.preventDefault();
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                if (modal) modal.hide();
+            }
+        });
+
+        bodyEl.addEventListener('submit', async function (e) {
+            const form = e.target;
+            if (!(form instanceof HTMLFormElement)) return;
+
+            e.preventDefault();
+
+            const url = form.getAttribute('action');
+            if (!url) return;
+
+            try {
+                const res = await fetch(url, {
+                    method: (form.getAttribute('method') || 'POST').toUpperCase(),
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    },
+                    body: new FormData(form)
+                });
+
+                const data = await res.json().catch(() => null);
+                if (!res.ok || !data || data.success !== true) {
+                    throw new Error(data?.message || 'Request failed');
+                }
+
+                if (window.UniPrintUI && typeof window.UniPrintUI.toast === 'function') {
+                    window.UniPrintUI.toast(data.message || 'Updated.', { variant: 'success' });
+                }
+
+                const currentUrl = modalEl.dataset.currentDetailsUrl;
+                if (currentUrl) {
+                    openUserDetailsModal(currentUrl);
+                }
+            } catch (err) {
+                console.error(err);
+                if (window.UniPrintUI && typeof window.UniPrintUI.toast === 'function') {
+                    window.UniPrintUI.toast('Failed to update user.', { variant: 'danger' });
+                }
+            }
+        });
+    });
 </script>
 @endpush

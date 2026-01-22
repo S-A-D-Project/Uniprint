@@ -17,7 +17,44 @@ class BusinessController extends Controller
     {
         $userId = session('user_id');
 
+        $role = null;
+        try {
+            $role = DB::table('roles')
+                ->join('role_types', 'roles.role_type_id', '=', 'role_types.role_type_id')
+                ->where('roles.user_id', $userId)
+                ->select('role_types.user_role_type')
+                ->first();
+        } catch (\Throwable $e) {
+            $role = null;
+        }
+
+        $roleType = $role?->user_role_type;
+
         $enterprise = null;
+
+        if ($roleType === 'admin') {
+            $enterpriseId = request()->query('enterprise_id');
+            if ($enterpriseId) {
+                $enterprise = DB::table('enterprises')->where('enterprise_id', $enterpriseId)->select('enterprises.*')->first();
+            }
+
+            if (! $enterprise) {
+                $serviceId = request()->route('id');
+                if ($serviceId) {
+                    $enterprise = DB::table('services')
+                        ->join('enterprises', 'services.enterprise_id', '=', 'enterprises.enterprise_id')
+                        ->where('services.service_id', $serviceId)
+                        ->select('enterprises.*')
+                        ->first();
+                }
+            }
+
+            if (! $enterprise) {
+                abort(400, 'Enterprise context is required.');
+            }
+
+            return $enterprise;
+        }
 
         if (Schema::hasColumn('enterprises', 'owner_user_id')) {
             $enterprise = DB::table('enterprises')
@@ -616,12 +653,18 @@ class BusinessController extends Controller
         return view('business.services.index', compact('services', 'enterprise', 'userName'));
     }
 
-    public function createService()
+    public function createService(Request $request)
     {
         $userName = session('user_name');
         $enterprise = $this->getUserEnterprise();
 
-        return view('business.services.create', compact('enterprise', 'userName'));
+        $view = view('business.services.create', compact('enterprise', 'userName'));
+        if ($request->ajax()) {
+            $sections = $view->renderSections();
+            return $sections['content'] ?? $view->render();
+        }
+
+        return $view;
     }
 
     public function storeService(Request $request)
@@ -712,10 +755,18 @@ class BusinessController extends Controller
         // Log audit
         $this->logAudit('create', 'service', $serviceId, "Created service: {$request->service_name}", null, $request->all());
 
+        if ($request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Service created successfully',
+                'service_id' => (string) $serviceId,
+            ]);
+        }
+
         return redirect()->route('business.services.index')->with('success', 'Service created successfully');
     }
 
-    public function editService($id)
+    public function editService(Request $request, $id)
     {
         $userName = session('user_name');
         $enterprise = $this->getUserEnterprise();
@@ -729,7 +780,13 @@ class BusinessController extends Controller
             abort(404);
         }
 
-        return view('business.services.edit', compact('service', 'enterprise', 'userName'));
+        $view = view('business.services.edit', compact('service', 'enterprise', 'userName'));
+        if ($request->ajax()) {
+            $sections = $view->renderSections();
+            return $sections['content'] ?? $view->render();
+        }
+
+        return $view;
     }
 
     public function updateService(Request $request, $id)
@@ -823,6 +880,14 @@ class BusinessController extends Controller
             (array)$oldService, 
             $request->all()
         );
+
+        if ($request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Service updated successfully',
+                'service_id' => (string) $id,
+            ]);
+        }
 
         return redirect()->route('business.services.index')->with('success', 'Service updated successfully');
     }
@@ -1230,12 +1295,18 @@ class BusinessController extends Controller
         return view('business.pricing.index', compact('rules', 'enterprise', 'userName'));
     }
 
-    public function createPricingRule()
+    public function createPricingRule(Request $request)
     {
         $userName = session('user_name');
         $enterprise = $this->getUserEnterprise();
 
-        return view('business.pricing.create', compact('enterprise', 'userName'));
+        $view = view('business.pricing.create', compact('enterprise', 'userName'));
+        if ($request->ajax()) {
+            $sections = $view->renderSections();
+            return $sections['content'] ?? $view->render();
+        }
+
+        return $view;
     }
 
     public function storePricingRule(Request $request)
@@ -1276,10 +1347,18 @@ class BusinessController extends Controller
         // Log audit
         $this->logAudit('create', 'pricing_rule', $ruleId, "Created pricing rule: {$request->rule_name}", null, $request->all());
 
+        if ($request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Pricing rule created successfully',
+                'rule_id' => (string) $ruleId,
+            ]);
+        }
+
         return redirect()->route('business.pricing.index')->with('success', 'Pricing rule created successfully');
     }
 
-    public function editPricingRule($id)
+    public function editPricingRule(Request $request, $id)
     {
         $userName = session('user_name');
         $enterprise = $this->getUserEnterprise();
@@ -1293,7 +1372,13 @@ class BusinessController extends Controller
             abort(404);
         }
 
-        return view('business.pricing.edit', compact('rule', 'enterprise', 'userName'));
+        $view = view('business.pricing.edit', compact('rule', 'enterprise', 'userName'));
+        if ($request->ajax()) {
+            $sections = $view->renderSections();
+            return $sections['content'] ?? $view->render();
+        }
+
+        return $view;
     }
 
     public function updatePricingRule(Request $request, $id)
@@ -1337,6 +1422,14 @@ class BusinessController extends Controller
 
         // Log audit
         $this->logAudit('update', 'pricing_rule', $id, "Updated pricing rule: {$request->rule_name}", (array)$oldRule, $request->all());
+
+        if ($request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Pricing rule updated successfully',
+                'rule_id' => (string) $id,
+            ]);
+        }
 
         return redirect()->route('business.pricing.index')->with('success', 'Pricing rule updated successfully');
     }

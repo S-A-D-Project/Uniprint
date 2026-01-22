@@ -71,16 +71,29 @@ class CustomerController extends Controller
         return view('customer.dashboard', compact('stats', 'recent_orders', 'userName'));
     }
 
-    public function orders()
+    public function orders(Request $request)
     {
         $userId = session('user_id');
         $userName = session('user_name');
+
+        $tab = (string) $request->query('tab', 'all');
+        $tabToStatuses = [
+            'all' => [],
+            'to_confirm' => ['Pending', 'Confirmed'],
+            'processing' => ['Processing', 'In Progress'],
+            'final_process' => ['Ready for Pickup', 'Shipped', 'Delivered'],
+            'completed' => ['Completed'],
+        ];
+
+        if (!array_key_exists($tab, $tabToStatuses)) {
+            $tab = 'all';
+        }
 
         $latestStatusTimes = DB::table('order_status_history')
             ->select('purchase_order_id', DB::raw('MAX(timestamp) as latest_time'))
             ->groupBy('purchase_order_id');
 
-        $orders = DB::table('customer_orders')
+        $ordersQuery = DB::table('customer_orders')
             ->join('enterprises', 'customer_orders.enterprise_id', '=', 'enterprises.enterprise_id')
             ->leftJoinSub($latestStatusTimes, 'latest_status_times', function ($join) {
                 $join->on('customer_orders.purchase_order_id', '=', 'latest_status_times.purchase_order_id');
@@ -92,13 +105,19 @@ class CustomerController extends Controller
             ->leftJoin('statuses', 'osh.status_id', '=', 'statuses.status_id')
             ->where('customer_orders.customer_id', $userId)
             ->select('customer_orders.*', 'enterprises.name as enterprise_name', 'statuses.status_name')
-            ->orderBy('customer_orders.created_at', 'desc')
-            ->paginate(10);
+            ->orderBy('customer_orders.created_at', 'desc');
 
-        return view('customer.orders', compact('orders', 'userName'));
+        $statusFilter = $tabToStatuses[$tab] ?? [];
+        if (!empty($statusFilter)) {
+            $ordersQuery->whereIn('statuses.status_name', $statusFilter);
+        }
+
+        $orders = $ordersQuery->paginate(10)->withQueryString();
+
+        return view('customer.orders', compact('orders', 'userName', 'tab'));
     }
 
-    public function orderDetails($id)
+    public function orderDetails(Request $request, $id)
     {
         $userId = session('user_id');
         $userName = session('user_name');
@@ -195,7 +214,14 @@ class CustomerController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
-        return view('customer.order-details', compact('order', 'orderItems', 'statusHistory', 'transaction', 'designFiles', 'userName', 'currentStatusName', 'requiresFileUpload', 'fileUploadEnabled'));
+        $view = view('customer.order-details', compact('order', 'orderItems', 'statusHistory', 'transaction', 'designFiles', 'userName', 'currentStatusName', 'requiresFileUpload', 'fileUploadEnabled'));
+
+        if ($request->ajax()) {
+            $sections = $view->renderSections();
+            return $sections['content'] ?? $view->render();
+        }
+
+        return $view;
     }
 
     public function confirmCompletion($id)
@@ -498,19 +524,34 @@ class CustomerController extends Controller
         $userId = session('user_id');
         $userName = session('user_name');
 
-        $notifications = DB::table('order_notifications')
+        $query = DB::table('order_notifications')
             ->where('recipient_id', $userId)
-            ->orderBy('created_at', 'desc')
-            ->paginate(20);
+            ->orderBy('created_at', 'desc');
+
+        if (request()->expectsJson() || request()->ajax()) {
+            $notifications = $query->limit(20)->get();
+            $unreadCount = DB::table('order_notifications')
+                ->where('recipient_id', $userId)
+                ->where('is_read', false)
+                ->count();
+
+            return response()->json([
+                'success' => true,
+                'notifications' => $notifications,
+                'unread_count' => $unreadCount,
+            ]);
+        }
+
+        $notifications = $query->paginate(20);
 
         return view('customer.notifications', compact('notifications', 'userName'));
     }
 
-    public function markNotificationRead($id)
+    public function markNotificationRead(Request $request, $id)
     {
         $userId = session('user_id');
 
-        DB::table('order_notifications')
+        $updated = DB::table('order_notifications')
             ->where('notification_id', $id)
             ->where('recipient_id', $userId)
             ->update([
@@ -518,6 +559,12 @@ class CustomerController extends Controller
                 'read_at' => now(),
                 'updated_at' => now(),
             ]);
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => (bool) $updated,
+            ]);
+        }
 
         return redirect()->back()->with('success', 'Notification marked as read');
     }

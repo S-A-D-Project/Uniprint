@@ -63,10 +63,6 @@
                     <span class="font-semibold text-gray-900">{{ $orderStats->total_orders ?? 0 }}</span>
                 </div>
                 <div class="flex justify-between items-center">
-                    <span class="text-gray-600">Total Spent:</span>
-                    <span class="font-semibold text-primary">₱{{ number_format($orderStats->total_spent ?? 0, 2) }}</span>
-                </div>
-                <div class="flex justify-between items-center">
                     <span class="text-gray-600">Recent (30 days):</span>
                     <span class="font-semibold text-gray-900">{{ $orderStats->recent_orders ?? 0 }}</span>
                 </div>

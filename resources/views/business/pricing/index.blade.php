@@ -6,7 +6,7 @@
 
 @section('header-actions')
 <a href="{{ route('business.pricing.create') }}" 
-   class="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground font-medium rounded-lg hover:shadow-glow transition-smooth">
+   class="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground font-medium rounded-lg hover:shadow-glow transition-smooth js-pricing-create">
     <i data-lucide="plus" class="h-4 w-4"></i>
     Add Rule
 </a>
@@ -57,7 +57,8 @@
                                 <td class="px-6 py-4">
                                     <div class="flex items-center gap-2">
                                         <a href="{{ route('business.pricing.edit', $rule->rule_id) }}" 
-                                           class="text-primary hover:text-primary/80 text-sm font-medium">
+                                           class="text-primary hover:text-primary/80 text-sm font-medium js-pricing-edit"
+                                           data-pricing-edit-url="{{ route('business.pricing.edit', $rule->rule_id) }}">
                                             Edit
                                         </a>
                                         <form id="delete-pricing-rule-{{ $rule->rule_id }}" action="{{ route('business.pricing.delete', $rule->rule_id) }}" method="POST">
@@ -88,7 +89,7 @@
                 <h3 class="text-xl font-bold mb-2">No Pricing Rules Yet</h3>
                 <p class="text-muted-foreground mb-6">Create rules for volume discounts, bulk pricing, or special fees</p>
                 <a href="{{ route('business.pricing.create') }}" 
-                   class="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground font-medium rounded-lg hover:shadow-glow transition-smooth">
+                   class="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground font-medium rounded-lg hover:shadow-glow transition-smooth js-pricing-create">
                     <i data-lucide="plus" class="h-5 w-5"></i>
                     Create First Rule
                 </a>
@@ -97,11 +98,58 @@
     </div>
 </div>
 
+<x-ui.modal id="pricingRuleModal" title="Pricing Rule" size="xl" scrollable>
+    <div id="pricingRuleModalBody" class="min-h-[200px]"></div>
+</x-ui.modal>
+
 <x-modals.confirm-action />
 @endsection
 
 @push('scripts')
 <script>
+function openPricingRuleModal(url) {
+    const modalEl = document.getElementById('pricingRuleModal');
+    const bodyEl = document.getElementById('pricingRuleModalBody');
+    if (!modalEl || !bodyEl) return;
+
+    modalEl.dataset.currentFormUrl = url;
+    bodyEl.innerHTML = '<div class="p-4 text-muted">Loading...</div>';
+
+    const modal = new bootstrap.Modal(modalEl);
+    modal.show();
+
+    fetch(url, {
+        method: 'GET',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'text/html'
+        }
+    })
+    .then(async (res) => {
+        if (!res.ok) throw new Error('Failed to load');
+        return await res.text();
+    })
+    .then((html) => {
+        bodyEl.innerHTML = html || '<div class="p-4 text-muted">No content</div>';
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+
+        const methodEl = bodyEl.querySelector('#calculation_method');
+        if (methodEl) {
+            try {
+                toggleFormulaField();
+            } catch (e) {
+                // no-op
+            }
+        }
+    })
+    .catch((err) => {
+        console.error(err);
+        bodyEl.innerHTML = '<div class="p-4 text-danger">Failed to load pricing rule form.</div>';
+    });
+}
+
 function confirmPricingRuleDelete(ruleId, ruleName) {
     if (typeof window.showConfirmModal !== 'function') return;
 
@@ -115,5 +163,82 @@ function confirmPricingRuleDelete(ruleId, ruleName) {
         }
     });
 }
+
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.js-pricing-create').forEach((a) => {
+        a.addEventListener('click', function (e) {
+            e.preventDefault();
+            const url = a.getAttribute('href');
+            if (!url) return;
+            openPricingRuleModal(url);
+        });
+    });
+
+    document.querySelectorAll('.js-pricing-edit').forEach((a) => {
+        a.addEventListener('click', function (e) {
+            e.preventDefault();
+            const url = a.getAttribute('data-pricing-edit-url') || a.getAttribute('href');
+            if (!url) return;
+            openPricingRuleModal(url);
+        });
+    });
+
+    const modalEl = document.getElementById('pricingRuleModal');
+    const bodyEl = document.getElementById('pricingRuleModalBody');
+    if (!modalEl || !bodyEl) return;
+
+    bodyEl.addEventListener('click', function (e) {
+        const link = e.target.closest('a');
+        if (!link) return;
+
+        const href = link.getAttribute('href');
+        if (href && href === `{{ route('business.pricing.index') }}`) {
+            e.preventDefault();
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            if (modal) modal.hide();
+        }
+    });
+
+    bodyEl.addEventListener('submit', async function (e) {
+        const form = e.target;
+        if (!(form instanceof HTMLFormElement)) return;
+
+        e.preventDefault();
+
+        const url = form.getAttribute('action');
+        if (!url) return;
+
+        try {
+            const res = await fetch(url, {
+                method: (form.getAttribute('method') || 'POST').toUpperCase(),
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                },
+                body: new FormData(form)
+            });
+
+            const data = await res.json().catch(() => null);
+            if (!res.ok || !data || data.success !== true) {
+                throw new Error(data?.message || 'Request failed');
+            }
+
+            if (window.UniPrintUI && typeof window.UniPrintUI.toast === 'function') {
+                window.UniPrintUI.toast(data.message || 'Saved.', { variant: 'success' });
+            }
+
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            if (modal) modal.hide();
+
+            window.location.reload();
+        } catch (err) {
+            console.error(err);
+            if (window.UniPrintUI && typeof window.UniPrintUI.toast === 'function') {
+                window.UniPrintUI.toast(err?.message || 'Failed to save pricing rule.', { variant: 'danger' });
+            }
+        }
+    });
+});
 </script>
 @endpush

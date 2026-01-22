@@ -141,6 +141,7 @@ Route::prefix('admin')->middleware([\App\Http\Middleware\CheckAuth::class, \App\
         return redirect()->route('admin.services');
     })->name('products');
     Route::get('/reports', [AdminController::class, 'reports'])->name('reports');
+    Route::get('/audit-logs', [AdminController::class, 'auditLogs'])->name('audit-logs');
     
     // Real-time API endpoints
     Route::get('/api/dashboard-stats', [AdminController::class, 'getDashboardStats'])->name('api.dashboard-stats');
@@ -157,55 +158,60 @@ Route::prefix('admin')->middleware([\App\Http\Middleware\CheckAuth::class, \App\
 });
 
 // Business routes
-Route::prefix('business')->middleware([\App\Http\Middleware\CheckAuth::class, \App\Http\Middleware\CheckRole::class.':business_user'])->name('business.')->group(function () {
-    Route::get('/dashboard', [BusinessController::class, 'dashboard'])->name('dashboard');
+Route::prefix('business')->middleware([\App\Http\Middleware\CheckAuth::class])->name('business.')->group(function () {
+    Route::middleware([\App\Http\Middleware\CheckRole::class.':business_user|admin'])->group(function () {
+        Route::get('/services/create', [BusinessController::class, 'createService'])->name('services.create');
+        Route::post('/services', [BusinessController::class, 'storeService'])->name('services.store');
+        Route::get('/services/{id}/edit', [BusinessController::class, 'editService'])->whereUuid('id')->name('services.edit');
+        Route::put('/services/{id}', [BusinessController::class, 'updateService'])->whereUuid('id')->name('services.update');
+    });
 
-    // Settings
-    Route::get('/settings', [BusinessController::class, 'settings'])->name('settings');
-    Route::put('/settings/account', [BusinessController::class, 'updateAccount'])->name('settings.account.update');
-    Route::put('/settings/enterprise', [BusinessController::class, 'updateEnterprise'])->name('settings.enterprise.update');
-    
-    // Order Management
-    Route::get('/orders', [BusinessController::class, 'orders'])->name('orders.index');
-    Route::get('/orders/{id}', [BusinessController::class, 'orderDetails'])->whereUuid('id')->name('orders.details');
-    Route::post('/orders/{id}/confirm', [BusinessController::class, 'confirmOrder'])->whereUuid('id')->name('orders.confirm');
-    Route::post('/orders/{id}/status', [BusinessController::class, 'updateOrderStatus'])->whereUuid('id')->name('orders.update-status');
-    
-    // Service Management
-    Route::get('/services', [BusinessController::class, 'services'])->name('services.index');
-    Route::get('/services/create', [BusinessController::class, 'createService'])->name('services.create');
-    Route::post('/services', [BusinessController::class, 'storeService'])->name('services.store');
-    Route::get('/services/{id}/edit', [BusinessController::class, 'editService'])->whereUuid('id')->name('services.edit');
-    Route::put('/services/{id}', [BusinessController::class, 'updateService'])->whereUuid('id')->name('services.update');
-    Route::post('/services/{id}/upload-settings', [BusinessController::class, 'updateServiceUploadSettings'])->whereUuid('id')->name('services.upload-settings');
-    Route::post('/services/{id}/toggle-status', [BusinessController::class, 'toggleServiceStatus'])->whereUuid('id')->name('services.toggle-status');
-    Route::delete('/services/{id}', [BusinessController::class, 'deleteService'])->whereUuid('id')->name('services.delete');
-    
-    // Customization Management
-    Route::get('/services/{serviceId}/customizations', [BusinessController::class, 'customizations'])->whereUuid('serviceId')->name('customizations.index');
-    Route::post('/services/{serviceId}/customizations', [BusinessController::class, 'storeCustomization'])->whereUuid('serviceId')->name('customizations.store');
-    Route::put('/services/{serviceId}/customizations/{optionId}', [BusinessController::class, 'updateCustomization'])->whereUuid('serviceId')->whereUuid('optionId')->name('customizations.update');
-    Route::delete('/services/{serviceId}/customizations/{optionId}', [BusinessController::class, 'deleteCustomization'])->whereUuid('serviceId')->whereUuid('optionId')->name('customizations.delete');
+    Route::middleware([\App\Http\Middleware\CheckRole::class.':business_user'])->group(function () {
+        Route::get('/dashboard', [BusinessController::class, 'dashboard'])->name('dashboard');
 
-    Route::post('/services/{serviceId}/custom-fields', [BusinessController::class, 'storeCustomField'])->whereUuid('serviceId')->name('custom-fields.store');
-    Route::put('/services/{serviceId}/custom-fields/{fieldId}', [BusinessController::class, 'updateCustomField'])->whereUuid('serviceId')->whereUuid('fieldId')->name('custom-fields.update');
-    Route::delete('/services/{serviceId}/custom-fields/{fieldId}', [BusinessController::class, 'deleteCustomField'])->whereUuid('serviceId')->whereUuid('fieldId')->name('custom-fields.delete');
-    
-    
-    // Pricing Rules Management
-    Route::get('/pricing-rules', [BusinessController::class, 'pricingRules'])->name('pricing.index');
-    Route::get('/pricing-rules/create', [BusinessController::class, 'createPricingRule'])->name('pricing.create');
-    Route::post('/pricing-rules', [BusinessController::class, 'storePricingRule'])->name('pricing.store');
-    Route::get('/pricing-rules/{id}/edit', [BusinessController::class, 'editPricingRule'])->whereUuid('id')->name('pricing.edit');
-    Route::put('/pricing-rules/{id}', [BusinessController::class, 'updatePricingRule'])->whereUuid('id')->name('pricing.update');
-    Route::delete('/pricing-rules/{id}', [BusinessController::class, 'deletePricingRule'])->whereUuid('id')->name('pricing.delete');
-    
-    // Design File Management
-    Route::post('/design-files/{fileId}/approve', [BusinessController::class, 'approveDesignFile'])->whereUuid('fileId')->name('design-files.approve');
-    Route::post('/design-files/{fileId}/reject', [BusinessController::class, 'rejectDesignFile'])->whereUuid('fileId')->name('design-files.reject');
-    
-    // Chat Management
-    Route::get('/chat', [BusinessController::class, 'chat'])->name('chat');
+        // Settings
+        Route::get('/settings', [BusinessController::class, 'settings'])->name('settings');
+        Route::put('/settings/account', [BusinessController::class, 'updateAccount'])->name('settings.account.update');
+        Route::put('/settings/enterprise', [BusinessController::class, 'updateEnterprise'])->name('settings.enterprise.update');
+        
+        // Order Management
+        Route::get('/orders', [BusinessController::class, 'orders'])->name('orders.index');
+        Route::get('/orders/{id}', [BusinessController::class, 'orderDetails'])->whereUuid('id')->name('orders.details');
+        Route::post('/orders/{id}/confirm', [BusinessController::class, 'confirmOrder'])->whereUuid('id')->name('orders.confirm');
+        Route::post('/orders/{id}/status', [BusinessController::class, 'updateOrderStatus'])->whereUuid('id')->name('orders.update-status');
+        
+        // Service Management
+        Route::get('/services', [BusinessController::class, 'services'])->name('services.index');
+        Route::post('/services/{id}/upload-settings', [BusinessController::class, 'updateServiceUploadSettings'])->whereUuid('id')->name('services.upload-settings');
+        Route::post('/services/{id}/toggle-status', [BusinessController::class, 'toggleServiceStatus'])->whereUuid('id')->name('services.toggle-status');
+        Route::delete('/services/{id}', [BusinessController::class, 'deleteService'])->whereUuid('id')->name('services.delete');
+        
+        // Customization Management
+        Route::get('/services/{serviceId}/customizations', [BusinessController::class, 'customizations'])->whereUuid('serviceId')->name('customizations.index');
+        Route::post('/services/{serviceId}/customizations', [BusinessController::class, 'storeCustomization'])->whereUuid('serviceId')->name('customizations.store');
+        Route::put('/services/{serviceId}/customizations/{optionId}', [BusinessController::class, 'updateCustomization'])->whereUuid('serviceId')->whereUuid('optionId')->name('customizations.update');
+        Route::delete('/services/{serviceId}/customizations/{optionId}', [BusinessController::class, 'deleteCustomization'])->whereUuid('serviceId')->whereUuid('optionId')->name('customizations.delete');
+
+        Route::post('/services/{serviceId}/custom-fields', [BusinessController::class, 'storeCustomField'])->whereUuid('serviceId')->name('custom-fields.store');
+        Route::put('/services/{serviceId}/custom-fields/{fieldId}', [BusinessController::class, 'updateCustomField'])->whereUuid('serviceId')->whereUuid('fieldId')->name('custom-fields.update');
+        Route::delete('/services/{serviceId}/custom-fields/{fieldId}', [BusinessController::class, 'deleteCustomField'])->whereUuid('serviceId')->whereUuid('fieldId')->name('custom-fields.delete');
+        
+        
+        // Pricing Rules Management
+        Route::get('/pricing-rules', [BusinessController::class, 'pricingRules'])->name('pricing.index');
+        Route::get('/pricing-rules/create', [BusinessController::class, 'createPricingRule'])->name('pricing.create');
+        Route::post('/pricing-rules', [BusinessController::class, 'storePricingRule'])->name('pricing.store');
+        Route::get('/pricing-rules/{id}/edit', [BusinessController::class, 'editPricingRule'])->whereUuid('id')->name('pricing.edit');
+        Route::put('/pricing-rules/{id}', [BusinessController::class, 'updatePricingRule'])->whereUuid('id')->name('pricing.update');
+        Route::delete('/pricing-rules/{id}', [BusinessController::class, 'deletePricingRule'])->whereUuid('id')->name('pricing.delete');
+        
+        // Design File Management
+        Route::post('/design-files/{fileId}/approve', [BusinessController::class, 'approveDesignFile'])->whereUuid('fileId')->name('design-files.approve');
+        Route::post('/design-files/{fileId}/reject', [BusinessController::class, 'rejectDesignFile'])->whereUuid('fileId')->name('design-files.reject');
+        
+        // Chat Management
+        Route::get('/chat', [BusinessController::class, 'chat'])->name('chat');
+    });
 });
 
 // Service Marketplace API routes

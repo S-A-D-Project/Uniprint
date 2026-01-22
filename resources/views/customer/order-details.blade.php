@@ -142,9 +142,9 @@
                     </div>
                     @endif
 
-                    @if($item->notes_to_enterprise)
+                    @if(!empty($item->notes_to_enterprise ?? null))
                     <div class="mt-3 alert alert-info mb-0">
-                        <strong><i class="bi bi-chat-left-text me-1"></i>Your Notes:</strong> {{ $item->notes_to_enterprise }}
+                        <strong><i class="bi bi-chat-left-text me-1"></i>Your Notes:</strong> {{ $item->notes_to_enterprise ?? '' }}
                     </div>
                     @endif
                 </div>

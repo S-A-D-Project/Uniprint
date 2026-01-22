@@ -12,6 +12,28 @@ use App\Traits\SafePropertyAccess;
 class AdminController extends Controller
 {
     use SafePropertyAccess;
+
+    private function logAudit(string $action, string $entityType, ?string $entityId, string $description, $oldValues = null, $newValues = null): void
+    {
+        try {
+            DB::table('audit_logs')->insert([
+                'log_id' => (string) Str::uuid(),
+                'user_id' => session('user_id'),
+                'action' => $action,
+                'entity_type' => $entityType,
+                'entity_id' => $entityId,
+                'description' => $description,
+                'old_values' => $oldValues ? json_encode($oldValues) : null,
+                'new_values' => $newValues ? json_encode($newValues) : null,
+                'ip_address' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to write audit log', ['error' => $e->getMessage()]);
+        }
+    }
     public function dashboard()
     {
         try {
@@ -93,7 +115,7 @@ class AdminController extends Controller
                     'enterprises.name as enterprise_name',
                     'statuses.status_name',
                     DB::raw('COALESCE(customer_orders.total, 0) as total'),
-                    DB::raw('COALESCE(customer_orders.order_no, customer_orders.purchase_order_id) as order_no')
+                    DB::raw('COALESCE(customer_orders.order_no, CAST(customer_orders.purchase_order_id AS TEXT)) as order_no')
                 )
                 ->orderBy('customer_orders.created_at', 'desc')
                 ->limit(10)
@@ -159,7 +181,7 @@ class AdminController extends Controller
                     'enterprises.name as enterprise_name', 
                     'statuses.status_name',
                     DB::raw('COALESCE(customer_orders.total, 0) as total'),
-                    DB::raw('COALESCE(customer_orders.order_no, customer_orders.purchase_order_id) as order_no')
+                    DB::raw('COALESCE(customer_orders.order_no, CAST(customer_orders.purchase_order_id AS TEXT)) as order_no')
                 )
                 ->orderBy('customer_orders.created_at', 'desc')
                 ->paginate(20);
@@ -200,7 +222,7 @@ class AdminController extends Controller
         return view('admin.users', compact('users'));
     }
 
-    public function userDetails($id)
+    public function userDetails(Request $request, $id)
     {
         $hasUserIsActive = Schema::hasColumn('users', 'is_active');
 
@@ -235,17 +257,38 @@ class AdminController extends Controller
             $orderTotal = 0;
         }
 
-        return view('admin.users.details', compact('user', 'orderCount', 'orderTotal', 'hasUserIsActive'));
+        $view = view('admin.users.details', compact('user', 'orderCount', 'orderTotal', 'hasUserIsActive'));
+
+        if ($request->expectsJson() || $request->ajax()) {
+            $sections = $view->renderSections();
+            return response($sections['content'] ?? '');
+        }
+
+        return $view;
     }
 
     public function toggleUserActive($id)
     {
         if (!Schema::hasColumn('users', 'is_active')) {
+            if (request()->expectsJson() || request()->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User active status is not supported by the current schema.',
+                ], 400);
+            }
+
             return redirect()->back()->with('error', 'User active status is not supported by the current schema.');
         }
 
         $user = DB::table('users')->where('user_id', $id)->first();
         if (!$user) {
+            if (request()->expectsJson() || request()->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not found.',
+                ], 404);
+            }
+
             return redirect()->back()->with('error', 'User not found.');
         }
 
@@ -257,6 +300,14 @@ class AdminController extends Controller
                 'is_active' => $newValue,
                 'updated_at' => now(),
             ]);
+
+        if (request()->expectsJson() || request()->ajax()) {
+            return response()->json([
+                'success' => true,
+                'is_active' => $newValue,
+                'message' => $newValue ? 'User activated.' : 'User deactivated.',
+            ]);
+        }
 
         return redirect()->back()->with('success', $newValue ? 'User activated.' : 'User deactivated.');
     }
@@ -366,7 +417,7 @@ class AdminController extends Controller
                     'users.name as customer_name',
                     'statuses.status_name',
                     DB::raw('COALESCE(customer_orders.total, 0) as total'),
-                    DB::raw('COALESCE(customer_orders.order_no, customer_orders.purchase_order_id) as order_no')
+                    DB::raw('COALESCE(customer_orders.order_no, CAST(customer_orders.purchase_order_id AS TEXT)) as order_no')
                 )
                 ->orderBy('customer_orders.created_at', 'desc')
                 ->limit(20)
@@ -399,7 +450,14 @@ class AdminController extends Controller
             'staff_count' => DB::table('staff')->where('enterprise_id', $id)->count(),
         ];
 
-        return view('admin.enterprises.details', compact('enterprise', 'stats', 'services', 'orders', 'staff'));
+        $view = view('admin.enterprises.details', compact('enterprise', 'stats', 'services', 'orders', 'staff'));
+
+        if ($request->expectsJson() || $request->ajax()) {
+            $sections = $view->renderSections();
+            return response($sections['content'] ?? '');
+        }
+
+        return $view;
     }
 
     public function orders(Request $request)
@@ -426,7 +484,7 @@ class AdminController extends Controller
                     'enterprises.name as enterprise_name', 
                     'statuses.status_name',
                     DB::raw('COALESCE(customer_orders.total, 0) as total'),
-                    DB::raw('COALESCE(customer_orders.order_no, customer_orders.purchase_order_id) as order_no')
+                    DB::raw('COALESCE(customer_orders.order_no, CAST(customer_orders.purchase_order_id AS TEXT)) as order_no')
                 )
 
                 ->orderBy('customer_orders.created_at', 'desc');
@@ -469,7 +527,7 @@ class AdminController extends Controller
                 'enterprises.name as enterprise_name',
                 'statuses.status_name',
                 DB::raw('COALESCE(customer_orders.total, 0) as total'),
-                DB::raw('COALESCE(customer_orders.order_no, customer_orders.purchase_order_id) as order_no')
+                DB::raw('COALESCE(customer_orders.order_no, CAST(customer_orders.purchase_order_id AS TEXT)) as order_no')
             )
             ->first();
 
@@ -540,6 +598,10 @@ class AdminController extends Controller
             ->select('statuses.status_name')
             ->first();
 
+        $newStatus = DB::table('statuses')
+            ->where('status_id', $request->status_id)
+            ->first();
+
         DB::table('order_status_history')->insert([
             'approval_id' => (string) Str::uuid(),
             'purchase_order_id' => $id,
@@ -551,6 +613,15 @@ class AdminController extends Controller
             'updated_at' => now(),
         ]);
 
+        $this->logAudit(
+            'status_change',
+            'order',
+            $id,
+            'Order status updated by admin',
+            ['status' => $oldStatus?->status_name ?? null],
+            ['status' => $newStatus?->status_name ?? null, 'remarks' => $request->remarks ?? null]
+        );
+
         if (Schema::hasColumn('customer_orders', 'status_id')) {
             DB::table('customer_orders')
                 ->where('purchase_order_id', $id)
@@ -559,10 +630,6 @@ class AdminController extends Controller
                     'updated_at' => now(),
                 ]);
         }
-
-        $newStatus = DB::table('statuses')
-            ->where('status_id', $request->status_id)
-            ->first();
 
         if (Schema::hasTable('order_notifications')) {
             $oldStatusName = $oldStatus?->status_name ?? 'Unknown';
@@ -580,6 +647,48 @@ class AdminController extends Controller
         }
 
         return redirect()->route('admin.orders.details', $id)->with('success', 'Order status updated successfully');
+    }
+
+    public function auditLogs(Request $request)
+    {
+        $driver = DB::getDriverName();
+        $query = DB::table('audit_logs')
+            ->leftJoin('users', 'audit_logs.user_id', '=', 'users.user_id')
+            ->select(
+                'audit_logs.*',
+                'users.name as user_name',
+                'users.email as user_email'
+            )
+            ->orderBy('audit_logs.created_at', 'desc');
+
+        if ($request->filled('action')) {
+            $query->where('audit_logs.action', $request->string('action')->toString());
+        }
+
+        if ($request->filled('entity_type')) {
+            $query->where('audit_logs.entity_type', $request->string('entity_type')->toString());
+        }
+
+        if ($request->filled('user_id')) {
+            $query->where('audit_logs.user_id', $request->string('user_id')->toString());
+        }
+
+        if ($request->filled('q')) {
+            $q = $request->string('q')->toString();
+            $op = $driver === 'pgsql' ? 'ILIKE' : 'LIKE';
+            $query->where(function ($sub) use ($q, $op) {
+                $sub->where('audit_logs.description', $op, "%{$q}%")
+                    ->orWhere('audit_logs.action', $op, "%{$q}%")
+                    ->orWhere('audit_logs.entity_type', $op, "%{$q}%")
+                    ->orWhere('audit_logs.ip_address', $op, "%{$q}%")
+                    ->orWhere('users.name', $op, "%{$q}%")
+                    ->orWhere('users.email', $op, "%{$q}%");
+            });
+        }
+
+        $logs = $query->paginate(25)->withQueryString();
+
+        return view('admin.audit-logs', compact('logs'));
     }
 
     public function services(Request $request)
@@ -666,11 +775,25 @@ class AdminController extends Controller
     public function toggleEnterpriseActive($id)
     {
         if (!Schema::hasColumn('enterprises', 'is_active')) {
+            if (request()->expectsJson() || request()->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Enterprise active status is not supported by the current schema.',
+                ], 400);
+            }
+
             return redirect()->back()->with('error', 'Enterprise active status is not supported by the current schema.');
         }
 
         $enterprise = DB::table('enterprises')->where('enterprise_id', $id)->first();
         if (!$enterprise) {
+            if (request()->expectsJson() || request()->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Enterprise not found.',
+                ], 404);
+            }
+
             return redirect()->back()->with('error', 'Enterprise not found.');
         }
 
@@ -682,6 +805,14 @@ class AdminController extends Controller
                 'is_active' => $newValue,
                 'updated_at' => now(),
             ]);
+
+        if (request()->expectsJson() || request()->ajax()) {
+            return response()->json([
+                'success' => true,
+                'is_active' => $newValue,
+                'message' => $newValue ? 'Enterprise activated.' : 'Enterprise deactivated.',
+            ]);
+        }
 
         return redirect()->back()->with('success', $newValue ? 'Enterprise activated.' : 'Enterprise deactivated.');
     }

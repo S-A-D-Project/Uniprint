@@ -607,13 +607,15 @@ class CustomerOrderService
                 'log_id' => \Illuminate\Support\Str::uuid()->toString(),
                 'user_id' => $userId,
                 'action' => $action,
-                'table_name' => $tableName,
-                'record_id' => $recordId,
-                'changes' => json_encode($changes),
+                'entity_type' => $tableName,
+                'entity_id' => $recordId,
+                'description' => $action,
+                'old_values' => null,
+                'new_values' => empty($changes) ? null : json_encode($changes),
                 'ip_address' => request()->ip(),
                 'user_agent' => request()->userAgent(),
-                'timestamp' => Carbon::now(),
                 'created_at' => Carbon::now(),
+                'updated_at' => Carbon::now(),
             ]);
         } catch (\Exception $e) {
             Log::error('Error logging audit', ['error' => $e->getMessage()]);

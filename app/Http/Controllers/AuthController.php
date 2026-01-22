@@ -91,6 +91,25 @@ class AuthController extends Controller
                 ]);
                 $request->session()->regenerateToken();
 
+                try {
+                    DB::table('audit_logs')->insert([
+                        'log_id' => (string) Str::uuid(),
+                        'user_id' => $user->user_id,
+                        'action' => 'login',
+                        'entity_type' => 'auth',
+                        'entity_id' => null,
+                        'description' => 'User logged in',
+                        'old_values' => null,
+                        'new_values' => json_encode(['intended_role_type' => $intendedRoleType]),
+                        'ip_address' => $request->ip(),
+                        'user_agent' => $request->userAgent(),
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                } catch (\Exception $e) {
+                    \Log::error('Failed to write audit log (login)', ['error' => $e->getMessage()]);
+                }
+
                 return $this->redirectToDashboard();
             }
         }
@@ -124,6 +143,28 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
+        try {
+            $userId = session('user_id');
+            if ($userId) {
+                DB::table('audit_logs')->insert([
+                    'log_id' => (string) Str::uuid(),
+                    'user_id' => $userId,
+                    'action' => 'logout',
+                    'entity_type' => 'auth',
+                    'entity_id' => null,
+                    'description' => 'User logged out',
+                    'old_values' => null,
+                    'new_values' => null,
+                    'ip_address' => $request->ip(),
+                    'user_agent' => $request->userAgent(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+        } catch (\Exception $e) {
+            \Log::error('Failed to write audit log (logout)', ['error' => $e->getMessage()]);
+        }
+
         $request->session()->flush();
         $request->session()->regenerateToken();
         return redirect()->route('login');

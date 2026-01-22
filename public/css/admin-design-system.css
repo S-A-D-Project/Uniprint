@@ -2,6 +2,9 @@
 
 .gradient-admin{background:linear-gradient(135deg,var(--up-admin-primary),var(--up-admin-primary-glow))}
 
+.gradient-primary{background:linear-gradient(135deg,hsl(263 70% 50%),hsl(263 85% 65%)) !important}
+.gradient-accent{background:linear-gradient(135deg,hsl(16 90% 62%),hsl(16 100% 70%)) !important}
+
 .shadow-card{box-shadow:0 1px 3px 0 rgb(0 0 0 / .1),0 1px 2px -1px rgb(0 0 0 / .1)}
 .shadow-card-hover{box-shadow:0 10px 15px -3px rgb(0 0 0 / .1),0 4px 6px -4px rgb(0 0 0 / .1)}
 .shadow-glow{box-shadow:0 0 20px hsl(0 84% 60% / .3)}
