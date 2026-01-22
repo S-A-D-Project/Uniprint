@@ -49,6 +49,7 @@ Route::middleware(['throttle:60,1'])->group(function () {
 // Social Authentication routes (outside throttle to ensure availability)
 Route::get('/auth/google', [SocialAuthController::class, 'redirectToGoogle'])->name('auth.google');
 Route::get('/auth/google/callback', [SocialAuthController::class, 'handleGoogleCallback'])->name('auth.google.callback');
+Route::get('/auth/callback', [SocialAuthController::class, 'handleGoogleCallback'])->name('auth.google.callback.alias');
 Route::get('/auth/facebook', [SocialAuthController::class, 'redirectToFacebook'])->name('auth.facebook');
 Route::get('/auth/facebook/callback', [SocialAuthController::class, 'handleFacebookCallback'])->name('auth.facebook.callback');
 

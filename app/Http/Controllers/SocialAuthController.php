@@ -10,13 +10,22 @@ use Exception;
 
 class SocialAuthController extends Controller
 {
+    private const GOOGLE_REDIRECT_URL_SESSION_KEY = 'oauth_google_redirect_url';
+
     /**
      * Redirect to Google OAuth
      */
     public function redirectToGoogle()
     {
         $this->storeRoleIntentFromRequest();
-        return Socialite::driver('google')->stateless()->redirect();
+
+        $redirectUrl = $this->resolveGoogleRedirectUrl();
+        session([self::GOOGLE_REDIRECT_URL_SESSION_KEY => $redirectUrl]);
+
+        return Socialite::driver('google')
+            ->stateless()
+            ->redirectUrl($redirectUrl)
+            ->redirect();
     }
 
     /**
@@ -25,7 +34,9 @@ class SocialAuthController extends Controller
     public function handleGoogleCallback()
     {
         try {
-            $googleUser = Socialite::driver('google')->stateless()->user();
+            $redirectUrl = session(self::GOOGLE_REDIRECT_URL_SESSION_KEY) ?: $this->resolveGoogleRedirectUrl();
+            $googleUser = Socialite::driver('google')->stateless()->redirectUrl($redirectUrl)->user();
+            session()->forget(self::GOOGLE_REDIRECT_URL_SESSION_KEY);
             return $this->handleSocialLogin($googleUser, 'google');
         } catch (Exception $e) {
             \Log::error('Google OAuth error', [
@@ -36,6 +47,39 @@ class SocialAuthController extends Controller
             ]);
             return redirect()->route('login')->withErrors(['social' => 'Failed to authenticate with Google. Please try again.']);
         }
+    }
+
+    private function resolveGoogleRedirectUrl(): string
+    {
+        $local = config('services.google.redirect_local') ?: env('GOOGLE_REDIRECT_URI_LOCAL');
+        $herd = config('services.google.redirect_herd') ?: env('GOOGLE_REDIRECT_URI_HERD');
+
+        $fallback = config('services.google.redirect');
+        if (is_string($fallback) && str_starts_with($fallback, '/')) {
+            $fallback = url($fallback);
+        }
+
+        $host = request()->getHost();
+        if (in_array($host, ['127.0.0.1', 'localhost'], true)) {
+            return $local ?: ($fallback ?: route('auth.google.callback'));
+        }
+
+        $fwdHostFallback = $this->resolveFwdHostRedirectUrl();
+        return $herd ?: ($fwdHostFallback ?: ($fallback ?: route('auth.google.callback')));
+    }
+
+    private function resolveFwdHostRedirectUrl(): ?string
+    {
+        $host = request()->getHost();
+        if (!is_string($host) || $host === '') {
+            return null;
+        }
+
+        if (!str_ends_with($host, '.test')) {
+            return null;
+        }
+
+        return 'https://fwd.host/https://' . $host . '/auth/callback';
     }
 
     /**
