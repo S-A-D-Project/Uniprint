@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schema;
 use Carbon\Carbon;
 
 class SystemController extends Controller
@@ -17,8 +18,38 @@ class SystemController extends Controller
     public function settings()
     {
         $backups = $this->getBackupsList();
+
+        $autoCompleteHours = 72;
+        if (Schema::hasTable('system_settings')) {
+            $raw = DB::table('system_settings')->where('key', 'order_auto_complete_hours')->value('value');
+            if (is_numeric($raw)) {
+                $autoCompleteHours = (int) $raw;
+            }
+        }
         
-        return view('admin.settings', compact('backups'));
+        return view('admin.settings', compact('backups', 'autoCompleteHours'));
+    }
+
+    public function updateOrderAutoComplete(Request $request)
+    {
+        $request->validate([
+            'order_auto_complete_hours' => 'required|integer|min:1|max:720',
+        ]);
+
+        if (! Schema::hasTable('system_settings')) {
+            return redirect()->back()->with('error', 'System settings table is not available. Please run migrations.');
+        }
+
+        DB::table('system_settings')->updateOrInsert(
+            ['key' => 'order_auto_complete_hours'],
+            [
+                'value' => (string) $request->integer('order_auto_complete_hours'),
+                'updated_at' => now(),
+                'created_at' => now(),
+            ]
+        );
+
+        return redirect()->back()->with('success', 'Auto-complete timeout updated successfully.');
     }
     
     /**

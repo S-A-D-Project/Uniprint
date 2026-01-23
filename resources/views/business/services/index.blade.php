@@ -6,7 +6,7 @@
 
 @section('header-actions')
 <a href="{{ route('business.services.create') }}" 
-   class="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground font-medium rounded-lg hover:shadow-glow transition-smooth">
+   class="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground font-medium rounded-lg hover:shadow-glow transition-smooth js-business-service-create">
     <i data-lucide="plus" class="h-4 w-4"></i>
     Add Service
 </a>
@@ -70,7 +70,7 @@
                             Customizations
                         </a>
                         <a href="{{ route('business.services.edit', $service->service_id) }}" 
-                           class="flex-1 px-3 py-2 text-sm text-center bg-primary text-primary-foreground rounded-md hover:shadow-glow transition-smooth">
+                           class="flex-1 px-3 py-2 text-sm text-center bg-primary text-primary-foreground rounded-md hover:shadow-glow transition-smooth js-business-service-edit">
                             Edit
                         </a>
 
@@ -123,12 +123,120 @@
     @endif
 </div>
 
+    <x-ui.modal id="businessServiceFormModal" title="Service" size="xl" scrollable>
+        <div id="businessServiceFormModalBody" class="min-h-[200px]"></div>
+    </x-ui.modal>
+
     <x-modals.service-upload-settings />
     <x-modals.confirm-action />
 @endsection
 
 @push('scripts')
 <script>
+function openBusinessServiceFormModal(url) {
+    const modalEl = document.getElementById('businessServiceFormModal');
+    const bodyEl = document.getElementById('businessServiceFormModalBody');
+    if (!modalEl || !bodyEl) {
+        window.location.href = url;
+        return;
+    }
+
+    bodyEl.innerHTML = '<div class="py-5 text-center text-muted">Loading…</div>';
+
+    let bsModal = window.modal_businessServiceFormModal;
+    if (!bsModal && typeof bootstrap !== 'undefined') {
+        bsModal = new bootstrap.Modal(modalEl);
+        window.modal_businessServiceFormModal = bsModal;
+    }
+
+    if (bsModal) {
+        bsModal.show();
+    }
+
+    fetch(url, {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'text/html'
+        }
+    })
+        .then((res) => {
+            if (!res.ok) throw new Error('Failed to load service form');
+            return res.text();
+        })
+        .then((html) => {
+            bodyEl.innerHTML = html;
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+        })
+        .catch(() => {
+            bodyEl.innerHTML = '<div class="alert alert-danger mb-0">Failed to load service form.</div>';
+        });
+}
+
+document.addEventListener('click', function (e) {
+    const createLink = e.target.closest('a.js-business-service-create');
+    if (createLink) {
+        e.preventDefault();
+        openBusinessServiceFormModal(createLink.getAttribute('href'));
+        return;
+    }
+
+    const editLink = e.target.closest('a.js-business-service-edit');
+    if (editLink) {
+        e.preventDefault();
+        openBusinessServiceFormModal(editLink.getAttribute('href'));
+        return;
+    }
+});
+
+document.addEventListener('submit', async function (e) {
+    const form = e.target;
+    if (!(form instanceof HTMLFormElement)) return;
+    if (!form.closest('#businessServiceFormModal')) return;
+
+    e.preventDefault();
+
+    const submitBtn = form.querySelector('button[type="submit"]');
+    if (window.UniPrintUI && typeof window.UniPrintUI.setButtonLoading === 'function' && submitBtn) {
+        window.UniPrintUI.setButtonLoading(submitBtn, true, { text: 'Saving…' });
+    }
+
+    try {
+        const response = await fetch(form.action, {
+            method: form.method ? form.method.toUpperCase() : 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            },
+            body: new FormData(form)
+        });
+
+        const data = await response.json().catch(() => null);
+        if (!response.ok || !data || data.success !== true) {
+            throw new Error((data && data.message) ? data.message : 'Failed to save service');
+        }
+
+        if (window.UniPrintUI && typeof window.UniPrintUI.toast === 'function') {
+            window.UniPrintUI.toast(data.message || 'Saved.', { variant: 'success' });
+        }
+
+        const modalEl = document.getElementById('businessServiceFormModal');
+        const modal = modalEl ? bootstrap.Modal.getInstance(modalEl) : null;
+        if (modal) modal.hide();
+
+        setTimeout(() => window.location.reload(), 600);
+    } catch (err) {
+        if (window.UniPrintUI && typeof window.UniPrintUI.toast === 'function') {
+            window.UniPrintUI.toast(err.message || 'Failed to save service.', { variant: 'danger' });
+        }
+    } finally {
+        if (window.UniPrintUI && typeof window.UniPrintUI.setButtonLoading === 'function' && submitBtn) {
+            window.UniPrintUI.setButtonLoading(submitBtn, false);
+        }
+    }
+}, true);
+
 function openServiceUploadSettings(serviceId, serviceName, fileUploadEnabled, requiresFileUpload) {
     const modalEl = document.getElementById('serviceUploadSettingsModal');
     if (!modalEl) return;

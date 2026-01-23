@@ -62,9 +62,7 @@ $breadcrumbs = [
                             <x-admin.badge variant="warning" icon="clock">Pending</x-admin.badge>
                         @elseif($order->status_name == 'In Progress')
                             <x-admin.badge variant="info" icon="loader">In Progress</x-admin.badge>
-                        @elseif($order->status_name == 'Shipped')
-                            <x-admin.badge variant="primary" icon="truck">Shipped</x-admin.badge>
-                        @elseif($order->status_name == 'Delivered')
+                        @elseif(in_array($order->status_name, ['Delivered', 'Shipped'], true))
                             <x-admin.badge variant="success" icon="check-circle">Delivered</x-admin.badge>
                         @else
                             <x-admin.badge variant="secondary">{{ $order->status_name ?? 'Unknown' }}</x-admin.badge>

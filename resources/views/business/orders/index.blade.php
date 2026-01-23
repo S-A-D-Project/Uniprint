@@ -4,6 +4,13 @@
 @section('page-title', 'Orders Management')
 @section('page-subtitle', 'Manage and track all customer orders')
 
+@section('header-actions')
+    <a href="{{ route('business.orders.walk-in.create') }}" class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:shadow-glow transition-smooth">
+        <i data-lucide="plus" class="h-4 w-4"></i>
+        Walk-in Order
+    </a>
+@endsection
+
 @section('content')
 
     <!-- Stats Cards -->
@@ -14,6 +21,35 @@
                 <i data-lucide="shopping-bag" class="h-5 w-5 text-primary"></i>
             </div>
             <p class="text-3xl font-bold">{{ $orders->total() }}</p>
+        </div>
+    </div>
+
+    @php
+        $activeTab = $tab ?? request()->query('tab', 'all');
+        $tabLinks = [
+            'all' => 'All',
+            'pending' => 'Pending',
+            'confirmed' => 'Confirmed',
+            'in_progress' => 'In Progress',
+            'ready_for_pickup' => 'Ready for Pickup',
+            'delivered' => 'Delivered',
+            'completed' => 'Completed',
+            'cancelled' => 'Cancelled',
+        ];
+        $today = \Carbon\Carbon::today()->toDateString();
+        $dueSoon = \Carbon\Carbon::today()->addDay()->toDateString();
+    @endphp
+
+    <div class="mb-6">
+        <div class="bg-card border border-border rounded-xl shadow-card overflow-hidden">
+            <div class="flex items-center gap-4 px-6 pt-4 overflow-x-auto" aria-label="Order Status Tabs">
+                @foreach($tabLinks as $key => $label)
+                    <a href="{{ route('business.orders.index', ['tab' => $key]) }}"
+                       class="pb-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors {{ $activeTab === $key ? 'text-primary border-primary' : 'text-muted-foreground border-transparent hover:text-foreground hover:border-border' }}">
+                        {{ $label }}
+                    </a>
+                @endforeach
+            </div>
         </div>
     </div>
 
@@ -30,6 +66,7 @@
                         <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Order #</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Customer</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Date</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Due</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Total</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Status</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Actions</th>
@@ -42,6 +79,26 @@
                             <td class="px-6 py-4">{{ $order->customer_name }}</td>
                             <td class="px-6 py-4 text-sm text-muted-foreground">
                                 {{ date('M d, Y', strtotime($order->created_at)) }}
+                            </td>
+                            <td class="px-6 py-4 text-sm">
+                                @php
+                                    $dueDate = $order->due_date ?? null;
+                                    $isOverdue = $dueDate && $dueDate < $today;
+                                    $isDueSoon = $dueDate && ! $isOverdue && $dueDate <= $dueSoon;
+                                @endphp
+
+                                @if($dueDate)
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-muted-foreground">{{ date('M d, Y', strtotime($dueDate)) }}</span>
+                                        @if($isOverdue)
+                                            <span class="inline-block px-2 py-0.5 text-xs font-medium rounded-md bg-destructive/10 text-destructive">Overdue</span>
+                                        @elseif($isDueSoon)
+                                            <span class="inline-block px-2 py-0.5 text-xs font-medium rounded-md bg-warning/10 text-warning">Due soon</span>
+                                        @endif
+                                    </div>
+                                @else
+                                    <span class="text-muted-foreground">—</span>
+                                @endif
                             </td>
                             <td class="px-6 py-4 font-medium">₱{{ number_format($order->total, 2) }}</td>
                             <td class="px-6 py-4">
@@ -69,7 +126,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="px-6 py-12 text-center text-muted-foreground">
+                            <td colspan="7" class="px-6 py-12 text-center text-muted-foreground">
                                 <i data-lucide="inbox" class="h-12 w-12 mx-auto mb-4 text-muted-foreground"></i>
                                 <p>No orders yet</p>
                             </td>

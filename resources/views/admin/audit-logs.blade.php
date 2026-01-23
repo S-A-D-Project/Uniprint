@@ -73,7 +73,18 @@ $breadcrumbs = [
                         <div class="max-w-[520px]">
                             <div class="font-medium">{{ $log->description }}</div>
                             @if(!empty($log->new_values))
-                                <div class="text-xs text-muted-foreground mt-1 break-all">{{ $log->new_values }}</div>
+                                @php
+                                    $newValuesPretty = null;
+                                    $decodedNewValues = json_decode((string) $log->new_values, true);
+                                    if (json_last_error() === JSON_ERROR_NONE) {
+                                        $newValuesPretty = json_encode($decodedNewValues, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+                                    }
+                                @endphp
+                                @if(!empty($newValuesPretty))
+                                    <pre class="text-xs text-muted-foreground mt-1 whitespace-pre-wrap">{{ $newValuesPretty }}</pre>
+                                @else
+                                    <div class="text-xs text-muted-foreground mt-1 break-all">{{ $log->new_values }}</div>
+                                @endif
                             @endif
                         </div>
                     </td>

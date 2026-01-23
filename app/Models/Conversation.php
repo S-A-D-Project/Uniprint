@@ -59,7 +59,7 @@ class Conversation extends Model
     public function lastMessage()
     {
         return $this->hasOne(ChatMessage::class, 'conversation_id', 'conversation_id')
-            ->latestOfMany();
+            ->latest('created_at');
     }
 
     public function unreadCount($userId)

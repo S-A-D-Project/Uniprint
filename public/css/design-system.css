@@ -13,3 +13,13 @@
 .bg-clip-text{-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
 
 html{color-scheme:light}
+
+.bg-background{background-color:var(--up-background)!important}
+.text-foreground{color:var(--up-foreground)!important}
+.text-muted-foreground{color:var(--up-muted-foreground)!important}
+.border-border{border-color:var(--up-border)!important}
+.bg-card{background-color:#fff!important}
+.text-card-foreground{color:var(--up-foreground)!important}
+.bg-popover{background-color:#fff!important}
+.text-popover-foreground{color:var(--up-foreground)!important}
+.border-input{border-color:var(--up-border)!important}

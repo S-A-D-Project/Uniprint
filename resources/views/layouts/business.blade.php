@@ -228,10 +228,14 @@
                         @yield('header-actions')
                         
                         <!-- Notifications -->
-                        <button class="relative p-2 hover:bg-secondary rounded-lg transition-smooth">
+                        <a href="{{ route('business.notifications') }}" class="relative p-2 hover:bg-secondary rounded-lg transition-smooth">
                             <i data-lucide="bell" class="h-5 w-5"></i>
-                            <span class="absolute -top-1 -right-1 w-3 h-3 bg-destructive rounded-full"></span>
-                        </button>
+                            @if(isset($unreadNotificationsCount) && $unreadNotificationsCount > 0)
+                                <span class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-destructive text-destructive-foreground text-[11px] leading-[18px] rounded-full text-center">
+                                    {{ $unreadNotificationsCount > 99 ? '99+' : $unreadNotificationsCount }}
+                                </span>
+                            @endif
+                        </a>
                     </div>
                 </div>
             </header>

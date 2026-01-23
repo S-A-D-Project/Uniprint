@@ -122,9 +122,7 @@
                                     <span class="inline-block px-2 py-1 text-xs bg-warning/10 text-warning rounded-md font-medium">Pending</span>
                                 @elseif($order->status_name == 'In Progress')
                                     <span class="inline-block px-2 py-1 text-xs bg-blue-500/10 text-blue-500 rounded-md font-medium">In Progress</span>
-                                @elseif($order->status_name == 'Shipped')
-                                    <span class="inline-block px-2 py-1 text-xs bg-primary/10 text-primary rounded-md font-medium">Shipped</span>
-                                @elseif($order->status_name == 'Delivered')
+                                @elseif(in_array($order->status_name, ['Delivered', 'Shipped'], true))
                                     <span class="inline-block px-2 py-1 text-xs bg-success/10 text-success rounded-md font-medium">Delivered</span>
                                 @else
                                     <span class="inline-block px-2 py-1 text-xs bg-secondary text-secondary-foreground rounded-md font-medium">{{ $order->status_name ?? 'Unknown' }}</span>

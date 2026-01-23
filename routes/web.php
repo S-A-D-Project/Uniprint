@@ -150,6 +150,7 @@ Route::prefix('admin')->middleware([\App\Http\Middleware\CheckAuth::class, \App\
     
     // System Management
     Route::get('/settings', [\App\Http\Controllers\Admin\SystemController::class, 'settings'])->name('settings');
+    Route::post('/settings/order-auto-complete', [\App\Http\Controllers\Admin\SystemController::class, 'updateOrderAutoComplete'])->name('settings.order-auto-complete');
     Route::post('/backup/create', [\App\Http\Controllers\Admin\SystemController::class, 'createBackup'])->name('backup.create');
     Route::get('/backup/download/{filename}', [\App\Http\Controllers\Admin\SystemController::class, 'downloadBackup'])->name('backup.download');
     Route::delete('/backup/delete/{filename}', [\App\Http\Controllers\Admin\SystemController::class, 'deleteBackup'])->name('backup.delete');
@@ -177,9 +178,16 @@ Route::prefix('business')->middleware([\App\Http\Middleware\CheckAuth::class])->
         
         // Order Management
         Route::get('/orders', [BusinessController::class, 'orders'])->name('orders.index');
+        Route::get('/orders/walk-in/create', [BusinessController::class, 'createWalkInOrder'])->name('orders.walk-in.create');
+        Route::post('/orders/walk-in', [BusinessController::class, 'storeWalkInOrder'])->name('orders.walk-in.store');
         Route::get('/orders/{id}', [BusinessController::class, 'orderDetails'])->whereUuid('id')->name('orders.details');
+        Route::get('/orders/{id}/print', [BusinessController::class, 'printOrder'])->whereUuid('id')->name('orders.print');
         Route::post('/orders/{id}/confirm', [BusinessController::class, 'confirmOrder'])->whereUuid('id')->name('orders.confirm');
         Route::post('/orders/{id}/status', [BusinessController::class, 'updateOrderStatus'])->whereUuid('id')->name('orders.update-status');
+
+        // Notifications
+        Route::get('/notifications', [BusinessController::class, 'notifications'])->name('notifications');
+        Route::post('/notifications/{id}/read', [BusinessController::class, 'markNotificationRead'])->whereUuid('id')->name('notifications.read');
         
         // Service Management
         Route::get('/services', [BusinessController::class, 'services'])->name('services.index');

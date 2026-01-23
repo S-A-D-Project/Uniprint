@@ -118,27 +118,24 @@ class CustomerDashboardController extends Controller
             return redirect()->route('login');
         }
         
-        $status = $request->get('status', 'all');
-        
-        $query = DB::table('customer_orders')
-            ->join('statuses', 'customer_orders.status_id', '=', 'statuses.status_id')
-            ->join('enterprises', 'customer_orders.enterprise_id', '=', 'enterprises.enterprise_id')
-            ->where('customer_orders.customer_id', $userId)
-            ->select(
-                'customer_orders.*',
-                'statuses.status_name',
-                'statuses.description as status_description',
-                'enterprises.name as enterprise_name',
-                'enterprises.shop_logo'
-            );
-        
+        $status = (string) $request->get('status', 'all');
+
+        $tab = 'all';
         if ($status !== 'all') {
-            $query->where('statuses.status_name', $status);
+            if (in_array($status, ['Pending', 'Confirmed'], true)) {
+                $tab = 'to_confirm';
+            } elseif (in_array($status, ['Processing', 'In Progress'], true)) {
+                $tab = 'processing';
+            } elseif (in_array($status, ['Ready for Pickup', 'Shipped', 'Delivered'], true)) {
+                $tab = 'final_process';
+            } elseif ($status === 'Completed') {
+                $tab = 'completed';
+            }
         }
-        
-        $orders = $query->orderBy('customer_orders.created_at', 'desc')->paginate(10);
-        
-        return view('customer.orders', compact('orders', 'status'));
+
+        return redirect()->route('customer.orders', array_filter([
+            'tab' => $tab,
+        ]));
     }
     
     /**

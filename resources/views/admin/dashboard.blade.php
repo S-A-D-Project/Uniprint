@@ -276,11 +276,7 @@ $breadcrumbs = [
                                     <span class="inline-block px-2 py-1 text-xs bg-blue-500/10 text-blue-500 rounded-md font-medium">
                                         <i data-lucide="loader" class="h-3 w-3 inline mr-1"></i> In Progress
                                     </span>
-                                @elseif(($order->status_name ?? '') == 'Shipped')
-                                    <span class="inline-block px-2 py-1 text-xs bg-primary/10 text-primary rounded-md font-medium">
-                                        <i data-lucide="truck" class="h-3 w-3 inline mr-1"></i> Shipped
-                                    </span>
-                                @elseif(($order->status_name ?? '') == 'Delivered')
+                                @elseif(in_array(($order->status_name ?? ''), ['Delivered', 'Shipped'], true))
                                     <span class="inline-block px-2 py-1 text-xs bg-success/10 text-success rounded-md font-medium">
                                         <i data-lucide="check-circle" class="h-3 w-3 inline mr-1"></i> Delivered
                                     </span>

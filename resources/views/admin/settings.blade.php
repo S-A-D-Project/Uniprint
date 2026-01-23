@@ -58,6 +58,34 @@ $breadcrumbs = [
             </form>
         </div>
     </x-admin.card>
+
+    <!-- Order Automation -->
+    <x-admin.card title="Order Automation" icon="clock">
+        <p class="text-sm text-muted-foreground mb-4">
+            Automatically complete delivered orders if the customer does not confirm within the configured time.
+        </p>
+
+        <form action="{{ route('admin.settings.order-auto-complete') }}" method="POST" class="space-y-3">
+            @csrf
+            <div>
+                <label class="block text-sm font-medium mb-2">Auto-complete after (hours)</label>
+                <input
+                    type="number"
+                    name="order_auto_complete_hours"
+                    min="1"
+                    max="720"
+                    value="{{ (int) ($autoCompleteHours ?? 72) }}"
+                    class="admin-form-input w-full"
+                    required
+                />
+                <div class="text-xs text-muted-foreground mt-2">Default is 72 hours (3 days).</div>
+            </div>
+
+            <x-admin.button type="submit" variant="primary" icon="save" class="w-full">
+                Save Automation Settings
+            </x-admin.button>
+        </form>
+    </x-admin.card>
 </div>
 
 <!-- Backup Files List -->

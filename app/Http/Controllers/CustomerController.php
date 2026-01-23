@@ -77,12 +77,14 @@ class CustomerController extends Controller
         $userName = session('user_name');
 
         $tab = (string) $request->query('tab', 'all');
+        $search = trim((string) $request->query('q', ''));
         $tabToStatuses = [
             'all' => [],
             'to_confirm' => ['Pending', 'Confirmed'],
             'processing' => ['Processing', 'In Progress'],
-            'final_process' => ['Ready for Pickup', 'Shipped', 'Delivered'],
+            'final_process' => ['Ready for Pickup', 'Delivered'],
             'completed' => ['Completed'],
+            'cancelled' => ['Cancelled'],
         ];
 
         if (!array_key_exists($tab, $tabToStatuses)) {
@@ -112,9 +114,40 @@ class CustomerController extends Controller
             $ordersQuery->whereIn('statuses.status_name', $statusFilter);
         }
 
+        if ($search !== '') {
+            $ordersQuery->where(function ($q) use ($search) {
+                $q->where('customer_orders.purchase_order_id', 'like', '%' . $search . '%')
+                    ->orWhere('customer_orders.purpose', 'like', '%' . $search . '%')
+                    ->orWhere('enterprises.name', 'like', '%' . $search . '%');
+            });
+        }
+
         $orders = $ordersQuery->paginate(10)->withQueryString();
 
-        return view('customer.orders', compact('orders', 'userName', 'tab'));
+        $orderIds = collect($orders->items())
+            ->pluck('purchase_order_id')
+            ->filter()
+            ->values();
+
+        $orderItemsByOrder = collect();
+        if ($orderIds->isNotEmpty()) {
+            $orderItemsByOrder = DB::table('order_items')
+                ->join('services', 'order_items.service_id', '=', 'services.service_id')
+                ->whereIn('order_items.purchase_order_id', $orderIds)
+                ->select(
+                    'order_items.purchase_order_id',
+                    'order_items.item_id',
+                    'order_items.quantity',
+                    'order_items.total_cost',
+                    'order_items.unit_price',
+                    'services.service_name'
+                )
+                ->orderBy('order_items.created_at', 'asc')
+                ->get()
+                ->groupBy('purchase_order_id');
+        }
+
+        return view('customer.orders', compact('orders', 'userName', 'tab', 'search', 'orderItemsByOrder'));
     }
 
     public function orderDetails(Request $request, $id)
@@ -243,13 +276,23 @@ class CustomerController extends Controller
             ->orderBy('order_status_history.timestamp', 'desc')
             ->value('statuses.status_name') ?? 'Pending';
 
-        if (! in_array($currentStatusName, ['Ready for Pickup', 'Delivered'], true)) {
-            return redirect()->back()->with('error', 'You can only confirm orders that are ready or delivered.');
+        if ($currentStatusName !== 'Delivered') {
+            return redirect()->back()->with('error', 'You can only confirm orders that are marked as delivered.');
         }
 
         $completedStatusId = DB::table('statuses')->where('status_name', 'Completed')->value('status_id');
         if (! $completedStatusId) {
-            return redirect()->back()->with('error', 'Status "Completed" is not configured.');
+            $newCompletedId = (string) \Illuminate\Support\Str::uuid();
+            DB::table('statuses')->insertOrIgnore([
+                'status_id' => $newCompletedId,
+                'status_name' => 'Completed',
+                'description' => 'Order has been received/confirmed by the customer',
+            ]);
+
+            $completedStatusId = DB::table('statuses')->where('status_name', 'Completed')->value('status_id');
+            if (! $completedStatusId) {
+                return redirect()->back()->with('error', 'Status "Completed" is not configured.');
+            }
         }
 
         DB::table('order_status_history')->insert([

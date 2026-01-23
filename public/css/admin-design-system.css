@@ -76,3 +76,13 @@
 
  .admin-stat-card{border-radius:16px;padding:18px;box-shadow:0 1px 3px 0 rgb(0 0 0 / .08)}
  .admin-stat-value{font-size:32px;line-height:1.1;font-weight:800}
+
+.bg-background{background-color:#fff!important}
+.text-foreground{color:hsl(240 10% 3.9%)!important}
+.text-muted-foreground{color:hsl(240 3.8% 46.1%)!important}
+.border-border{border-color:hsl(240 5.9% 90%)!important}
+.bg-card{background-color:#fff!important}
+.text-card-foreground{color:hsl(240 10% 3.9%)!important}
+.bg-popover{background-color:#fff!important}
+.text-popover-foreground{color:hsl(240 10% 3.9%)!important}
+.border-input{border-color:hsl(240 5.9% 90%)!important}

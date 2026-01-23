@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+ use Carbon\Carbon;
 
 class BusinessController extends Controller
 {
@@ -83,17 +84,28 @@ class BusinessController extends Controller
     /**
      * Resolve next allowed status buttons for business actions
      */
-    private function getBusinessStatusActions(?string $currentStatusName, $statusIds)
+    private function getBusinessStatusActions(?string $currentStatusName, $statusIds, string $fulfillmentMethod = 'pickup')
     {
         $current = $currentStatusName ?? 'Pending';
+
+        // Normalize legacy/alternate statuses
+        if ($current === 'Processing') {
+            $current = 'In Progress';
+        }
+        if ($current === 'Shipped') {
+            $current = 'Delivered';
+        }
+
+        $fulfillmentMethod = in_array($fulfillmentMethod, ['pickup', 'delivery'], true)
+            ? $fulfillmentMethod
+            : 'pickup';
 
         $allowed = [
             'Pending' => ['Confirmed', 'Cancelled'],
             'Confirmed' => ['In Progress', 'Cancelled'],
-            'In Progress' => ['Ready for Pickup', 'Delivered'],
-            'Ready for Pickup' => [],
+            'In Progress' => $fulfillmentMethod === 'delivery' ? ['Delivered'] : ['Ready for Pickup'],
+            'Ready for Pickup' => ['Delivered'],
             'Delivered' => [],
-            'Shipped' => ['Delivered'],
             'Completed' => [],
             'Cancelled' => [],
         ];
@@ -104,9 +116,20 @@ class BusinessController extends Controller
         $actions = [];
         foreach ($next as $statusName) {
             if (isset($statusIds[$statusName])) {
+                $label = $statusName;
+                if ($current === 'Pending' && $statusName === 'Confirmed') {
+                    $label = 'Confirm Order';
+                }
+                if ($current === 'Ready for Pickup' && $statusName === 'Delivered') {
+                    $label = 'Confirm Pickup';
+                }
+                if ($current === 'In Progress' && $statusName === 'Delivered') {
+                    $label = 'Mark Delivered';
+                }
                 $actions[] = [
                     'name' => $statusName,
                     'id' => $statusIds[$statusName],
+                    'label' => $label,
                 ];
             }
         }
@@ -140,6 +163,11 @@ class BusinessController extends Controller
         $userId = session('user_id');
         $userName = session('user_name');
         $enterprise = $this->getUserEnterprise();
+
+        $unreadNotificationsCount = DB::table('order_notifications')
+            ->where('recipient_id', $userId)
+            ->where('is_read', false)
+            ->count();
 
         $latestStatusTimes = DB::table('order_status_history')
             ->select('purchase_order_id', DB::raw('MAX(timestamp) as latest_time'))
@@ -190,7 +218,7 @@ class BusinessController extends Controller
             ->limit(10)
             ->get();
 
-        return view('business.dashboard', compact('stats', 'recent_orders', 'enterprise', 'userName'));
+        return view('business.dashboard', compact('stats', 'recent_orders', 'enterprise', 'userName', 'unreadNotificationsCount'));
     }
 
     // =====================================================
@@ -309,16 +337,49 @@ class BusinessController extends Controller
     // ORDER MANAGEMENT
     // =====================================================
     
-    public function orders()
+    public function orders(Request $request)
     {
         $userName = session('user_name');
         $enterprise = $this->getUserEnterprise();
+
+        $unreadNotificationsCount = DB::table('order_notifications')
+            ->where('recipient_id', session('user_id'))
+            ->where('is_read', false)
+            ->count();
+
+        $tab = (string) $request->query('tab', 'all');
+
+        $tabToStatuses = [
+            'all' => [],
+            'pending' => ['Pending'],
+            'confirmed' => ['Confirmed'],
+            'in_progress' => ['In Progress', 'Processing'],
+            'ready_for_pickup' => ['Ready for Pickup'],
+            'delivered' => ['Delivered', 'Shipped'],
+            'completed' => ['Completed'],
+            'cancelled' => ['Cancelled'],
+        ];
+
+        $statusFilter = $tabToStatuses[$tab] ?? [];
 
         $latestStatusTimes = DB::table('order_status_history')
             ->select('purchase_order_id', DB::raw('MAX(timestamp) as latest_time'))
             ->groupBy('purchase_order_id');
 
-        $orders = DB::table('customer_orders')
+        $dueExpr = 'customer_orders.date_requested';
+        if (Schema::hasColumn('customer_orders', 'pickup_date')) {
+            $dueExpr = 'customer_orders.pickup_date';
+        } elseif (Schema::hasColumn('customer_orders', 'requested_fulfillment_date')) {
+            $dueExpr = 'customer_orders.requested_fulfillment_date';
+        } elseif (Schema::hasColumn('customer_orders', 'delivery_date')) {
+            $dueExpr = 'customer_orders.delivery_date';
+        }
+
+        $dueDateSql = "DATE({$dueExpr})";
+        $today = Carbon::today()->toDateString();
+        $dueSoon = Carbon::today()->addDay()->toDateString();
+
+        $ordersQuery = DB::table('customer_orders')
             ->join('users', 'customer_orders.customer_id', '=', 'users.user_id')
             ->leftJoinSub($latestStatusTimes, 'latest_status_times', function ($join) {
                 $join->on('customer_orders.purchase_order_id', '=', 'latest_status_times.purchase_order_id');
@@ -330,10 +391,203 @@ class BusinessController extends Controller
             ->leftJoin('statuses', 'osh.status_id', '=', 'statuses.status_id')
             ->where('customer_orders.enterprise_id', $enterprise->enterprise_id)
             ->select('customer_orders.*', 'users.name as customer_name', 'statuses.status_name')
-            ->orderBy('customer_orders.created_at', 'desc')
-            ->paginate(20);
+            ->addSelect(DB::raw("{$dueDateSql} as due_date"));
 
-        return view('business.orders.index', compact('orders', 'enterprise', 'userName'));
+        if (! empty($statusFilter)) {
+            $ordersQuery->whereIn('statuses.status_name', $statusFilter);
+        }
+
+        if (Schema::hasColumn('customer_orders', 'rush_option')) {
+            $ordersQuery->orderByRaw(
+                "CASE customer_orders.rush_option WHEN 'same_day' THEN 0 WHEN 'rush' THEN 1 WHEN 'express' THEN 2 ELSE 3 END"
+            );
+        }
+
+        $orders = $ordersQuery
+            ->orderByRaw(
+                "CASE WHEN {$dueExpr} IS NULL THEN 3 WHEN {$dueDateSql} < ? THEN 0 WHEN {$dueDateSql} <= ? THEN 1 ELSE 2 END",
+                [$today, $dueSoon]
+            )
+            ->orderByRaw("{$dueDateSql} asc")
+            ->orderBy('customer_orders.created_at', 'desc')
+            ->paginate(20)
+            ->appends($request->query());
+
+        return view('business.orders.index', compact('orders', 'enterprise', 'userName', 'tab', 'unreadNotificationsCount'));
+    }
+
+    public function createWalkInOrder()
+    {
+        $userName = session('user_name');
+        $enterprise = $this->getUserEnterprise();
+
+        $unreadNotificationsCount = DB::table('order_notifications')
+            ->where('recipient_id', session('user_id'))
+            ->where('is_read', false)
+            ->count();
+
+        $services = DB::table('services')
+            ->where('enterprise_id', $enterprise->enterprise_id)
+            ->where('is_active', true)
+            ->orderBy('service_name')
+            ->get();
+
+        return view('business.orders.walk-in-create', compact('enterprise', 'userName', 'services', 'unreadNotificationsCount'));
+    }
+
+    public function storeWalkInOrder(Request $request)
+    {
+        $enterprise = $this->getUserEnterprise();
+        $businessUserId = session('user_id');
+
+        $request->validate([
+            'contact_name' => 'required|string|max:255',
+            'contact_phone' => 'nullable|string|max:30',
+            'contact_email' => 'nullable|email|max:255',
+            'purpose' => 'required|string|max:255',
+            'fulfillment_method' => 'required|in:pickup,delivery',
+            'requested_fulfillment_date' => 'nullable|date',
+            'rush_option' => 'nullable|string|max:50',
+            'service_id' => 'required|uuid',
+            'quantity' => 'required|integer|min:1',
+            'unit_price' => 'nullable|numeric|min:0',
+        ]);
+
+        $service = DB::table('services')
+            ->where('service_id', $request->service_id)
+            ->where('enterprise_id', $enterprise->enterprise_id)
+            ->first();
+
+        if (! $service) {
+            return redirect()->back()->with('error', 'Selected service not found.');
+        }
+
+        $pendingStatusId = DB::table('statuses')->where('status_name', 'Pending')->value('status_id');
+        if (! $pendingStatusId) {
+            $newId = (string) Str::uuid();
+            DB::table('statuses')->insertOrIgnore([
+                'status_id' => $newId,
+                'status_name' => 'Pending',
+                'description' => 'Order has been placed and is awaiting confirmation',
+            ]);
+            $pendingStatusId = DB::table('statuses')->where('status_name', 'Pending')->value('status_id');
+        }
+        if (! $pendingStatusId) {
+            return redirect()->back()->with('error', 'Status "Pending" is not configured.');
+        }
+
+        $orderId = (string) Str::uuid();
+        $orderNo = $this->generateOrderNumber();
+
+        $customerId = (string) Str::uuid();
+        $email = $request->contact_email ?: ('walkin+' . now()->format('YmdHis') . '+' . substr((string) Str::uuid(), 0, 8) . '@uniprint.local');
+
+        $quantity = (int) $request->quantity;
+        $unitPrice = $request->filled('unit_price') ? (float) $request->unit_price : (float) ($service->base_price ?? 0);
+        $itemTotal = $quantity * $unitPrice;
+
+        $dateRequested = Carbon::today()->toDateString();
+        $deliveryDate = Carbon::today()->toDateString();
+
+        DB::transaction(function () use (
+            $enterprise,
+            $businessUserId,
+            $orderId,
+            $orderNo,
+            $customerId,
+            $email,
+            $request,
+            $pendingStatusId,
+            $quantity,
+            $unitPrice,
+            $itemTotal,
+            $service,
+            $dateRequested,
+            $deliveryDate
+        ) {
+            DB::table('users')->insert([
+                'user_id' => $customerId,
+                'name' => $request->contact_name,
+                'email' => $email,
+                'position' => 'Walk-in',
+                'department' => 'Walk-in',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            DB::table('customer_orders')->insert([
+                'purchase_order_id' => $orderId,
+                'customer_id' => $customerId,
+                'enterprise_id' => $enterprise->enterprise_id,
+                'purpose' => $request->purpose,
+                'order_no' => $orderNo,
+                'official_receipt_no' => null,
+                'date_requested' => $dateRequested,
+                'delivery_date' => $deliveryDate,
+                'shipping_fee' => $request->fulfillment_method === 'delivery' ? 0 : 0,
+                'discount' => 0,
+                'subtotal' => $itemTotal,
+                'total' => $itemTotal,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            if (Schema::hasColumn('customer_orders', 'status_id')) {
+                DB::table('customer_orders')->where('purchase_order_id', $orderId)->update([
+                    'status_id' => $pendingStatusId,
+                    'updated_at' => now(),
+                ]);
+            }
+
+            if (Schema::hasColumn('customer_orders', 'contact_name')) {
+                DB::table('customer_orders')->where('purchase_order_id', $orderId)->update([
+                    'contact_name' => $request->contact_name,
+                    'contact_phone' => $request->contact_phone,
+                    'contact_email' => $request->contact_email,
+                    'updated_at' => now(),
+                ]);
+            }
+
+            if (Schema::hasColumn('customer_orders', 'rush_option')) {
+                DB::table('customer_orders')->where('purchase_order_id', $orderId)->update([
+                    'rush_option' => $request->rush_option ?: 'standard',
+                    'updated_at' => now(),
+                ]);
+            }
+
+            if (Schema::hasColumn('customer_orders', 'fulfillment_method')) {
+                DB::table('customer_orders')->where('purchase_order_id', $orderId)->update([
+                    'fulfillment_method' => $request->fulfillment_method,
+                    'requested_fulfillment_date' => $request->requested_fulfillment_date,
+                    'updated_at' => now(),
+                ]);
+            }
+
+            DB::table('order_items')->insert([
+                'item_id' => (string) Str::uuid(),
+                'purchase_order_id' => $orderId,
+                'service_id' => $service->service_id,
+                'item_description' => $service->service_name,
+                'quantity' => $quantity,
+                'unit_price' => $unitPrice,
+                'total_cost' => $itemTotal,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            DB::table('order_status_history')->insert([
+                'approval_id' => (string) Str::uuid(),
+                'purchase_order_id' => $orderId,
+                'user_id' => $businessUserId,
+                'status_id' => $pendingStatusId,
+                'remarks' => 'Walk-in order created by business',
+                'timestamp' => now(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        });
+
+        return redirect()->route('business.orders.details', $orderId)->with('success', 'Walk-in order created.');
     }
 
     public function orderDetails($id)
@@ -341,15 +595,43 @@ class BusinessController extends Controller
         $userName = session('user_name');
         $enterprise = $this->getUserEnterprise();
 
+        $unreadNotificationsCount = DB::table('order_notifications')
+            ->where('recipient_id', session('user_id'))
+            ->where('is_read', false)
+            ->count();
+
+        $dueExpr = 'customer_orders.date_requested';
+        if (Schema::hasColumn('customer_orders', 'pickup_date')) {
+            $dueExpr = 'customer_orders.pickup_date';
+        } elseif (Schema::hasColumn('customer_orders', 'requested_fulfillment_date')) {
+            $dueExpr = 'customer_orders.requested_fulfillment_date';
+        } elseif (Schema::hasColumn('customer_orders', 'delivery_date')) {
+            $dueExpr = 'customer_orders.delivery_date';
+        }
+
+        $dueDateSql = "DATE({$dueExpr})";
+
         $order = DB::table('customer_orders')
             ->join('users', 'customer_orders.customer_id', '=', 'users.user_id')
             ->where('customer_orders.purchase_order_id', $id)
             ->where('customer_orders.enterprise_id', $enterprise->enterprise_id)
             ->select('customer_orders.*', 'users.name as customer_name', 'users.email as customer_email')
+            ->addSelect(DB::raw("{$dueDateSql} as due_date"))
             ->first();
 
         if (!$order) {
             abort(404);
+        }
+
+        $fulfillmentMethod = 'pickup';
+        if (Schema::hasColumn('customer_orders', 'fulfillment_method')) {
+            $fulfillmentMethod = (string) ($order->fulfillment_method ?? 'pickup');
+        } elseif (Schema::hasColumn('customer_orders', 'shipping_fee')) {
+            $fulfillmentMethod = ((float) ($order->shipping_fee ?? 0)) > 0 ? 'delivery' : 'pickup';
+        }
+
+        if (! in_array($fulfillmentMethod, ['pickup', 'delivery'], true)) {
+            $fulfillmentMethod = 'pickup';
         }
 
         $requiresFiles = false;
@@ -434,9 +716,102 @@ class BusinessController extends Controller
             ->value('statuses.status_name');
 
         $statusIds = $statuses->pluck('status_id', 'status_name');
-        $businessActions = $this->getBusinessStatusActions($currentStatusName, $statusIds);
+        $businessActions = $this->getBusinessStatusActions($currentStatusName, $statusIds, $fulfillmentMethod);
 
-        return view('business.orders.details', compact('order', 'orderItems', 'statusHistory', 'designFiles', 'statuses', 'statusIds', 'currentStatusName', 'enterprise', 'userName', 'businessActions'));
+        return view('business.orders.details', compact('order', 'orderItems', 'statusHistory', 'designFiles', 'statuses', 'statusIds', 'currentStatusName', 'enterprise', 'userName', 'businessActions', 'unreadNotificationsCount'));
+    }
+
+    public function printOrder($id)
+    {
+        $userName = session('user_name');
+        $enterprise = $this->getUserEnterprise();
+
+        $dueExpr = 'customer_orders.date_requested';
+        if (Schema::hasColumn('customer_orders', 'pickup_date')) {
+            $dueExpr = 'customer_orders.pickup_date';
+        } elseif (Schema::hasColumn('customer_orders', 'requested_fulfillment_date')) {
+            $dueExpr = 'customer_orders.requested_fulfillment_date';
+        } elseif (Schema::hasColumn('customer_orders', 'delivery_date')) {
+            $dueExpr = 'customer_orders.delivery_date';
+        }
+        $dueDateSql = "DATE({$dueExpr})";
+
+        $order = DB::table('customer_orders')
+            ->join('users', 'customer_orders.customer_id', '=', 'users.user_id')
+            ->where('customer_orders.purchase_order_id', $id)
+            ->where('customer_orders.enterprise_id', $enterprise->enterprise_id)
+            ->select('customer_orders.*', 'users.name as customer_name', 'users.email as customer_email')
+            ->addSelect(DB::raw("{$dueDateSql} as due_date"))
+            ->first();
+
+        if (! $order) {
+            abort(404);
+        }
+
+        $orderItems = DB::table('order_items')
+            ->join('services', 'order_items.service_id', '=', 'services.service_id')
+            ->where('order_items.purchase_order_id', $id)
+            ->select('order_items.*', 'services.service_name')
+            ->get();
+
+        $currentStatusName = DB::table('order_status_history')
+            ->join('statuses', 'order_status_history.status_id', '=', 'statuses.status_id')
+            ->where('order_status_history.purchase_order_id', $id)
+            ->orderBy('order_status_history.timestamp', 'desc')
+            ->value('statuses.status_name') ?? 'Pending';
+
+        return view('business.orders.print', compact('order', 'orderItems', 'enterprise', 'userName', 'currentStatusName'));
+    }
+
+    public function notifications(Request $request)
+    {
+        $userId = session('user_id');
+        $userName = session('user_name');
+        $enterprise = $this->getUserEnterprise();
+
+        $query = DB::table('order_notifications')
+            ->where('recipient_id', $userId)
+            ->orderBy('created_at', 'desc');
+
+        $unreadNotificationsCount = DB::table('order_notifications')
+            ->where('recipient_id', $userId)
+            ->where('is_read', false)
+            ->count();
+
+        $notifications = $query->paginate(20);
+
+        return view('business.notifications', compact('notifications', 'enterprise', 'userName', 'unreadNotificationsCount'));
+    }
+
+    public function markNotificationRead(Request $request, $id)
+    {
+        $userId = session('user_id');
+
+        DB::table('order_notifications')
+            ->where('notification_id', $id)
+            ->where('recipient_id', $userId)
+            ->update([
+                'is_read' => true,
+                'read_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+        return redirect()->back()->with('success', 'Notification marked as read');
+    }
+
+    private function generateOrderNumber(): string
+    {
+        $prefix = 'ORD';
+        $date = Carbon::now()->format('Ymd');
+
+        $lastOrder = DB::table('customer_orders')
+            ->where('order_no', 'LIKE', "{$prefix}{$date}%")
+            ->orderBy('order_no', 'desc')
+            ->value('order_no');
+
+        $sequence = $lastOrder ? (int) substr($lastOrder, -4) + 1 : 1;
+
+        return $prefix . $date . str_pad((string) $sequence, 4, '0', STR_PAD_LEFT);
     }
 
     public function confirmOrder($id)
@@ -543,11 +918,41 @@ class BusinessController extends Controller
 
         $currentStatusName = $oldStatus?->status_name ?? 'Pending';
 
+        // Normalize legacy/alternate statuses
+        if ($currentStatusName === 'Processing') {
+            $currentStatusName = 'In Progress';
+        }
+        if ($currentStatusName === 'Shipped') {
+            $currentStatusName = 'Delivered';
+        }
+
         $statusLookup = DB::table('statuses')->pluck('status_name', 'status_id');
         $newStatusName = $statusLookup[$request->status_id] ?? null;
 
         if (! $newStatusName) {
             return redirect()->back()->with('error', 'Selected status is not configured.');
+        }
+
+        // Legacy compatibility: treat Shipped as Delivered.
+        $targetStatusId = $request->status_id;
+        if ($newStatusName === 'Shipped') {
+            $deliveredStatusId = DB::table('statuses')->where('status_name', 'Delivered')->value('status_id');
+            if (! $deliveredStatusId) {
+                return redirect()->back()->with('error', 'Status "Delivered" is not configured.');
+            }
+            $newStatusName = 'Delivered';
+            $targetStatusId = $deliveredStatusId;
+        }
+
+        $fulfillmentMethod = 'pickup';
+        if (Schema::hasColumn('customer_orders', 'fulfillment_method')) {
+            $fulfillmentMethod = (string) ($order->fulfillment_method ?? 'pickup');
+        } elseif (Schema::hasColumn('customer_orders', 'shipping_fee')) {
+            $fulfillmentMethod = ((float) ($order->shipping_fee ?? 0)) > 0 ? 'delivery' : 'pickup';
+        }
+
+        if (! in_array($fulfillmentMethod, ['pickup', 'delivery'], true)) {
+            $fulfillmentMethod = 'pickup';
         }
 
         $requiresFiles = false;
@@ -577,13 +982,22 @@ class BusinessController extends Controller
         $allowedTransitions = [
             'Pending' => ['Confirmed', 'Cancelled'],
             'Confirmed' => ['In Progress', 'Cancelled'],
-            'In Progress' => ['Ready for Pickup', 'Delivered'],
-            'Ready for Pickup' => [],
+            'In Progress' => $fulfillmentMethod === 'pickup' ? ['Ready for Pickup', 'Delivered'] : ['Delivered'],
+            'Ready for Pickup' => ['Delivered'],
             'Delivered' => [],
-            'Shipped' => ['Delivered'],
             'Completed' => [],
             'Cancelled' => [],
         ];
+
+        // Enforce pickup vs delivery flow.
+        if ($currentStatusName === 'In Progress') {
+            if ($fulfillmentMethod === 'pickup' && $newStatusName === 'Delivered') {
+                return redirect()->back()->with('error', 'Pickup orders must be marked Ready for Pickup before confirming pickup.');
+            }
+            if ($fulfillmentMethod === 'delivery' && $newStatusName === 'Ready for Pickup') {
+                return redirect()->back()->with('error', 'Delivery orders cannot be marked Ready for Pickup.');
+            }
+        }
 
         $allowedNext = $allowedTransitions[$currentStatusName] ?? [];
 
@@ -596,7 +1010,7 @@ class BusinessController extends Controller
             'approval_id' => Str::uuid(),
             'purchase_order_id' => $id,
             'user_id' => $userId,
-            'status_id' => $request->status_id,
+            'status_id' => $targetStatusId,
             'remarks' => $request->remarks ?? 'Status updated by business',
             'timestamp' => now(),
             'created_at' => now(),
@@ -607,7 +1021,7 @@ class BusinessController extends Controller
             ->where('purchase_order_id', $id)
             ->where('enterprise_id', $enterprise->enterprise_id)
             ->update([
-                'status_id' => $request->status_id,
+                'status_id' => $targetStatusId,
                 'updated_at' => now(),
             ]);
 

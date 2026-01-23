@@ -39,7 +39,7 @@ $breadcrumbs = [
                     <span class="inline-block px-2 py-1 text-xs rounded-md font-medium
                         @if($status->status_name == 'Pending') bg-warning/10 text-warning
                         @elseif($status->status_name == 'In Progress') bg-blue-500/10 text-blue-500
-                        @elseif($status->status_name == 'Shipped') bg-primary/10 text-primary
+                        @elseif($status->status_name == 'Shipped') bg-success/10 text-success
                         @else bg-success/10 text-success
                         @endif
                     ">{{ $status->status_name }}</span>

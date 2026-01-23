@@ -34,11 +34,11 @@
                 </button>
             </form>
         @endif
-        @if(in_array($currentStatusName ?? null, ['Ready for Pickup', 'Delivered'], true))
+        @if(($currentStatusName ?? null) === 'Delivered')
             <form action="{{ route('customer.orders.confirm-completion', $order->purchase_order_id) }}" method="POST">
                 @csrf
                 <button type="submit" class="btn btn-success">
-                    <i class="bi bi-check2-circle me-2"></i>Confirm Completion
+                    <i class="bi bi-check2-circle me-2"></i>Confirm Received
                 </button>
             </form>
         @endif
@@ -72,10 +72,6 @@
                     <i class="bi bi-bag-check text-success" style="font-size: 4rem;"></i>
                     <h3 class="mt-3">Ready for Pickup</h3>
                     <p class="text-muted">Your order is ready. Please pick it up when convenient</p>
-                @elseif($status === 'Shipped')
-                    <i class="bi bi-truck text-primary" style="font-size: 4rem;"></i>
-                    <h3 class="mt-3">Order Shipped</h3>
-                    <p class="text-muted">Your order is on its way!</p>
                 @elseif($status === 'Delivered')
                     <i class="bi bi-check-circle text-success" style="font-size: 4rem;"></i>
                     <h3 class="mt-3">Order Delivered</h3>
@@ -259,7 +255,7 @@
                             <div class="bg-success text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
                                 <i class="bi bi-check-lg"></i>
                             </div>
-                        @elseif($history->status_name == 'Delivered' || $history->status_name == 'Shipped')
+                        @elseif($history->status_name == 'Delivered')
                             <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
                                 <i class="bi bi-truck"></i>
                             </div>

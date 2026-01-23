@@ -9,6 +9,11 @@
     <i data-lucide="arrow-left" class="h-4 w-4"></i>
     Back to Orders
 </a>
+
+<a href="{{ route('business.orders.print', $order->purchase_order_id) }}" target="_blank" class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:shadow-glow transition-smooth">
+    <i data-lucide="printer" class="h-4 w-4"></i>
+    Print
+</a>
 @endsection
 
 @section('content')
@@ -184,6 +189,26 @@
                         <p class="text-sm text-muted-foreground">Email</p>
                         <p class="font-medium">{{ $order->customer_email }}</p>
                     </div>
+                    @if(!empty($order->due_date))
+                        @php
+                            $today = \Carbon\Carbon::today()->toDateString();
+                            $dueSoon = \Carbon\Carbon::today()->addDay()->toDateString();
+                            $dueDate = $order->due_date;
+                            $isOverdue = $dueDate < $today;
+                            $isDueSoon = ! $isOverdue && $dueDate <= $dueSoon;
+                        @endphp
+                        <div>
+                            <p class="text-sm text-muted-foreground">Due</p>
+                            <div class="flex items-center gap-2">
+                                <p class="font-medium">{{ date('M d, Y', strtotime($dueDate)) }}</p>
+                                @if($isOverdue)
+                                    <span class="inline-block px-2 py-0.5 text-xs font-medium rounded-md bg-destructive/10 text-destructive">Overdue</span>
+                                @elseif($isDueSoon)
+                                    <span class="inline-block px-2 py-0.5 text-xs font-medium rounded-md bg-warning/10 text-warning">Due soon</span>
+                                @endif
+                            </div>
+                        </div>
+                    @endif
                     <div>
                         <p class="text-sm text-muted-foreground">Delivery Date</p>
                         <p class="font-medium">{{ date('M d, Y', strtotime($order->delivery_date)) }}</p>
@@ -199,25 +224,49 @@
                 </div>
 
                 @if(!empty($businessActions))
+                    @php
+                        $cancelAction = null;
+                        $advanceAction = null;
+                        foreach ($businessActions as $action) {
+                            if (($action['name'] ?? null) === 'Cancelled') {
+                                $cancelAction = $action;
+                                continue;
+                            }
+                            if ($advanceAction === null) {
+                                $advanceAction = $action;
+                            }
+                        }
+                    @endphp
+
                     <div class="space-y-3">
-                        @foreach($businessActions as $action)
+                        @if($advanceAction)
+                            <form action="{{ route('business.orders.update-status', $order->purchase_order_id) }}" method="POST">
+                                @csrf
+                                <input type="hidden" name="status_id" value="{{ $advanceAction['id'] }}">
+                                <button type="submit"
+                                        class="w-full px-4 py-2 font-medium rounded-md transition-smooth
+                                            @if(($advanceAction['name'] ?? null) === 'Confirmed') bg-success text-white hover:opacity-90
+                                            @elseif(($advanceAction['name'] ?? null) === 'In Progress') bg-primary text-primary-foreground hover:shadow-glow
+                                            @elseif(in_array(($advanceAction['name'] ?? null), ['Ready for Pickup', 'Delivered'], true)) bg-amber-500 text-white hover:opacity-90
+                                            @else bg-primary text-primary-foreground hover:shadow-glow @endif">
+                                    {{ $advanceAction['label'] ?? $advanceAction['name'] }}
+                                </button>
+                            </form>
+                        @endif
+
+                        @if($cancelAction)
                             <button type="button"
-                                    class="w-full px-4 py-2 font-medium rounded-md transition-smooth
-                                        @if($action['name'] === 'Cancelled') bg-destructive text-destructive-foreground hover:bg-destructive/90
-                                        @elseif($action['name'] === 'Confirmed') bg-success text-white hover:opacity-90
-                                        @elseif($action['name'] === 'In Progress') bg-primary text-primary-foreground hover:shadow-glow
-                                        @elseif($action['name'] === 'Ready for Pickup' || $action['name'] === 'Delivered') bg-amber-500 text-white hover:opacity-90
-                                        @else bg-primary text-primary-foreground hover:shadow-glow @endif"
-                                    onclick="openOrderStatusActionModal('{{ $order->purchase_order_id }}', '{{ $action['id'] }}', @json($action['name']))">
-                                {{ $action['name'] }}
+                                    class="w-full px-4 py-2 bg-destructive text-destructive-foreground font-medium rounded-md hover:bg-destructive/90 transition-smooth"
+                                    onclick="openOrderStatusActionModal('{{ $order->purchase_order_id }}', '{{ $cancelAction['id'] }}', @json($cancelAction['label'] ?? $cancelAction['name']))">
+                                {{ $cancelAction['label'] ?? $cancelAction['name'] }}
                             </button>
-                        @endforeach
+                        @endif
                     </div>
                 @else
                     <p class="text-sm text-muted-foreground">Waiting for customer confirmation.</p>
                 @endif
 
-                @if(($currentStatusName ?? null) === 'Pending')
+                @if(($currentStatusName ?? null) === 'Pending' && empty($cancelAction))
                     <div class="mt-4 border-t border-border pt-4">
                         <p class="text-sm font-medium mb-2">Need to undo?</p>
                         <button type="button"

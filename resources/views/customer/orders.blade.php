@@ -7,14 +7,16 @@ use Illuminate\Support\Facades\DB;
 @section('title', 'My Orders')
 
 @section('content')
-<!-- Page Header -->
-<div class="mb-8">
-    <div class="flex items-center gap-3 mb-2">
-        <i data-lucide="package" class="h-8 w-8 text-primary"></i>
-        <h1 class="text-3xl font-bold text-gray-900">My Orders</h1>
-    </div>
-    <p class="text-gray-600 text-lg">Track and manage your orders</p>
-</div>
+<div class="min-h-screen bg-background">
+    <main class="container mx-auto px-4 py-8">
+        <!-- Page Header -->
+        <div class="mb-8">
+            <div class="flex items-center gap-3 mb-2">
+                <i data-lucide="package" class="h-8 w-8 text-primary"></i>
+                <h1 class="text-3xl font-bold text-gray-900">My Orders</h1>
+            </div>
+            <p class="text-gray-600 text-lg">Track and manage your orders</p>
+        </div>
 
 @php
     $activeTab = $tab ?? 'all';
@@ -24,206 +26,169 @@ use Illuminate\Support\Facades\DB;
         'processing' => ['label' => 'Processing', 'url' => route('customer.orders', ['tab' => 'processing'])],
         'final_process' => ['label' => 'Final Process', 'url' => route('customer.orders', ['tab' => 'final_process'])],
         'completed' => ['label' => 'Completed', 'url' => route('customer.orders', ['tab' => 'completed'])],
+        'cancelled' => ['label' => 'Cancelled', 'url' => route('customer.orders', ['tab' => 'cancelled'])],
     ];
 @endphp
 
 <div class="mb-6">
-    <div class="inline-flex flex-wrap gap-2 bg-white p-2 rounded-lg shadow-sm">
-        @foreach($tabLinks as $key => $tabItem)
-            <a href="{{ $tabItem['url'] }}"
-               class="px-4 py-2 rounded-md text-sm font-medium transition-colors {{ $activeTab === $key ? 'bg-primary text-white' : 'text-gray-700 hover:bg-gray-100' }}">
-                {{ $tabItem['label'] }}
-            </a>
-        @endforeach
+    <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+        <div class="flex items-center justify-between gap-3 px-4 pt-4">
+            <nav class="flex items-center gap-6 overflow-x-auto" aria-label="Orders">
+                @foreach($tabLinks as $key => $tabItem)
+                    <a href="{{ route('customer.orders', array_filter(['tab' => $key, 'q' => ($search ?? '') !== '' ? ($search ?? '') : null])) }}"
+                       class="pb-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors {{ $activeTab === $key ? 'text-primary border-primary' : 'text-gray-600 border-transparent hover:text-gray-900 hover:border-gray-200' }}">
+                        {{ $tabItem['label'] }}
+                    </a>
+                @endforeach
+            </nav>
+
+            <form action="{{ route('customer.orders') }}" method="GET" class="hidden md:block w-full max-w-md">
+                <input type="hidden" name="tab" value="{{ $activeTab }}" />
+                <div class="relative">
+                    <i data-lucide="search" class="h-4 w-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                    <input
+                        name="q"
+                        value="{{ $search ?? '' }}"
+                        placeholder="Search by shop, order ID, or notes"
+                        class="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-md focus:ring-2 focus:ring-primary focus:border-transparent"
+                    />
+                </div>
+            </form>
+        </div>
+
+        <div class="px-4 pb-4 md:hidden">
+            <form action="{{ route('customer.orders') }}" method="GET">
+                <input type="hidden" name="tab" value="{{ $activeTab }}" />
+                <div class="relative">
+                    <i data-lucide="search" class="h-4 w-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                    <input
+                        name="q"
+                        value="{{ $search ?? '' }}"
+                        placeholder="Search orders"
+                        class="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-md focus:ring-2 focus:ring-primary focus:border-transparent"
+                    />
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 
     <!-- Order Statistics -->
-    @php
-        $orderStats = [
-            'pending' => $orders->where('status_name', 'Pending')->count(),
-            'in_progress' => $orders->where('status_name', 'Processing')->count(),
-            'completed' => $orders->where('status_name', 'Delivered')->count()
-        ];
-    @endphp
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div class="bg-white rounded-lg shadow-sm p-4">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-gray-600">Pending Orders</p>
-                    <p class="text-2xl font-bold text-warning">{{ $orderStats['pending'] }}</p>
-                </div>
-                <div class="w-12 h-12 bg-warning/10 rounded-lg flex items-center justify-center">
-                    <i data-lucide="clock" class="h-6 w-6 text-warning"></i>
-                </div>
-            </div>
-        </div>
-        <div class="bg-white rounded-lg shadow-sm p-4">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-gray-600">In Progress</p>
-                    <p class="text-2xl font-bold text-primary">{{ $orderStats['in_progress'] }}</p>
-                </div>
-                <div class="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                    <i data-lucide="settings" class="h-6 w-6 text-primary"></i>
-                </div>
-            </div>
-        </div>
-        <div class="bg-white rounded-lg shadow-sm p-4">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-gray-600">Completed</p>
-                    <p class="text-2xl font-bold text-success">{{ $orderStats['completed'] }}</p>
-                </div>
-                <div class="w-12 h-12 bg-success/10 rounded-lg flex items-center justify-center">
-                    <i data-lucide="check-circle" class="h-6 w-6 text-success"></i>
-                </div>
-            </div>
-        </div>
+    <div class="mb-6 text-sm text-gray-600">
+        @if(($search ?? '') !== '')
+            Showing results for <span class="font-medium text-gray-900">{{ $search }}</span>
+            <a href="{{ route('customer.orders', ['tab' => $activeTab]) }}" class="ml-2 text-primary hover:underline">Clear</a>
+        @else
+            Showing <span class="font-medium text-gray-900">{{ $orders->count() }}</span> orders on this page
+        @endif
     </div>
 
     <!-- Orders List -->
     <div class="space-y-4">
         @forelse($orders as $order)
-        <div class="bg-white rounded-lg shadow-sm">
-            <div class="p-6">
-                <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                    <div class="lg:col-span-3">
-                        <div class="flex items-start gap-4 mb-4">
-                            <div class="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                                <i data-lucide="receipt" class="h-6 w-6 text-primary"></i>
-                            </div>
-                            <div class="flex items-center justify-between">
-                                <div class="flex-1">
-                                    <h3 class="text-lg font-semibold text-gray-900 mb-1">Order #{{ substr($order->purchase_order_id, 0, 8) }}</h3>
-                                    <p class="text-gray-600 mb-2">{{ $order->enterprise_name ?? 'Unknown Shop' }}</p>
-                                    <div class="flex items-center text-sm text-gray-500">
-                                        <i data-lucide="calendar" class="h-4 w-4 mr-1"></i>
-                                        {{ isset($order->created_at) ? (is_string($order->created_at) ? date('M d, Y H:i', strtotime($order->created_at)) : $order->created_at->format('M d, Y H:i')) : 'N/A' }}
-                                    </div>
-                                </div>
-                                <div class="flex items-center gap-2">
-                                    <!-- Order Status Badge -->
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                        {{ $order->status_name === 'Pending' ? 'bg-yellow-100 text-yellow-800' : 
-                                           ($order->status_name === 'Processing' ? 'bg-blue-100 text-blue-800' : 
-                                           ($order->status_name === 'Delivered' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800')) }}">
-                                        {{ $order->status_name ?? 'Unknown' }}
-                                    </span>
-                                    <!-- Chat Button -->
-                                    <button onclick="openOrderChat('{{ $order->purchase_order_id }}', '{{ $order->enterprise_id }}', '{{ $order->enterprise_name }}')" 
-                                            class="inline-flex items-center px-3 py-1.5 border border-primary text-primary text-sm font-medium rounded-md hover:bg-primary hover:text-white transition-colors">
-                                        <i data-lucide="message-circle" class="h-4 w-4 mr-1"></i>
-                                        Chat
-                                    </button>
-                                </div>
-                            </div>
+        <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+            <div class="px-4 py-3 flex items-center justify-between border-b border-gray-100">
+                <div class="flex items-center gap-2 min-w-0">
+                    <div class="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <i data-lucide="store" class="h-4 w-4 text-primary"></i>
+                    </div>
+                    <div class="min-w-0">
+                        <div class="flex items-center gap-2 min-w-0">
+                            <span class="font-semibold text-gray-900 truncate">{{ $order->enterprise_name ?? 'Print Shop' }}</span>
+                            <span class="text-xs text-gray-400">•</span>
+                            <span class="text-xs text-gray-500">#{{ substr((string) $order->purchase_order_id, 0, 8) }}</span>
                         </div>
-
-                        @if(!empty($order->purpose) && $order->purpose !== 'Online order via UniPrint')
-                        <div class="border-t border-gray-200 pt-4">
-                            <h4 class="text-sm font-medium text-gray-900 mb-3">Special Instructions:</h4>
-                            <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                                <p class="text-sm text-blue-800">{{ $order->purpose }}</p>
-                            </div>
-                        </div>
-                        @endif
-
-                        <div class="border-t border-gray-200 pt-4">
-                            <h4 class="text-sm font-medium text-gray-900 mb-3">Order Items:</h4>
-                            @php
-                                // Load order items with customizations
-                                $orderItems = DB::table('order_items')
-                                    ->join('services', 'order_items.service_id', '=', 'services.service_id')
-                                    ->where('order_items.purchase_order_id', $order->purchase_order_id)
-                                    ->select('order_items.*', 'services.service_name as product_name')
-                                    ->get();
-                            @endphp
-                            @if($orderItems->count() > 0)
-                                <div class="space-y-3">
-                                    @foreach($orderItems as $item)
-                                    <div class="bg-gray-50 rounded-lg p-3">
-                                        <div class="flex justify-between items-start mb-2">
-                                            <div class="flex-1">
-                                                <span class="font-medium text-gray-900">{{ $item->quantity }}x {{ $item->product_name ?? 'Unknown Product' }}</span>
-                                            </div>
-                                            <span class="font-medium text-gray-900">₱{{ number_format($item->total_cost ?? ($item->quantity * ($item->unit_price ?? 0)), 2) }}</span>
-                                        </div>
-                                        
-                                        @php
-                                            // Load customizations for this item
-                                            $customizations = DB::table('order_item_customizations')
-                                                ->join('customization_options', 'order_item_customizations.option_id', '=', 'customization_options.option_id')
-                                                ->where('order_item_customizations.order_item_id', $item->item_id)
-                                                ->select('customization_options.option_name', 'customization_options.option_type', 'order_item_customizations.price_snapshot')
-                                                ->get();
-                                        @endphp
-                                        
-                                        @if($customizations->count() > 0)
-                                            <div class="flex flex-wrap gap-1 mt-2">
-                                                @foreach($customizations as $customization)
-                                                    <span class="inline-flex items-center px-2 py-1 text-xs bg-primary/10 text-primary rounded-md">
-                                                        {{ $customization->option_type }}: {{ $customization->option_name }}
-                                                        @if($customization->price_snapshot > 0)
-                                                            (+₱{{ number_format($customization->price_snapshot, 2) }})
-                                                        @endif
-                                                    </span>
-                                                @endforeach
-                                            </div>
-                                        @endif
-                                    </div>
-                                    @endforeach
-                                </div>
-                            @else
-                                <div class="text-gray-500">No items found</div>
-                            @endif
+                        <div class="flex items-center gap-1 text-xs text-gray-500">
+                            <i data-lucide="calendar" class="h-3.5 w-3.5"></i>
+                            <span>
+                                {{ isset($order->created_at) ? (is_string($order->created_at) ? date('M d, Y H:i', strtotime($order->created_at)) : $order->created_at->format('M d, Y H:i')) : 'N/A' }}
+                            </span>
                         </div>
                     </div>
+                </div>
 
-                    <div class="lg:col-span-1 lg:border-l lg:border-gray-200 lg:pl-6">
-                        <div class="text-center mb-4">
-                            @if(($order->status_name ?? $order->current_status ?? 'Pending') == 'Pending')
-                                <div class="w-16 h-16 bg-warning/10 rounded-full flex items-center justify-center mx-auto mb-3">
-                                    <i data-lucide="clock" class="h-8 w-8 text-warning"></i>
+                <div class="flex items-center gap-2 flex-shrink-0">
+                    <span class="text-sm font-medium text-primary">{{ $order->status_name ?? 'Pending' }}</span>
+                </div>
+            </div>
+
+            <div class="px-4 py-4">
+                @php
+                    $orderItems = $orderItemsByOrder[$order->purchase_order_id] ?? collect();
+                    $firstItem = $orderItems->first();
+                @endphp
+
+                @if($orderItems->count() > 0)
+                    <div class="flex items-start gap-3">
+                        <div class="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <i data-lucide="file-text" class="h-6 w-6 text-gray-500"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="font-medium text-gray-900 truncate">{{ $firstItem->service_name ?? 'Service' }}</div>
+                            <div class="text-sm text-gray-500 mt-0.5">
+                                Qty: {{ $firstItem->quantity ?? 1 }}
+                                @if($orderItems->count() > 1)
+                                    <span class="ml-2">+{{ $orderItems->count() - 1 }} more item{{ ($orderItems->count() - 1) === 1 ? '' : 's' }}</span>
+                                @endif
+                            </div>
+                            @if(!empty($order->purpose) && $order->purpose !== 'Online order via UniPrint')
+                                <div class="mt-2 text-sm text-gray-600 truncate">
+                                    {{ $order->purpose }}
                                 </div>
-                                <span class="status-badge status-pending">Pending</span>
-                            @elseif(($order->status_name ?? $order->current_status ?? 'Pending') == 'In Progress')
-                                <div class="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3">
-                                    <i data-lucide="settings" class="h-8 w-8 text-primary"></i>
-                                </div>
-                                <span class="status-badge status-in-progress">In Progress</span>
-                            @elseif(($order->status_name ?? $order->current_status ?? 'Pending') == 'Shipped')
-                                <div class="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3">
-                                    <i data-lucide="truck" class="h-8 w-8 text-primary"></i>
-                                </div>
-                                <span class="status-badge status-in-progress">Shipped</span>
-                            @else
-                                <div class="w-16 h-16 bg-success/10 rounded-full flex items-center justify-center mx-auto mb-3">
-                                    <i data-lucide="check-circle" class="h-8 w-8 text-success"></i>
-                                </div>
-                                <span class="status-badge status-completed">{{ $order->status_name ?? $order->current_status ?? 'Complete' }}</span>
                             @endif
                         </div>
-
-                        <div class="text-center mb-4">
-                            <p class="text-2xl font-bold text-primary">
-                                ₱{{ number_format($order->total ?? $order->total_order_amount ?? 0, 2) }}
-                            </p>
+                        <div class="text-right flex-shrink-0">
+                            <div class="text-xs text-gray-500">Item total</div>
+                            <div class="font-semibold text-gray-900">
+                                ₱{{ number_format($firstItem->total_cost ?? (($firstItem->quantity ?? 1) * ($firstItem->unit_price ?? 0)), 2) }}
+                            </div>
                         </div>
+                    </div>
+                @else
+                    <div class="text-gray-500">No items found</div>
+                @endif
+            </div>
 
-                        <a href="{{ route('customer.order.details', $order->purchase_order_id) }}" 
-                           class="customer-button-primary w-full text-center js-customer-order-details">
-                            <i data-lucide="eye" class="h-4 w-4 mr-2"></i>View Details
+            <div class="px-4 py-3 border-t border-gray-100 bg-gray-50">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div class="flex items-center gap-2">
+                        <button onclick="openOrderChat('{{ $order->purchase_order_id }}', '{{ $order->enterprise_id }}', '{{ $order->enterprise_name }}')"
+                                class="inline-flex items-center px-3 py-2 border border-primary text-primary text-sm font-medium rounded-md hover:bg-primary hover:text-white transition-colors">
+                            <i data-lucide="message-circle" class="h-4 w-4 mr-1"></i>
+                            Chat
+                        </button>
+                        <a href="{{ route('customer.order.details', $order->purchase_order_id) }}"
+                           class="inline-flex items-center px-3 py-2 border border-gray-200 text-gray-700 text-sm font-medium rounded-md hover:bg-white transition-colors js-customer-order-details">
+                            <i data-lucide="eye" class="h-4 w-4 mr-1"></i>
+                            View
                         </a>
-
-                        @if(($order->status_name ?? 'Pending') === 'Pending')
-                        <form action="{{ route('customer.orders.cancel', $order->purchase_order_id) }}" method="POST" class="mt-2" onsubmit="return confirm('Cancel this order?');">
-                            @csrf
-                            <button type="submit" class="w-full inline-flex items-center justify-center px-4 py-2 border border-red-200 text-red-600 rounded-md hover:bg-red-50 transition-colors">
-                                <i data-lucide="x-circle" class="h-4 w-4 mr-2"></i>Cancel Order
-                            </button>
-                        </form>
+                        @if(($order->status_name ?? 'Pending') === 'Delivered')
+                            <form action="{{ route('customer.orders.confirm-completion', $order->purchase_order_id) }}" method="POST" onsubmit="return confirm('Confirm you received this order?');">
+                                @csrf
+                                <button type="submit" class="inline-flex items-center px-3 py-2 border border-success/30 text-success text-sm font-medium rounded-md hover:bg-success/10 transition-colors">
+                                    <i data-lucide="check-circle" class="h-4 w-4 mr-1"></i>
+                                    Confirm Received
+                                </button>
+                            </form>
                         @endif
+                        @if(($order->status_name ?? 'Pending') === 'Pending')
+                            <form action="{{ route('customer.orders.cancel', $order->purchase_order_id) }}" method="POST" onsubmit="return confirm('Cancel this order?');">
+                                @csrf
+                                <button type="submit" class="inline-flex items-center px-3 py-2 border border-red-200 text-red-600 text-sm font-medium rounded-md hover:bg-red-50 transition-colors">
+                                    <i data-lucide="x-circle" class="h-4 w-4 mr-1"></i>
+                                    Cancel
+                                </button>
+                            </form>
+                        @endif
+                    </div>
+
+                    <div class="flex items-center justify-between sm:justify-end gap-3">
+                        <div class="text-right">
+                            <div class="text-xs text-gray-500">Order total</div>
+                            <div class="text-lg font-bold text-primary">
+                                ₱{{ number_format($order->total ?? $order->total_order_amount ?? 0, 2) }}
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -247,6 +212,7 @@ use Illuminate\Support\Facades\DB;
         {{ $orders->links() }}
     </div>
     @endif
+    </main>
 </div>
 
 <x-ui.modal id="customerOrderDetailsModal" title="Order Details" size="xl" scrollable>
