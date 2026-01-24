@@ -22,7 +22,7 @@
                 <h5>
                     <i class="bi bi-chat-dots"></i> Messages
                 </h5>
-                <small>{{ auth()->user()->role_type === 'customer' ? 'Customer' : 'Business Representative' }}</small>
+                <small>{{ auth()->user()->getUserRoleType() === 'customer' ? 'Customer' : 'Business Representative' }}</small>
             </div>
 
             <div class="conversations-search">
@@ -70,7 +70,7 @@
         user: {
             id: '{{ auth()->user()->user_id }}',
             name: '{{ auth()->user()->name }}',
-            role_type: '{{ auth()->user()->role_type }}'
+            role_type: '{{ auth()->user()->getUserRoleType() }}'
         },
         pusher: {
             key: '{{ config("broadcasting.connections.pusher.key") }}',

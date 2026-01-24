@@ -52,7 +52,7 @@
                 <p class="text-muted mb-0 mt-1">Fill in the details below to add a new service to your catalog</p>
             </div>
             <div class="enhanced-card-body">
-                <form action="{{ route('business.services.store') }}" method="POST" enctype="multipart/form-data" class="needs-validation" novalidate>
+                <form action="{{ route('business.services.store') }}" method="POST" enctype="multipart/form-data" class="needs-validation" novalidate data-up-global-loader>
                     @csrf
                     <div class="row">
                         <div class="col-md-8 mb-3">
@@ -195,6 +195,32 @@
                                             />
                                         </div>
                                     @endif
+
+                                    @if(\Illuminate\Support\Facades\Schema::hasColumn('services', 'requires_downpayment') && \Illuminate\Support\Facades\Schema::hasColumn('services', 'downpayment_percent'))
+                                        <div class="mt-3">
+                                            <x-ui.form.switch
+                                                name="requires_downpayment"
+                                                id="requires_downpayment"
+                                                :checked="old('requires_downpayment', false)"
+                                                label="Require Downpayment"
+                                                help="If enabled, customers must pay a downpayment before production can start."
+                                            />
+                                            <div class="mt-2">
+                                                <label for="downpayment_percent" class="form-label fw-semibold">Downpayment Percent (%)</label>
+                                                <input type="number"
+                                                       class="form-control form-control-enhanced @error('downpayment_percent') is-invalid @enderror"
+                                                       id="downpayment_percent"
+                                                       name="downpayment_percent"
+                                                       value="{{ old('downpayment_percent', 0) }}"
+                                                       step="0.01"
+                                                       min="0"
+                                                       max="100">
+                                                @error('downpayment_percent')
+                                                    <div class="invalid-feedback">{{ $message }}</div>
+                                                @enderror
+                                            </div>
+                                        </div>
+                                    @endif
                                 </div>
                             </div>
                         </div>
@@ -222,7 +248,7 @@
                             <i data-lucide="x" class="h-4 w-4 me-2"></i>
                             Cancel
                         </a>
-                        <button type="submit" class="btn btn-enhanced-primary">
+                        <button type="submit" class="btn btn-enhanced-primary" data-up-button-loader>
                             <i data-lucide="plus-circle" class="h-4 w-4 me-2"></i>
                             Create Service
                         </button>

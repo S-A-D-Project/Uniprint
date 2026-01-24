@@ -27,7 +27,7 @@
                 $allowedPaymentMethods = ['gcash', 'cash'];
             }
         @endphp
-        <form action="{{ route('business.services.update', $service->service_id) }}" method="POST" enctype="multipart/form-data">
+        <form action="{{ route('business.services.update', $service->service_id) }}" method="POST" enctype="multipart/form-data" data-up-global-loader>
             @csrf
             @method('PUT')
             <div class="space-y-6">
@@ -114,13 +114,28 @@
                     />
                 @endif
 
+                @if(\Illuminate\Support\Facades\Schema::hasColumn('services', 'requires_downpayment') && \Illuminate\Support\Facades\Schema::hasColumn('services', 'downpayment_percent'))
+                    <x-ui.form.switch
+                        name="requires_downpayment"
+                        id="requires_downpayment"
+                        :checked="old('requires_downpayment', !empty($service->requires_downpayment))"
+                        label="Require Downpayment"
+                    />
+
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Downpayment Percent (%)</label>
+                        <input type="number" name="downpayment_percent" value="{{ old('downpayment_percent', $service->downpayment_percent ?? 0) }}" step="0.01" min="0" max="100"
+                               class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
+                    </div>
+                @endif
+
                 <div class="flex gap-3 pt-4">
                     <a href="{{ route('business.services.index') }}" 
                        class="flex-1 px-6 py-3 text-center border border-input rounded-lg hover:bg-secondary transition-smooth">
                         Cancel
                     </a>
                     <button type="submit" 
-                            class="flex-1 px-6 py-3 bg-primary text-primary-foreground font-medium rounded-lg hover:shadow-glow transition-smooth">
+                            class="flex-1 px-6 py-3 bg-primary text-primary-foreground font-medium rounded-lg hover:shadow-glow transition-smooth" data-up-button-loader>
                         Update Service
                     </button>
                 </div>

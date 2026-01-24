@@ -1,5 +1,5 @@
 <x-ui.modal id="rejectDesignFileModal" title="Reject Design File" size="md" centered>
-    <form id="rejectDesignFileForm" method="POST">
+    <form id="rejectDesignFileForm" method="POST" data-up-global-loader>
         @csrf
         <div class="space-y-4">
             <div>
@@ -12,6 +12,6 @@
 
     <x-slot name="footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="submit" form="rejectDesignFileForm" class="btn btn-danger">Reject File</button>
+        <button type="submit" form="rejectDesignFileForm" class="btn btn-danger" data-up-button-loader>Reject File</button>
     </x-slot>
 </x-ui.modal>

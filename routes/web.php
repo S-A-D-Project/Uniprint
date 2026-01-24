@@ -184,6 +184,7 @@ Route::prefix('business')->middleware([\App\Http\Middleware\CheckAuth::class])->
         Route::get('/orders/{id}/print', [BusinessController::class, 'printOrder'])->whereUuid('id')->name('orders.print');
         Route::post('/orders/{id}/confirm', [BusinessController::class, 'confirmOrder'])->whereUuid('id')->name('orders.confirm');
         Route::post('/orders/{id}/status', [BusinessController::class, 'updateOrderStatus'])->whereUuid('id')->name('orders.update-status');
+        Route::post('/orders/{id}/downpayment-received', [BusinessController::class, 'markDownpaymentReceived'])->whereUuid('id')->name('orders.downpayment-received');
 
         // Notifications
         Route::get('/notifications', [BusinessController::class, 'notifications'])->name('notifications');

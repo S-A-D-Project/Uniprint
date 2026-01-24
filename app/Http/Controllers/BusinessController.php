@@ -479,8 +479,17 @@ class BusinessController extends Controller
         $orderId = (string) Str::uuid();
         $orderNo = $this->generateOrderNumber();
 
-        $customerId = (string) Str::uuid();
-        $email = $request->contact_email ?: ('walkin+' . now()->format('YmdHis') . '+' . substr((string) Str::uuid(), 0, 8) . '@uniprint.local');
+        $normalizedEmail = $request->filled('contact_email') ? Str::lower(trim((string) $request->contact_email)) : null;
+        $existingUser = null;
+        if ($normalizedEmail) {
+            $existingUser = DB::table('users')
+                ->whereRaw('LOWER(email) = ?', [$normalizedEmail])
+                ->first();
+        }
+
+        $shouldCreateUser = $existingUser === null;
+        $customerId = $shouldCreateUser ? (string) Str::uuid() : (string) $existingUser->user_id;
+        $email = $existingUser ? (string) $existingUser->email : ($request->contact_email ?: ('walkin+' . now()->format('YmdHis') . '+' . substr((string) Str::uuid(), 0, 8) . '@uniprint.local'));
 
         $quantity = (int) $request->quantity;
         $unitPrice = $request->filled('unit_price') ? (float) $request->unit_price : (float) ($service->base_price ?? 0);
@@ -496,6 +505,7 @@ class BusinessController extends Controller
             $orderNo,
             $customerId,
             $email,
+            $shouldCreateUser,
             $request,
             $pendingStatusId,
             $quantity,
@@ -505,15 +515,17 @@ class BusinessController extends Controller
             $dateRequested,
             $deliveryDate
         ) {
-            DB::table('users')->insert([
-                'user_id' => $customerId,
-                'name' => $request->contact_name,
-                'email' => $email,
-                'position' => 'Walk-in',
-                'department' => 'Walk-in',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            if ($shouldCreateUser) {
+                DB::table('users')->insert([
+                    'user_id' => $customerId,
+                    'name' => $request->contact_name,
+                    'email' => $email,
+                    'position' => 'Walk-in',
+                    'department' => 'Walk-in',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
 
             DB::table('customer_orders')->insert([
                 'purchase_order_id' => $orderId,
@@ -632,6 +644,14 @@ class BusinessController extends Controller
 
         if (! in_array($fulfillmentMethod, ['pickup', 'delivery'], true)) {
             $fulfillmentMethod = 'pickup';
+        }
+
+        // Guard: cash is only valid for pickup fulfillment.
+        if (Schema::hasColumn('customer_orders', 'payment_method')) {
+            $paymentMethod = (string) ($order->payment_method ?? 'cash');
+            if ($paymentMethod === 'cash' && $fulfillmentMethod !== 'pickup') {
+                return redirect()->back()->with('error', 'Cash payments are only supported for pickup orders.');
+            }
         }
 
         $requiresFiles = false;
@@ -1005,6 +1025,33 @@ class BusinessController extends Controller
             return redirect()->back()->with('error', "Cannot move order from {$currentStatusName} to {$newStatusName}.");
         }
 
+        // Downpayment gating: block starting production unless the required downpayment is verified.
+        if ($currentStatusName === 'Confirmed' && $newStatusName === 'In Progress') {
+            if (Schema::hasColumn('services', 'requires_downpayment') && Schema::hasColumn('services', 'downpayment_percent')) {
+                $downpaymentPercent = (float) (DB::table('order_items')
+                    ->join('services', 'order_items.service_id', '=', 'services.service_id')
+                    ->where('order_items.purchase_order_id', $id)
+                    ->where('services.requires_downpayment', true)
+                    ->max('services.downpayment_percent') ?? 0);
+
+                if ($downpaymentPercent > 0) {
+                    $requiredAmount = ((float) ($order->total ?? 0)) * ($downpaymentPercent / 100);
+                    $paidAmount = 0.0;
+
+                    if (Schema::hasTable('payments')) {
+                        $p = DB::table('payments')->where('purchase_order_id', $id)->first();
+                        if ($p && !empty($p->is_verified)) {
+                            $paidAmount = (float) ($p->amount_paid ?? 0);
+                        }
+                    }
+
+                    if ($paidAmount + 0.00001 < $requiredAmount) {
+                        return redirect()->back()->with('error', 'This order requires a downpayment before production can start.');
+                    }
+                }
+            }
+        }
+
         // Create status history entry
         DB::table('order_status_history')->insert([
             'approval_id' => Str::uuid(),
@@ -1024,6 +1071,32 @@ class BusinessController extends Controller
                 'status_id' => $targetStatusId,
                 'updated_at' => now(),
             ]);
+
+        // Cash-on-pickup: mark paid when pickup is confirmed (Delivered for pickup flow)
+        if (Schema::hasColumn('customer_orders', 'payment_method') && Schema::hasColumn('customer_orders', 'payment_status')) {
+            $isCash = ($order->payment_method ?? null) === 'cash';
+            $isPickup = $fulfillmentMethod === 'pickup';
+            if ($isCash && $isPickup && $newStatusName === 'Delivered') {
+                DB::table('customer_orders')
+                    ->where('purchase_order_id', $id)
+                    ->where('enterprise_id', $enterprise->enterprise_id)
+                    ->update([
+                        'payment_status' => 'paid',
+                        'updated_at' => now(),
+                    ]);
+
+                if (Schema::hasTable('payments')) {
+                    DB::table('payments')
+                        ->where('purchase_order_id', $id)
+                        ->update([
+                            'amount_paid' => DB::raw('amount_due'),
+                            'is_verified' => true,
+                            'payment_date_time' => now(),
+                            'updated_at' => now(),
+                        ]);
+                }
+            }
+        }
 
         // Send notification to customer
         DB::table('order_notifications')->insert([
@@ -1045,6 +1118,102 @@ class BusinessController extends Controller
         );
 
         return redirect()->back()->with('success', "Order moved to {$newStatusName}");
+    }
+
+    public function markDownpaymentReceived(Request $request, $id)
+    {
+        $enterprise = $this->getUserEnterprise();
+        $userId = session('user_id');
+
+        $order = DB::table('customer_orders')
+            ->where('purchase_order_id', $id)
+            ->where('enterprise_id', $enterprise->enterprise_id)
+            ->first();
+
+        if (! $order) {
+            abort(404);
+        }
+
+        if (!Schema::hasColumn('services', 'requires_downpayment') || !Schema::hasColumn('services', 'downpayment_percent')) {
+            return redirect()->back()->with('error', 'Downpayment settings are not available.');
+        }
+
+        $downpaymentPercent = (float) (DB::table('order_items')
+            ->join('services', 'order_items.service_id', '=', 'services.service_id')
+            ->where('order_items.purchase_order_id', $id)
+            ->where('services.requires_downpayment', true)
+            ->max('services.downpayment_percent') ?? 0);
+
+        if ($downpaymentPercent <= 0) {
+            return redirect()->back()->with('error', 'This order does not require a downpayment.');
+        }
+
+        $requiredAmount = ((float) ($order->total ?? 0)) * ($downpaymentPercent / 100);
+        if ($requiredAmount <= 0) {
+            return redirect()->back()->with('error', 'Cannot compute required downpayment amount for this order.');
+        }
+
+        $paymentMethod = 'gcash';
+
+        if (Schema::hasTable('payments')) {
+            $p = DB::table('payments')->where('purchase_order_id', $id)->first();
+            if ($p) {
+                DB::table('payments')->where('purchase_order_id', $id)->update([
+                    'amount_paid' => max((float) ($p->amount_paid ?? 0), $requiredAmount),
+                    'is_verified' => true,
+                    'payment_date_time' => now(),
+                    'updated_at' => now(),
+                ]);
+            } else {
+                DB::table('payments')->insert([
+                    'payment_id' => Str::uuid(),
+                    'purchase_order_id' => $id,
+                    'payment_method' => $paymentMethod,
+                    'amount_paid' => $requiredAmount,
+                    'amount_due' => (float) ($order->total ?? 0),
+                    'payment_date_time' => now(),
+                    'is_verified' => true,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+        }
+
+        if (Schema::hasTable('transactions')) {
+            DB::table('transactions')->insert([
+                'transaction_id' => Str::uuid(),
+                'purchase_order_id' => $id,
+                'payment_method' => $paymentMethod,
+                'transaction_ref' => 'DP-' . Str::uuid(),
+                'amount' => $requiredAmount,
+                'transaction_date' => now(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        if (Schema::hasTable('order_status_history')) {
+            $statusId = DB::table('statuses')->where('status_name', 'Confirmed')->value('status_id');
+            if ($statusId) {
+                DB::table('order_status_history')->insert([
+                    'approval_id' => Str::uuid(),
+                    'purchase_order_id' => $id,
+                    'user_id' => $userId,
+                    'status_id' => $statusId,
+                    'remarks' => 'Downpayment marked as received by business',
+                    'timestamp' => now(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+        }
+
+        $this->logAudit('update', 'payment', $id, 'Marked downpayment received', null, [
+            'downpayment_percent' => $downpaymentPercent,
+            'required_amount' => $requiredAmount,
+        ]);
+
+        return redirect()->back()->with('success', 'Downpayment marked as received.');
     }
 
     // =====================================================
@@ -1108,6 +1277,13 @@ class BusinessController extends Controller
             $rules['allowed_payment_methods.*'] = 'in:gcash,cash';
         }
 
+        if (Schema::hasColumn('services', 'requires_downpayment')) {
+            $rules['requires_downpayment'] = 'boolean';
+        }
+        if (Schema::hasColumn('services', 'downpayment_percent')) {
+            $rules['downpayment_percent'] = 'nullable|numeric|min:0|max:100';
+        }
+
         $request->validate($rules);
 
         $enterprise = $this->getUserEnterprise();
@@ -1124,6 +1300,24 @@ class BusinessController extends Controller
         }
         $allowedPaymentMethodsJson = json_encode(array_values(array_unique($allowedPaymentMethods)));
 
+        $requiresDownpayment = Schema::hasColumn('services', 'requires_downpayment')
+            ? (bool) $request->has('requires_downpayment')
+            : false;
+        $downpaymentPercent = Schema::hasColumn('services', 'downpayment_percent')
+            ? (float) $request->input('downpayment_percent', 0)
+            : 0;
+
+        if ($requiresDownpayment && $downpaymentPercent <= 0) {
+            return redirect()->back()->with('error', 'Downpayment percent must be greater than 0 when downpayment is required.');
+        }
+        if (! $requiresDownpayment) {
+            $downpaymentPercent = 0;
+        }
+
+        if ($requiresDownpayment && !in_array('gcash', $allowedPaymentMethods, true)) {
+            return redirect()->back()->with('error', 'Downpayment requires GCash to be enabled in allowed payment methods.');
+        }
+
         $insert = [
             'service_id' => $serviceId,
             'enterprise_id' => $enterprise->enterprise_id,
@@ -1132,6 +1326,8 @@ class BusinessController extends Controller
             'image_path' => $imagePath,
             'fulfillment_type' => $request->fulfillment_type,
             'allowed_payment_methods' => $allowedPaymentMethodsJson,
+            'requires_downpayment' => $requiresDownpayment,
+            'downpayment_percent' => $downpaymentPercent,
             'base_price' => $request->base_price,
             'is_active' => $request->has('is_active'),
             'file_upload_enabled' => $request->has('file_upload_enabled'),
@@ -1162,6 +1358,13 @@ class BusinessController extends Controller
 
         if (!Schema::hasColumn('services', 'requires_file_upload')) {
             unset($insert['requires_file_upload']);
+        }
+
+        if (!Schema::hasColumn('services', 'requires_downpayment')) {
+            unset($insert['requires_downpayment']);
+        }
+        if (!Schema::hasColumn('services', 'downpayment_percent')) {
+            unset($insert['downpayment_percent']);
         }
 
         DB::table('services')->insert($insert);
@@ -1230,6 +1433,13 @@ class BusinessController extends Controller
             $rules['allowed_payment_methods.*'] = 'in:gcash,cash';
         }
 
+        if (Schema::hasColumn('services', 'requires_downpayment')) {
+            $rules['requires_downpayment'] = 'boolean';
+        }
+        if (Schema::hasColumn('services', 'downpayment_percent')) {
+            $rules['downpayment_percent'] = 'nullable|numeric|min:0|max:100';
+        }
+
         $request->validate($rules);
 
         $enterprise = $this->getUserEnterprise();
@@ -1246,6 +1456,24 @@ class BusinessController extends Controller
         }
         $allowedPaymentMethodsJson = json_encode(array_values(array_unique($allowedPaymentMethods)));
 
+        $requiresDownpayment = Schema::hasColumn('services', 'requires_downpayment')
+            ? (bool) $request->has('requires_downpayment')
+            : false;
+        $downpaymentPercent = Schema::hasColumn('services', 'downpayment_percent')
+            ? (float) $request->input('downpayment_percent', 0)
+            : 0;
+
+        if ($requiresDownpayment && $downpaymentPercent <= 0) {
+            return redirect()->back()->with('error', 'Downpayment percent must be greater than 0 when downpayment is required.');
+        }
+        if (! $requiresDownpayment) {
+            $downpaymentPercent = 0;
+        }
+
+        if ($requiresDownpayment && !in_array('gcash', $allowedPaymentMethods, true)) {
+            return redirect()->back()->with('error', 'Downpayment requires GCash to be enabled in allowed payment methods.');
+        }
+
         $update = [
             'service_name' => $request->service_name,
             'description' => $request->description,
@@ -1255,6 +1483,8 @@ class BusinessController extends Controller
             'allowed_payment_methods' => $allowedPaymentMethodsJson,
             'file_upload_enabled' => $request->has('file_upload_enabled'),
             'requires_file_upload' => $request->has('requires_file_upload'),
+            'requires_downpayment' => $requiresDownpayment,
+            'downpayment_percent' => $downpaymentPercent,
             'updated_at' => now(),
         ];
 
@@ -1276,6 +1506,13 @@ class BusinessController extends Controller
 
         if (!Schema::hasColumn('services', 'requires_file_upload')) {
             unset($update['requires_file_upload']);
+        }
+
+        if (!Schema::hasColumn('services', 'requires_downpayment')) {
+            unset($update['requires_downpayment']);
+        }
+        if (!Schema::hasColumn('services', 'downpayment_percent')) {
+            unset($update['downpayment_percent']);
         }
 
         if ($request->hasFile('image') && Schema::hasColumn('services', 'image_path')) {

@@ -328,7 +328,7 @@
                 </div>
                 
                 <!-- Place Order Button -->
-                <button type="submit" id="place-order-btn" 
+                <button type="submit" id="place-order-btn" data-up-button-loader
                         class="w-full bg-primary text-white py-3 px-6 rounded-lg font-semibold hover:bg-primary/90 transition-colors flex flex-col items-center justify-center gap-1">
                     <div class="flex items-center gap-2">
                         <i data-lucide="credit-card" class="h-5 w-5"></i>

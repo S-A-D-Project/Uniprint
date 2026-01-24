@@ -107,6 +107,174 @@
 
 @push('scripts')
 <script>
+window.UPPricingRule = window.UPPricingRule || (function () {
+    function parseJsonSafe(raw, fallback) {
+        try {
+            const v = JSON.parse(raw);
+            return Array.isArray(v) ? v : (fallback || []);
+        } catch (e) {
+            return fallback || [];
+        }
+    }
+
+    function makeFieldSelect(value) {
+        const sel = document.createElement('select');
+        sel.className = 'px-3 py-2 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring';
+        const options = [
+            { value: 'quantity', label: 'Quantity' },
+            { value: 'subtotal', label: 'Subtotal' },
+            { value: 'base_price', label: 'Base Price' },
+        ];
+        options.forEach((o) => {
+            const opt = document.createElement('option');
+            opt.value = o.value;
+            opt.textContent = o.label;
+            sel.appendChild(opt);
+        });
+        sel.value = value || 'quantity';
+        return sel;
+    }
+
+    function makeOperatorSelect(value) {
+        const sel = document.createElement('select');
+        sel.className = 'px-3 py-2 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring';
+        const options = ['>=', '>', '=', '!=', '<', '<='];
+        options.forEach((v) => {
+            const opt = document.createElement('option');
+            opt.value = v;
+            opt.textContent = v;
+            sel.appendChild(opt);
+        });
+        sel.value = value || '>=';
+        return sel;
+    }
+
+    function makeValueInput(value) {
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.step = '0.01';
+        input.className = 'px-3 py-2 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring';
+        input.placeholder = 'Value';
+        if (value !== undefined && value !== null && value !== '') {
+            input.value = String(value);
+        }
+        return input;
+    }
+
+    function addConditionRow(container, condition) {
+        if (!container) return;
+
+        const row = document.createElement('div');
+        row.className = 'flex flex-col sm:flex-row gap-2';
+        row.dataset.upConditionRow = '1';
+
+        const fieldEl = makeFieldSelect(condition?.field);
+        const opEl = makeOperatorSelect(condition?.operator);
+        const valueEl = makeValueInput(condition?.value);
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'px-3 py-2 text-sm border border-input rounded-md hover:bg-secondary transition-smooth';
+        removeBtn.textContent = 'Remove';
+        removeBtn.addEventListener('click', function () {
+            row.remove();
+        });
+
+        row.appendChild(fieldEl);
+        row.appendChild(opEl);
+        row.appendChild(valueEl);
+        row.appendChild(removeBtn);
+        container.appendChild(row);
+    }
+
+    function clearConditions(container) {
+        if (!container) return;
+        container.innerHTML = '';
+    }
+
+    function readConditionsFromBuilder(container) {
+        if (!container) return [];
+        const rows = Array.from(container.querySelectorAll('[data-up-condition-row="1"]'));
+        const out = [];
+        for (const row of rows) {
+            const [fieldEl, opEl, valueEl] = row.querySelectorAll('select, input');
+            const field = fieldEl?.value || 'quantity';
+            const operator = opEl?.value || '>=';
+            const rawVal = valueEl?.value;
+            if (rawVal === undefined || rawVal === null || String(rawVal).trim() === '') {
+                continue;
+            }
+            const numericVal = Number(rawVal);
+            out.push({
+                field,
+                operator,
+                value: Number.isFinite(numericVal) ? numericVal : rawVal,
+            });
+        }
+        return out;
+    }
+
+    function toggleAdvancedJson() {
+        const el = document.getElementById('pricingRuleAdvancedJson');
+        if (!el) return;
+        el.style.display = el.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function syncBuilderToTextarea(rootEl) {
+        const container = rootEl?.querySelector?.('#pricingRuleConditionsBuilder');
+        if (!container) return;
+
+        const textarea = rootEl.querySelector('#pricingRuleConditionsJson') || rootEl.querySelector('textarea[name="conditions"]');
+        if (!textarea) return;
+
+        const conditions = readConditionsFromBuilder(container);
+        textarea.value = JSON.stringify(conditions);
+    }
+
+    function initBuilder(rootEl) {
+        const container = rootEl?.querySelector?.('#pricingRuleConditionsBuilder');
+        if (!container) return;
+
+        const textarea = rootEl.querySelector('#pricingRuleConditionsJson') || rootEl.querySelector('textarea[name="conditions"]');
+        const raw = textarea ? (textarea.value || '[]') : '[]';
+        const conditions = parseJsonSafe(raw, []);
+
+        clearConditions(container);
+        if (conditions.length === 0) {
+            return;
+        }
+        conditions.forEach((c) => addConditionRow(container, c));
+    }
+
+    return {
+        addConditionRow,
+        clearConditions,
+        toggleAdvancedJson,
+        initBuilder,
+        syncBuilderToTextarea,
+    };
+})();
+
+window.toggleFormulaField = window.toggleFormulaField || function toggleFormulaField() {
+    const methodEl = document.getElementById('calculation_method');
+    if (!methodEl) return;
+
+    const method = methodEl.value;
+    const valueField = document.getElementById('valueField');
+    const formulaField = document.getElementById('formulaField');
+    const valueInput = valueField?.querySelector?.('input[name="value"]') || valueField?.querySelector?.('input');
+
+    if (method === 'formula') {
+        if (valueField) valueField.style.display = 'none';
+        if (formulaField) formulaField.style.display = 'block';
+        if (valueInput) valueInput.required = false;
+    } else {
+        if (valueField) valueField.style.display = 'block';
+        if (formulaField) formulaField.style.display = 'none';
+        if (valueInput) valueInput.required = true;
+    }
+};
+
 function openPricingRuleModal(url) {
     const modalEl = document.getElementById('pricingRuleModal');
     const bodyEl = document.getElementById('pricingRuleModalBody');
@@ -142,6 +310,10 @@ function openPricingRuleModal(url) {
             } catch (e) {
                 // no-op
             }
+        }
+
+        if (window.UPPricingRule && typeof window.UPPricingRule.initBuilder === 'function') {
+            window.UPPricingRule.initBuilder(bodyEl);
         }
     })
     .catch((err) => {
@@ -204,6 +376,10 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!(form instanceof HTMLFormElement)) return;
 
         e.preventDefault();
+
+        if (window.UPPricingRule && typeof window.UPPricingRule.syncBuilderToTextarea === 'function') {
+            window.UPPricingRule.syncBuilderToTextarea(bodyEl);
+        }
 
         const url = form.getAttribute('action');
         if (!url) return;

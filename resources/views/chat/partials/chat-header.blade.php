@@ -7,7 +7,7 @@
         <div>
             <div class="fw-bold" id="participantName"></div>
             <div id="participantStatusText" class="participant-status"></div>
-            <div id="typingIndicator" class="typing-status" style="display: none;">
+            <div id="typingIndicatorHeader" class="typing-status" style="display: none;">
                 <i class="bi bi-three-dots"></i> typing...
             </div>
         </div>

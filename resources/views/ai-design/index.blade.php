@@ -592,6 +592,49 @@ function closeEnhancementModal() {
     }
 }
 
+function openGeneratedDesignPreview() {
+    const imageUrl = window.currentDesign?.image_url;
+    if (!imageUrl) return;
+
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4';
+    modal.id = 'generated-design-preview-modal';
+
+    modal.innerHTML = `
+        <div class="bg-card rounded-2xl shadow-2xl border border-border max-w-4xl w-full max-h-[90vh] overflow-hidden">
+            <div class="bg-gradient-to-r from-primary to-primary-glow px-6 py-4 flex items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-semibold text-white">Generated Design Preview</h3>
+                    <p class="text-sm text-white/80">This design is only shown in this modal</p>
+                </div>
+                <button onclick="closeGeneratedDesignPreview()" class="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center hover:bg-white/30 transition-colors">
+                    <i data-lucide="x" class="h-4 w-4 text-white"></i>
+                </button>
+            </div>
+            <div class="p-6 bg-background">
+                <div class="flex justify-center">
+                    <img src="${imageUrl}" class="max-w-full h-auto rounded-xl border border-border" alt="Generated Design" style="max-height: 70vh;" onerror="this.outerHTML='<div class=\"text-center py-12\"><p class=\"text-destructive\">Failed to load preview.</p></div>'">
+                </div>
+            </div>
+            <div class="px-6 py-4 border-t border-border bg-muted/20 flex justify-end">
+                <button onclick="closeGeneratedDesignPreview()" class="bg-muted text-foreground px-4 py-2 rounded-lg font-medium hover:bg-muted/80 transition-colors">Close</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+    if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+    }
+}
+
+function closeGeneratedDesignPreview() {
+    const modal = document.getElementById('generated-design-preview-modal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
 function showToast(message, type = 'info') {
     const toastContainer = document.createElement('div');
     toastContainer.className = 'fixed top-4 right-4 z-50';
@@ -679,26 +722,21 @@ document.getElementById('ai-design-form').addEventListener('submit', async funct
             const outputDiv = document.getElementById('design-output');
             outputDiv.innerHTML = `
                 <div class="text-center">
-                    <div class="relative inline-block">
-                        <img id="generated-design-img" src="${upload.publicUrl}" class="max-w-full h-auto rounded-xl shadow-lg border border-border" alt="Generated Design" style="max-height: 400px;">
-                        <div class="absolute -top-2 -right-2 w-6 h-6 bg-success rounded-full flex items-center justify-center">
-                            <i data-lucide="check" class="h-3 w-3 text-white"></i>
-                        </div>
+                    <div class="w-20 h-20 bg-success/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i data-lucide="check-circle" class="h-10 w-10 text-success"></i>
                     </div>
                     <div class="mt-6">
                         <h4 class="text-lg font-semibold text-success mb-2">Design Generated Successfully!</h4>
                         <p class="text-muted-foreground">Your custom design is ready for use</p>
                     </div>
+                    <div class="mt-5 flex flex-col sm:flex-row gap-3 justify-center">
+                        <button type="button" onclick="openGeneratedDesignPreview()" class="bg-primary text-white px-6 py-3 rounded-lg font-medium hover:bg-primary/90 transition-all duration-200 flex items-center justify-center gap-2">
+                            <i data-lucide="eye" class="h-4 w-4"></i>
+                            Preview Design
+                        </button>
+                    </div>
                 </div>
             `;
-            
-            // Add error handler for image
-            const img = document.getElementById('generated-design-img');
-            if (img) {
-                img.onerror = function() {
-                    this.parentElement.innerHTML = '<div class="text-center py-8"><p class="text-destructive">Failed to load image. Please try again.</p></div>';
-                };
-            }
             
             // Show design actions
             document.getElementById('design-actions').classList.remove('hidden');
@@ -709,6 +747,11 @@ document.getElementById('ai-design-form').addEventListener('submit', async funct
                 image_url: upload.publicUrl,
                 storage_path: upload.path
             };
+
+            // Re-initialize icons
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
             
         } else {
             const errorMsg = result.message || 'Failed to generate design. Please check your API key and try again.';

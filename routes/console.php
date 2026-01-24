@@ -12,6 +12,16 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Artisan::command('orders:auto-complete', function () {
+    if (! Schema::hasTable('order_status_history') || ! Schema::hasTable('customer_orders')) {
+        $this->warn('Required order tables not found. Run migrations first.');
+        return 0;
+    }
+
+    if (! Schema::hasTable('order_notifications')) {
+        $this->warn('order_notifications table not found. Run migrations first.');
+        return 0;
+    }
+
     if (! Schema::hasTable('system_settings')) {
         $this->warn('system_settings table not found. Run migrations first.');
         return 0;
@@ -33,15 +43,22 @@ Artisan::command('orders:auto-complete', function () {
 
     $cutoff = Carbon::now()->subHours($hours);
 
-    $deliveredAt = DB::table('order_status_history')
-        ->join('statuses', 'order_status_history.status_id', '=', 'statuses.status_id')
-        ->where('statuses.status_name', 'Delivered')
-        ->where('order_status_history.timestamp', '<=', $cutoff)
-        ->select('order_status_history.purchase_order_id', DB::raw('MAX(order_status_history.timestamp) as delivered_time'))
-        ->groupBy('order_status_history.purchase_order_id');
+    // Only auto-complete orders whose LATEST status is Delivered and that Delivered timestamp is older than cutoff.
+    $latest = DB::table('order_status_history')
+        ->select('purchase_order_id', DB::raw('MAX(timestamp) as last_ts'))
+        ->groupBy('purchase_order_id');
+
+    $latestDelivered = DB::table('order_status_history as osh')
+        ->joinSub($latest, 'latest', function ($join) {
+            $join->on('osh.purchase_order_id', '=', 'latest.purchase_order_id')
+                ->on('osh.timestamp', '=', 'latest.last_ts');
+        })
+        ->where('osh.status_id', $deliveredStatusId)
+        ->where('osh.timestamp', '<=', $cutoff)
+        ->select('osh.purchase_order_id', 'osh.timestamp as delivered_time');
 
     $candidates = DB::table('customer_orders')
-        ->joinSub($deliveredAt, 'delivered_at', function ($join) {
+        ->joinSub($latestDelivered, 'delivered_at', function ($join) {
             $join->on('customer_orders.purchase_order_id', '=', 'delivered_at.purchase_order_id');
         })
         ->leftJoin('order_status_history as osh_completed', function ($join) use ($completedStatusId) {

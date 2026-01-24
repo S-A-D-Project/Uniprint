@@ -163,18 +163,18 @@ use Illuminate\Support\Facades\DB;
                             View
                         </a>
                         @if(($order->status_name ?? 'Pending') === 'Delivered')
-                            <form action="{{ route('customer.orders.confirm-completion', $order->purchase_order_id) }}" method="POST" onsubmit="return confirm('Confirm you received this order?');">
+                            <form action="{{ route('customer.orders.confirm-completion', $order->purchase_order_id) }}" method="POST" onsubmit="return confirm('Confirm you received this order?');" data-up-global-loader>
                                 @csrf
-                                <button type="submit" class="inline-flex items-center px-3 py-2 border border-success/30 text-success text-sm font-medium rounded-md hover:bg-success/10 transition-colors">
+                                <button type="submit" class="inline-flex items-center px-3 py-2 border border-success/30 text-success text-sm font-medium rounded-md hover:bg-success/10 transition-colors" data-up-button-loader>
                                     <i data-lucide="check-circle" class="h-4 w-4 mr-1"></i>
                                     Confirm Received
                                 </button>
                             </form>
                         @endif
                         @if(($order->status_name ?? 'Pending') === 'Pending')
-                            <form action="{{ route('customer.orders.cancel', $order->purchase_order_id) }}" method="POST" onsubmit="return confirm('Cancel this order?');">
+                            <form action="{{ route('customer.orders.cancel', $order->purchase_order_id) }}" method="POST" onsubmit="return confirm('Cancel this order?');" data-up-global-loader>
                                 @csrf
-                                <button type="submit" class="inline-flex items-center px-3 py-2 border border-red-200 text-red-600 text-sm font-medium rounded-md hover:bg-red-50 transition-colors">
+                                <button type="submit" class="inline-flex items-center px-3 py-2 border border-red-200 text-red-600 text-sm font-medium rounded-md hover:bg-red-50 transition-colors" data-up-button-loader>
                                     <i data-lucide="x-circle" class="h-4 w-4 mr-1"></i>
                                     Cancel
                                 </button>
@@ -220,6 +220,7 @@ use Illuminate\Support\Facades\DB;
 </x-ui.modal>
 
 <!-- Chat Modal -->
+@if(false)
 <div id="chatModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 hidden">
     <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
         <!-- Chat Header -->
@@ -287,6 +288,8 @@ use Illuminate\Support\Facades\DB;
         </div>
     </div>
 </div>
+
+@endif
 
 @endsection
 
@@ -367,21 +370,14 @@ function initializePusher() {
 
 // Open chat modal for specific order
 async function openOrderChat(orderId, enterpriseId, businessName) {
-    currentOrderId = orderId;
-    window.currentEnterpriseId = enterpriseId;
-    
-    // Update modal header
-    document.getElementById('chatBusinessName').textContent = businessName;
-    document.getElementById('chatOrderId').textContent = orderId.substring(0, 8);
-    
-    // Show modal
-    document.getElementById('chatModal').classList.remove('hidden');
-    
-    // Initialize chat
-    await initializeOrderChat(enterpriseId);
-    
-    // Focus message input
-    document.getElementById('messageInput').focus();
+    if (window.UniPrintChat && typeof window.UniPrintChat.openEnterpriseChat === 'function') {
+        await window.UniPrintChat.openEnterpriseChat(enterpriseId);
+        return;
+    }
+
+    if (enterpriseId) {
+        window.location.href = `{{ url('/chat/enterprise') }}/${enterpriseId}`;
+    }
 }
 
 // Initialize chat for specific order
@@ -793,14 +789,17 @@ function escapeHtml(text) {
 
 // Initialize when page loads
 document.addEventListener('DOMContentLoaded', function() {
+    if (window.UniPrintChat) return;
+
     initializePusher();
-    
+
     // Update online status periodically
     setInterval(updateOnlineStatus, 30000); // Every 30 seconds
 });
 
 // Cleanup on page unload
 window.addEventListener('beforeunload', function() {
+    if (window.UniPrintChat) return;
     if (currentConversationId) {
         fetch('/api/chat/cleanup', {
             method: 'POST',
@@ -824,5 +823,7 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <!-- Pusher CDN v7.0 -->
-<script src="https://js.pusher.com/7.0/pusher.min.js"></script>
+@if(false)
+    <script src="https://js.pusher.com/7.0/pusher.min.js"></script>
+@endif
 @endpush

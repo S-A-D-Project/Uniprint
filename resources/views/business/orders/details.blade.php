@@ -121,9 +121,9 @@
                                                 Approved
                                             </span>
                                         @else
-                                            <form action="{{ route('business.design-files.approve', $file->file_id) }}" method="POST" class="inline">
+                                            <form action="{{ route('business.design-files.approve', $file->file_id) }}" method="POST" class="inline" data-up-global-loader>
                                                 @csrf
-                                                <button type="submit" class="px-3 py-1 text-sm bg-success text-white rounded-md hover:bg-success/90">
+                                                <button type="submit" class="px-3 py-1 text-sm bg-success text-white rounded-md hover:bg-success/90" data-up-button-loader>
                                                     Approve
                                                 </button>
                                             </form>
@@ -223,6 +223,58 @@
                     <span class="text-sm text-muted-foreground">Current: {{ $currentStatusName ?? 'Pending' }}</span>
                 </div>
 
+                @php
+                    $needsDownpayment = false;
+                    $downpaymentPercent = 0;
+                    $requiredDownpaymentAmount = 0;
+                    try {
+                        if (\Illuminate\Support\Facades\Schema::hasColumn('services', 'requires_downpayment') && \Illuminate\Support\Facades\Schema::hasColumn('services', 'downpayment_percent')) {
+                            $downpaymentPercent = (float) (\Illuminate\Support\Facades\DB::table('order_items')
+                                ->join('services', 'order_items.service_id', '=', 'services.service_id')
+                                ->where('order_items.purchase_order_id', $order->purchase_order_id)
+                                ->where('services.requires_downpayment', true)
+                                ->max('services.downpayment_percent') ?? 0);
+                            $needsDownpayment = $downpaymentPercent > 0;
+                            if ($needsDownpayment) {
+                                $requiredDownpaymentAmount = ((float) ($order->total ?? 0)) * ($downpaymentPercent / 100);
+                            }
+                        }
+                    } catch (\Exception $e) {
+                        $needsDownpayment = false;
+                        $downpaymentPercent = 0;
+                        $requiredDownpaymentAmount = 0;
+                    }
+                    $downpaymentPaid = false;
+                    try {
+                        if (\Illuminate\Support\Facades\Schema::hasTable('payments')) {
+                            $p = \Illuminate\Support\Facades\DB::table('payments')
+                                ->where('purchase_order_id', $order->purchase_order_id)
+                                ->first();
+                            if ($p && !empty($p->is_verified) && (float) ($p->amount_paid ?? 0) + 0.00001 >= (float) ($requiredDownpaymentAmount ?? 0)) {
+                                $downpaymentPaid = true;
+                            }
+                        } else {
+                            $downpaymentPaid = (($order->payment_status ?? null) === 'paid');
+                        }
+                    } catch (\Exception $e) {
+                        $downpaymentPaid = (($order->payment_status ?? null) === 'paid');
+                    }
+                @endphp
+
+                @if($needsDownpayment && ! $downpaymentPaid && (($currentStatusName ?? null) === 'Confirmed' || ($currentStatusName ?? null) === 'Pending'))
+                    <div class="mb-4 p-3 border border-amber-200 bg-amber-50 rounded-lg">
+                        <p class="text-sm font-medium text-amber-800">Downpayment required</p>
+                        <p class="text-sm text-amber-700 mt-1">This order requires a {{ number_format($downpaymentPercent, 2) }}% downpayment before production can start.</p>
+                        <form action="{{ route('business.orders.downpayment-received', $order->purchase_order_id) }}" method="POST" class="mt-3" data-up-global-loader>
+                            @csrf
+                            <button type="submit" class="w-full px-4 py-2 bg-amber-600 text-white font-medium rounded-md hover:bg-amber-700 transition-smooth" data-up-button-loader
+                                    onclick="return confirm('Mark downpayment as received? This will allow the order to start production.');">
+                                Mark Downpayment Received
+                            </button>
+                        </form>
+                    </div>
+                @endif
+
                 @if(!empty($businessActions))
                     @php
                         $cancelAction = null;
@@ -240,7 +292,7 @@
 
                     <div class="space-y-3">
                         @if($advanceAction)
-                            <form action="{{ route('business.orders.update-status', $order->purchase_order_id) }}" method="POST">
+                            <form action="{{ route('business.orders.update-status', $order->purchase_order_id) }}" method="POST" data-up-global-loader>
                                 @csrf
                                 <input type="hidden" name="status_id" value="{{ $advanceAction['id'] }}">
                                 <button type="submit"
@@ -248,7 +300,7 @@
                                             @if(($advanceAction['name'] ?? null) === 'Confirmed') bg-success text-white hover:opacity-90
                                             @elseif(($advanceAction['name'] ?? null) === 'In Progress') bg-primary text-primary-foreground hover:shadow-glow
                                             @elseif(in_array(($advanceAction['name'] ?? null), ['Ready for Pickup', 'Delivered'], true)) bg-amber-500 text-white hover:opacity-90
-                                            @else bg-primary text-primary-foreground hover:shadow-glow @endif">
+                                            @else bg-primary text-primary-foreground hover:shadow-glow @endif" data-up-button-loader>
                                     {{ $advanceAction['label'] ?? $advanceAction['name'] }}
                                 </button>
                             </form>

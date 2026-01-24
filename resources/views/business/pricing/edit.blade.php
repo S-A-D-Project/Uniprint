@@ -68,9 +68,29 @@
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium mb-2">Conditions (JSON)</label>
-                    <textarea name="conditions" rows="4"
-                              class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring font-mono text-sm">{{ old('conditions', $rule->conditions) }}</textarea>
+                    <label class="block text-sm font-medium mb-2">Conditions (Optional)</label>
+                    <div class="rounded-lg border border-border p-4 bg-background">
+                        <div class="text-sm text-muted-foreground mb-3">Add simple rules like “Quantity is at least 10” or “Subtotal is at least ₱500”.</div>
+                        <div id="pricingRuleConditionsBuilder" class="space-y-2"></div>
+                        <div class="mt-3 flex items-center gap-2">
+                            <button type="button" class="px-3 py-2 text-sm border border-input rounded-md hover:bg-secondary transition-smooth" onclick="window.UPPricingRule && window.UPPricingRule.addConditionRow && window.UPPricingRule.addConditionRow(document.getElementById('pricingRuleConditionsBuilder'))">
+                                Add Condition
+                            </button>
+                            <button type="button" class="px-3 py-2 text-sm border border-input rounded-md hover:bg-secondary transition-smooth" onclick="window.UPPricingRule && window.UPPricingRule.clearConditions && window.UPPricingRule.clearConditions(document.getElementById('pricingRuleConditionsBuilder'))">
+                                Clear
+                            </button>
+                        </div>
+                        <div class="mt-4">
+                            <button type="button" class="text-sm text-muted-foreground hover:text-foreground" onclick="window.UPPricingRule && window.UPPricingRule.toggleAdvancedJson && window.UPPricingRule.toggleAdvancedJson()">
+                                Advanced (JSON)
+                            </button>
+                            <div id="pricingRuleAdvancedJson" class="mt-2" style="display:none;">
+                                <textarea name="conditions" id="pricingRuleConditionsJson" rows="4" placeholder='[{"field":"quantity","operator":">=","value":10}]'
+                                          class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring font-mono text-sm">{{ old('conditions', $rule->conditions ?? '[]') }}</textarea>
+                                <p class="text-xs text-muted-foreground mt-1">This is optional. Most users can ignore this.</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div>

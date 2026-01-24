@@ -11,6 +11,14 @@
     <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <link rel="stylesheet" href="{{ asset('css/uniprint-ui.css') }}">
+    @auth
+        @php
+            $layoutRoleType = Auth::user()->getUserRoleType();
+        @endphp
+        @if($layoutRoleType === 'customer')
+            <link rel="stylesheet" href="{{ asset('css/chat.css') }}">
+        @endif
+    @endauth
     
     <style>
         :root {
@@ -152,6 +160,39 @@
                     <div class="container-fluid">
                         <div class="ms-auto d-flex align-items-center">
                             @auth
+                            @php
+                                $unreadChatCount = 0;
+                                try {
+                                    if (\Illuminate\Support\Facades\Schema::hasTable('conversations') && \Illuminate\Support\Facades\Schema::hasTable('chat_messages')) {
+                                        $uid = Auth::user()->user_id;
+                                        $conversationIds = \Illuminate\Support\Facades\DB::table('conversations')
+                                            ->where('customer_id', $uid)
+                                            ->orWhere('business_id', $uid)
+                                            ->pluck('conversation_id');
+
+                                        if ($conversationIds->isNotEmpty()) {
+                                            $unreadChatCount = (int) \Illuminate\Support\Facades\DB::table('chat_messages')
+                                                ->whereIn('conversation_id', $conversationIds)
+                                                ->where('sender_id', '!=', $uid)
+                                                ->where('is_read', false)
+                                                ->count();
+                                        }
+                                    }
+                                } catch (\Exception $e) {
+                                    $unreadChatCount = 0;
+                                }
+                            @endphp
+
+                            <a href="{{ route('chat.index') }}" class="btn btn-outline-primary btn-sm me-3 position-relative">
+                                <i class="bi bi-chat-dots me-1"></i>
+                                Chat
+                                @if($unreadChatCount > 0)
+                                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                                        {{ $unreadChatCount > 99 ? '99+' : $unreadChatCount }}
+                                    </span>
+                                @endif
+                            </a>
+
                             <span class="me-3 text-muted">
                                 <i class="bi bi-person-circle me-2"></i>
                                 {{ Auth::user()->username ?? Auth::user()->name ?? 'Account' }}
@@ -215,6 +256,101 @@
             </div>
         </div>
     </div>
+
+    @auth
+        @php
+            $layoutRoleType2 = Auth::user()->getUserRoleType();
+        @endphp
+        @if($layoutRoleType2 === 'customer' && !request()->routeIs('chat.index'))
+            <button type="button"
+                    class="btn btn-primary position-fixed shadow-lg"
+                    style="right: 24px; bottom: 24px; border-radius: 9999px; padding: 10px 16px; z-index: 1050;"
+                    data-bs-toggle="offcanvas" data-bs-target="#customerChatWidget" aria-controls="customerChatWidget">
+                <i class="bi bi-chat-dots-fill me-2"></i>
+                Chat
+                @if(!empty($unreadChatCount) && (int)$unreadChatCount > 0)
+                    <span class="badge bg-danger ms-2">{{ (int)$unreadChatCount > 99 ? '99+' : (int)$unreadChatCount }}</span>
+                @endif
+            </button>
+
+            <div class="offcanvas offcanvas-end" tabindex="-1" id="customerChatWidget" aria-labelledby="customerChatWidgetLabel" data-bs-backdrop="false" data-bs-scroll="true" style="--bs-offcanvas-width: min(420px, 95vw);">
+                <div class="offcanvas-header">
+                    <h5 class="offcanvas-title" id="customerChatWidgetLabel"><i class="bi bi-chat-dots me-2 text-primary"></i>Chat</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+                </div>
+                <div class="offcanvas-body">
+                    <div id="connectionStatus" class="connection-status connecting">
+                        <i class="bi bi-wifi"></i> Connecting to chat server...
+                    </div>
+
+                    <div class="chat-container">
+                        <div class="conversations-panel" id="conversationsPanel">
+                            <div class="conversations-header d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h5 class="mb-0"><i class="bi bi-chat-dots"></i> Messages</h5>
+                                    <small>Customer</small>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-primary" id="startNewChatBtn" title="Start new chat">
+                                    <i class="bi bi-plus"></i>
+                                </button>
+                            </div>
+                            <div class="conversations-search">
+                                <input type="text" class="form-control" id="searchConversations" placeholder="Search conversations...">
+                            </div>
+                            <div class="conversations-list" id="conversationsList">
+                                <div class="text-center py-4">
+                                    <div class="spinner mx-auto"></div>
+                                    <p class="mt-2 text-muted">Loading conversations...</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="chat-panel" id="chatPanel">
+                            <div class="empty-state" id="emptyState">
+                                <i class="bi bi-chat-text"></i>
+                                <h5>Select a conversation</h5>
+                                <p>Choose a conversation from the list to start chatting</p>
+                            </div>
+                            <div id="activeChat" style="display: none;">
+                                @include('chat.partials.chat-header')
+                                @include('chat.partials.chat-messages')
+                                @include('chat.partials.chat-input')
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="modal fade" id="businessListModal" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Start a new chat</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <div id="businessList"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <script>
+                window.Laravel = window.Laravel || {};
+                window.Laravel.user = {
+                    id: '{{ auth()->user()->user_id }}',
+                    name: '{{ auth()->user()->name }}',
+                    role_type: '{{ auth()->user()->getUserRoleType() }}'
+                };
+                window.Laravel.pusher = {
+                    key: '{{ config("broadcasting.connections.pusher.key") }}',
+                    cluster: '{{ config("broadcasting.connections.pusher.options.cluster") }}'
+                };
+            </script>
+            <script src="https://js.pusher.com/7.0/pusher.min.js"></script>
+            <script src="{{ asset('js/chat-app.js') }}"></script>
+        @endif
+    @endauth
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>

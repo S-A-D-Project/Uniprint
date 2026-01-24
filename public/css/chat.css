@@ -5,7 +5,7 @@
 .connection-status.connected{background:#d4edda;color:#155724;border:1px solid #c3e6cb}
 .connection-status.error,.connection-status.disconnected{background:#f8d7da;color:#721c24;border:1px solid #f5c6cb}
 
-.chat-container{display:flex;gap:1rem;background:transparent;min-height:600px}
+.chat-container{display:flex;gap:.75rem;background:transparent;min-height:600px}
 .conversations-panel{width:320px;max-width:100%;background:var(--chat-surface);border:1px solid var(--chat-border);border-radius:1rem;overflow:hidden;display:flex;flex-direction:column}
 .conversations-header{padding:1rem;border-bottom:1px solid var(--chat-border);background:linear-gradient(135deg,#ffffff,#f8fafc)}
 .conversations-header h5{margin:0;color:var(--chat-text)}
@@ -16,6 +16,8 @@
 .chat-panel{flex:1;background:var(--chat-surface);border:1px solid var(--chat-border);border-radius:1rem;overflow:hidden;display:flex;flex-direction:column;min-width:0}
 .empty-state{padding:3rem 1.5rem;text-align:center;color:var(--chat-muted)}
 .empty-state i{font-size:2rem;color:var(--chat-primary)}
+
+#activeChat{flex:1;min-height:0;display:flex;flex-direction:column}
 
 .chat-header{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1rem;border-bottom:1px solid var(--chat-border);background:linear-gradient(135deg,#ffffff,#f8fafc)}
 .chat-participant{display:flex;align-items:center;gap:.75rem;min-width:0}
@@ -53,3 +55,24 @@
 .remove-file:hover{background:var(--chat-bg);color:var(--chat-text)}
 
 @media (max-width: 992px){.chat-container{flex-direction:column}.conversations-panel{width:100%}}
+
+#customerChatWidget .offcanvas-body{display:flex;flex-direction:column}
+#customerChatWidget .chat-container{width:100%;min-height:0;flex:1;height:auto}
+#customerChatWidget .chat-container{flex-direction:column}
+#customerChatWidget .conversations-panel{width:100%}
+#customerChatWidget .chat-panel{width:100%}
+#customerChatWidget .chat-panel{min-height:0}
+
+#customerChatWidget .offcanvas-body{overflow:hidden}
+#customerChatWidget .conversations-list{min-height:0}
+#customerChatWidget .chat-messages{min-height:0}
+
+#customerChatWidget.offcanvas{top:auto;right:24px;bottom:88px;height:min(720px,75vh);border-radius:1rem;box-shadow:0 20px 50px rgba(15,23,42,.25);border-left:1px solid var(--chat-border)}
+#customerChatWidget .offcanvas-header{padding:.75rem 1rem}
+#customerChatWidget .offcanvas-body{padding:.75rem}
+#customerChatWidget .connection-status{margin-bottom:.75rem}
+
+@media (max-width: 768px){
+  #customerChatWidget.offcanvas{right:0;bottom:0;top:0;height:100vh;border-radius:0}
+  #customerChatWidget .offcanvas-body{padding:.75rem}
+}

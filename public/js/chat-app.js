@@ -83,6 +83,52 @@ function renderConversations(){
   });
 }
 
+async function openEnterpriseChat(enterpriseId){
+  if(!enterpriseId) return;
+
+  const offcanvasEl=document.getElementById('customerChatWidget');
+  if(offcanvasEl && window.bootstrap){
+    try{
+      const inst=window.bootstrap.Offcanvas.getInstance(offcanvasEl)||new window.bootstrap.Offcanvas(offcanvasEl);
+      inst.show();
+    }catch(e){
+      // no-op
+    }
+  }
+
+  try{
+    const owner=await apiFetch('/api/chat/enterprise-owner',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({enterprise_id: enterpriseId})
+    });
+
+    if(!owner || owner.success!==true || !owner.business_user_id){
+      return;
+    }
+
+    const conv=await apiFetch('/api/chat/conversations',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({business_id: owner.business_user_id})
+    });
+
+    await loadConversations();
+
+    const cid=conv?.conversation?.conversation_id;
+    const participant=conv?.conversation?.business || conv?.conversation?.participant;
+    if(cid){
+      openConversation(cid, participant);
+    }
+  }catch(e){
+    console.error('[Chat] open enterprise chat failed',e);
+  }
+}
+
+window.UniPrintChat = window.UniPrintChat || {};
+window.UniPrintChat.openEnterpriseChat = openEnterpriseChat;
+window.UniPrintChat.reloadConversations = loadConversations;
+
 function renderMessage(m){
   const wrap=el('chatMessages');
   if(!wrap) return;
@@ -126,7 +172,67 @@ function setActiveChatVisible(visible){
   const empty=el('emptyState');
   const active=el('activeChat');
   if(empty) empty.style.display=visible?'none':'block';
-  if(active) active.style.display=visible?'flex':'none';
+  if(active){
+    active.style.display=visible?'flex':'none';
+    if(visible){
+      active.style.flexDirection='column';
+      active.style.flex='1';
+      active.style.minHeight='0';
+    }
+  }
+}
+
+function applyResponsivePanels(){
+  const conv=el('conversationsPanel');
+  const chat=el('chatPanel');
+  const back=el('backButton');
+  if(!conv||!chat) return;
+
+  const widgetEl=document.getElementById('customerChatWidget');
+  const widgetWidth=widgetEl ? widgetEl.getBoundingClientRect().width : 0;
+  const isWidgetMode=!!widgetEl;
+  const isNarrow=isWidgetMode ? (widgetWidth > 0 ? widgetWidth < 700 : true) : (window.matchMedia && window.matchMedia('(max-width: 992px)').matches);
+  if(isNarrow){
+    if(state.currentConversationId){
+      conv.style.display='none';
+      chat.style.display='flex';
+      if(back) back.style.display='inline-flex';
+    }else{
+      conv.style.display='flex';
+      chat.style.display='none';
+      if(back) back.style.display='none';
+    }
+  }else{
+    conv.style.display='flex';
+    chat.style.display='flex';
+    if(back) back.style.display='none';
+  }
+}
+
+function setupHeaderActions(){
+  const back=el('backButton');
+  const refresh=el('refreshMessages');
+
+  if(back){
+    back.addEventListener('click',()=>{
+      state.currentConversationId=null;
+      setActiveChatVisible(false);
+      renderConversations();
+      applyResponsivePanels();
+    });
+  }
+
+  if(refresh){
+    refresh.addEventListener('click',async()=>{
+      if(!state.currentConversationId) return;
+      try{
+        const data=await apiFetch('/api/chat/conversations/'+state.currentConversationId+'/messages');
+        renderMessages(data.messages||[]);
+      }catch(e){
+        console.error('[Chat] refresh messages failed',e);
+      }
+    });
+  }
 }
 
 function updateHeader(participant){
@@ -260,6 +366,7 @@ async function openConversation(conversationId,participant){
   updateHeader(participant);
   renderConversations();
   bindPusherToConversation(conversationId);
+  applyResponsivePanels();
 
   try{
     const data=await apiFetch('/api/chat/conversations/'+conversationId+'/messages');
@@ -343,7 +450,10 @@ document.addEventListener('DOMContentLoaded',()=>{
   setupPusher();
   setupComposer();
   setupNewChat();
+  setupHeaderActions();
   loadConversations();
+  applyResponsivePanels();
+  window.addEventListener('resize',applyResponsivePanels);
 });
 
 })();

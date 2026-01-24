@@ -204,6 +204,11 @@ class CheckoutController extends Controller
             $availablePaymentMethods = ['gcash', 'cash'];
             $availableFulfillmentMethods = ['pickup', 'delivery'];
 
+            $requiresDownpayment = false;
+            if (Schema::hasColumn('services', 'requires_downpayment')) {
+                $requiresDownpayment = !empty($serviceData->requires_downpayment);
+            }
+
             // filter allowed methods using the single service
             if (Schema::hasColumn('services', 'allowed_payment_methods') && !empty($serviceData->allowed_payment_methods)) {
                 $decoded = json_decode($serviceData->allowed_payment_methods, true);
@@ -212,12 +217,22 @@ class CheckoutController extends Controller
                 }
             }
 
+            // Downpayment requires GCash (cash is not allowed)
+            if ($requiresDownpayment) {
+                $availablePaymentMethods = array_values(array_diff($availablePaymentMethods, ['cash']));
+            }
+
             if (Schema::hasColumn('services', 'fulfillment_type') && !empty($serviceData->fulfillment_type)) {
                 $supported = $serviceData->fulfillment_type === 'pickup'
                     ? ['pickup']
                     : ($serviceData->fulfillment_type === 'delivery' ? ['delivery'] : ['pickup', 'delivery']);
 
                 $availableFulfillmentMethods = array_values(array_intersect($availableFulfillmentMethods, $supported));
+            }
+
+            // Cash only for pickup
+            if (!in_array('pickup', $availableFulfillmentMethods, true)) {
+                $availablePaymentMethods = array_values(array_diff($availablePaymentMethods, ['cash']));
             }
 
             return view('checkout.index', compact('cartItems', 'subtotal', 'tax', 'total', 'user', 'availablePaymentMethods', 'availableFulfillmentMethods'));
@@ -294,9 +309,15 @@ class CheckoutController extends Controller
         $availablePaymentMethods = ['gcash', 'cash'];
         $availableFulfillmentMethods = ['pickup', 'delivery'];
 
+        $anyRequiresDownpayment = false;
+
         foreach ($cartItems as $item) {
             $service = $item['service'] ?? null;
             if (!$service) continue;
+
+            if (Schema::hasColumn('services', 'requires_downpayment') && !empty($service->requires_downpayment)) {
+                $anyRequiresDownpayment = true;
+            }
 
             if (Schema::hasColumn('services', 'allowed_payment_methods') && !empty($service->allowed_payment_methods)) {
                 $decoded = json_decode($service->allowed_payment_methods, true);
@@ -316,6 +337,16 @@ class CheckoutController extends Controller
                 }
                 $availableFulfillmentMethods = array_values(array_intersect($availableFulfillmentMethods, $supported));
             }
+        }
+
+        // Downpayment requires GCash (cash is not allowed)
+        if ($anyRequiresDownpayment) {
+            $availablePaymentMethods = array_values(array_diff($availablePaymentMethods, ['cash']));
+        }
+
+        // Cash only for pickup
+        if (!in_array('pickup', $availableFulfillmentMethods, true)) {
+            $availablePaymentMethods = array_values(array_diff($availablePaymentMethods, ['cash']));
         }
 
         return view('checkout.index', compact('cartItems', 'subtotal', 'tax', 'total', 'user', 'availablePaymentMethods', 'availableFulfillmentMethods'));
@@ -342,6 +373,10 @@ class CheckoutController extends Controller
         
         if (!$userId) {
             return response()->json(['success' => false, 'message' => 'Please login to checkout'], 401);
+        }
+
+        if ($request->payment_method === 'cash' && $request->fulfillment_method !== 'pickup') {
+            return response()->json(['success' => false, 'message' => 'Cash is only available for pickup orders.'], 422);
         }
 
         $direct = session('checkout_mode') === 'direct' && is_array(session('checkout_direct_item'));
@@ -447,6 +482,12 @@ class CheckoutController extends Controller
                         }
                         if ($serviceData->fulfillment_type === 'delivery' && $request->fulfillment_method !== 'delivery') {
                             return response()->json(['success' => false, 'message' => 'One or more services are delivery-only.'], 422);
+                        }
+                    }
+
+                    if (Schema::hasColumn('services', 'requires_downpayment') && !empty($serviceData->requires_downpayment)) {
+                        if ($request->payment_method === 'cash') {
+                            return response()->json(['success' => false, 'message' => 'Cash is not available for services that require a downpayment. Please use GCash.'], 422);
                         }
                     }
 

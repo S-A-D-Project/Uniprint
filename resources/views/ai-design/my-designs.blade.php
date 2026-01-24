@@ -37,9 +37,11 @@
     <div class="row g-4">
         @foreach($designs as $design)
         <div class="col-md-6 col-lg-4">
-            <div class="card h-100">
+            <div class="card h-100" data-design-id="{{ $design->design_id }}" data-title="{{ e($design->title) }}" data-url="{{ e($design->file_url) }}" data-description="{{ e($design->description ?? '') }}" data-date="{{ e(\Carbon\Carbon::parse($design->created_at)->format('M d, Y')) }}">
                 <div class="position-relative">
-                    <img src="{{ $design->file_url }}" class="card-img-top" alt="{{ $design->title }}" style="height: 200px; object-fit: cover;">
+                    <div class="bg-light d-flex align-items-center justify-content-center" style="height: 200px;">
+                        <i class="bi bi-image text-muted" style="font-size: 3rem;"></i>
+                    </div>
                     <div class="position-absolute top-0 end-0 p-2">
                         <button class="btn btn-sm btn-light rounded-circle" onclick="deleteDesign('{{ $design->design_id }}')" title="Delete">
                             <i class="bi bi-trash"></i>
@@ -116,23 +118,22 @@
 <script>
 // View design in modal
 function viewDesign(designId) {
-    // Find the design data (you could pass full data or fetch from server)
     const card = document.querySelector(`[data-design-id="${designId}"]`);
-    if (card) {
-        const title = card.querySelector('.card-title').textContent;
-        const image = card.querySelector('.card-img-top').src;
-        const description = card.querySelector('.card-text').textContent;
-        const date = card.querySelector('.text-muted').textContent;
-        
-        document.getElementById('designModalTitle').textContent = title;
-        document.getElementById('designModalImage').src = image;
-        document.getElementById('designModalDescription').textContent = description;
-        document.getElementById('designModalDate').textContent = date;
-        document.getElementById('downloadModalBtn').onclick = () => downloadDesign(designId);
-        
-        const modal = new bootstrap.Modal(document.getElementById('designModal'));
-        modal.show();
-    }
+    if (!card) return;
+
+    const title = card.dataset.title || 'Design Preview';
+    const imageUrl = card.dataset.url || '';
+    const description = card.dataset.description || '';
+    const date = card.dataset.date || '';
+
+    document.getElementById('designModalTitle').textContent = title;
+    document.getElementById('designModalImage').src = imageUrl;
+    document.getElementById('designModalDescription').textContent = description;
+    document.getElementById('designModalDate').textContent = date;
+    document.getElementById('downloadModalBtn').onclick = () => downloadDesign(designId);
+
+    const modal = new bootstrap.Modal(document.getElementById('designModal'));
+    modal.show();
 }
 
 // Download design
@@ -154,8 +155,10 @@ function deleteDesign(designId) {
             if (data.success) {
                 showToast('Design deleted successfully', 'success');
                 // Remove the card from DOM
-                const card = document.querySelector(`[data-design-id="${designId}"]`).closest('.col-md-6');
-                card.remove();
+                const wrapper = document.querySelector(`[data-design-id="${designId}"]`)?.closest('.col-md-6');
+                if (wrapper) {
+                    wrapper.remove();
+                }
                 
                 // Check if no designs left
                 if (document.querySelectorAll('.col-md-6').length === 0) {

@@ -26,18 +26,23 @@
         <p class="text-muted mb-0">Order details and tracking</p>
     </div>
     <div class="d-flex gap-2">
+        @if(!empty($order->enterprise_id))
+            <a href="{{ route('chat.enterprise', $order->enterprise_id) }}" class="btn btn-outline-primary">
+                <i class="bi bi-chat-dots me-2"></i>Chat with Shop
+            </a>
+        @endif
         @if(($currentStatusName ?? null) === 'Pending')
-            <form action="{{ route('customer.orders.cancel', $order->purchase_order_id) }}" method="POST" onsubmit="return confirm('Cancel this order?');">
+            <form action="{{ route('customer.orders.cancel', $order->purchase_order_id) }}" method="POST" onsubmit="return confirm('Cancel this order?');" data-up-global-loader>
                 @csrf
-                <button type="submit" class="btn btn-outline-danger">
+                <button type="submit" class="btn btn-outline-danger" data-up-button-loader>
                     <i class="bi bi-x-circle me-2"></i>Cancel Order
                 </button>
             </form>
         @endif
         @if(($currentStatusName ?? null) === 'Delivered')
-            <form action="{{ route('customer.orders.confirm-completion', $order->purchase_order_id) }}" method="POST">
+            <form action="{{ route('customer.orders.confirm-completion', $order->purchase_order_id) }}" method="POST" data-up-global-loader>
                 @csrf
-                <button type="submit" class="btn btn-success">
+                <button type="submit" class="btn btn-success" data-up-button-loader>
                     <i class="bi bi-check2-circle me-2"></i>Confirm Received
                 </button>
             </form>
@@ -197,11 +202,14 @@
                                         <a class="btn btn-sm btn-outline-primary" target="_blank" href="{{ asset('storage/' . $file->file_path) }}">
                                             <i class="bi bi-download me-1"></i>Download
                                         </a>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="previewOrderDesignFile('{{ asset('storage/' . $file->file_path) }}', '{{ e($file->file_name) }}')">
+                                            <i class="bi bi-eye me-1"></i>Preview
+                                        </button>
                                         @if(empty($file->is_approved))
-                                            <form action="{{ route('customer.orders.delete-design', [$order->purchase_order_id, $file->file_id]) }}" method="POST" onsubmit="return confirm('Delete this file?');">
+                                            <form action="{{ route('customer.orders.delete-design', [$order->purchase_order_id, $file->file_id]) }}" method="POST" onsubmit="return confirm('Delete this file?');" data-up-global-loader>
                                                 @csrf
                                                 @method('DELETE')
-                                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger" data-up-button-loader>
                                                     <i class="bi bi-trash me-1"></i>Delete
                                                 </button>
                                             </form>
@@ -216,7 +224,7 @@
                 @endif
 
                 @if(!empty($fileUploadEnabled))
-                    <form action="{{ route('customer.orders.upload-design', $order->purchase_order_id) }}" method="POST" enctype="multipart/form-data" class="border rounded p-3">
+                    <form action="{{ route('customer.orders.upload-design', $order->purchase_order_id) }}" method="POST" enctype="multipart/form-data" class="border rounded p-3" data-up-global-loader>
                         @csrf
                         <div class="mb-3">
                             <x-ui.form.file-dropzone
@@ -234,7 +242,7 @@
                             <label class="form-label fw-semibold">Notes (optional)</label>
                             <textarea name="design_notes" class="form-control" rows="2" placeholder="Any notes for the shop about this file..."></textarea>
                         </div>
-                        <button type="submit" class="btn btn-primary">
+                        <button type="submit" class="btn btn-primary" data-up-button-loader>
                             <i class="bi bi-cloud-upload me-2"></i>Upload
                         </button>
                     </form>
@@ -378,4 +386,57 @@
         @endif
     </div>
 </div>
+
+<div class="modal fade" id="orderDesignFilePreviewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="orderDesignFilePreviewTitle">Preview</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="orderDesignFilePreviewBody" class="text-center"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <a href="#" target="_blank" class="btn btn-primary" id="orderDesignFilePreviewDownload">
+                    <i class="bi bi-download me-2"></i>Download
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+@push('scripts')
+<script>
+function previewOrderDesignFile(url, name) {
+    const modalEl = document.getElementById('orderDesignFilePreviewModal');
+    const titleEl = document.getElementById('orderDesignFilePreviewTitle');
+    const bodyEl = document.getElementById('orderDesignFilePreviewBody');
+    const dlEl = document.getElementById('orderDesignFilePreviewDownload');
+    if (!modalEl || !titleEl || !bodyEl || !dlEl) return;
+
+    titleEl.textContent = name || 'Preview';
+    dlEl.href = url;
+
+    const lower = (url || '').toLowerCase();
+    bodyEl.innerHTML = '';
+
+    if (lower.endsWith('.pdf')) {
+        bodyEl.innerHTML = `<iframe src="${url}" style="width: 100%; height: 70vh;" class="border rounded"></iframe>`;
+    } else if (lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.png') || lower.endsWith('.webp') || lower.endsWith('.gif')) {
+        bodyEl.innerHTML = `<img src="${url}" alt="${name || 'Preview'}" class="img-fluid rounded" style="max-height: 70vh;">`;
+    } else {
+        bodyEl.innerHTML = `<div class="text-center py-5">
+            <i class="bi bi-file-earmark text-muted" style="font-size: 4rem;"></i>
+            <h6 class="mt-3">Preview not available</h6>
+            <p class="text-muted mb-0">This file type can’t be previewed. Please download it.</p>
+        </div>`;
+    }
+
+    const modal = new bootstrap.Modal(modalEl);
+    modal.show();
+}
+</script>
+@endpush
 @endsection
