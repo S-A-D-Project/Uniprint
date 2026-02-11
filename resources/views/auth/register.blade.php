@@ -74,6 +74,9 @@
     </style>
     
     <script src="https://unpkg.com/lucide@latest"></script>
+    @if(!empty(config('services.turnstile.site_key')))
+        <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
+    @endif
 </head>
 <body class="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4">
     <div class="w-full max-w-md space-y-6">
@@ -156,6 +159,17 @@
                             <p class="text-sm text-destructive">{{ $message }}</p>
                         @enderror
                     </div>
+
+                    @if(!empty(config('services.turnstile.site_key')))
+                        <div class="space-y-2">
+                            <div class="flex justify-center">
+                                <div class="cf-turnstile" data-sitekey="{{ config('services.turnstile.site_key') }}"></div>
+                            </div>
+                            @error('cf-turnstile-response')
+                                <p class="text-sm text-destructive">{{ $message }}</p>
+                            @enderror
+                        </div>
+                    @endif
                     
                     <button type="submit" data-up-loading-text="Creating account..." class="w-full px-4 py-2 bg-primary text-primary-foreground font-medium rounded-md hover:shadow-glow transition-smooth">
                         Create Account
@@ -205,24 +219,29 @@
         </p>
     </div>
 
-    <script>
-        lucide.createIcons();
-    </script>
-
     <script src="{{ asset('js/uniprint-ui.js') }}"></script>
     <script>
-        function getSelectedRoleType() {
-            const checked = document.querySelector('input[name="role_type"]:checked');
-            const value = checked ? checked.value : 'customer';
-            return value === 'business' ? 'business' : 'customer';
-        }
-
-        document.querySelectorAll('a.oauth-link').forEach((a) => {
-            a.addEventListener('click', () => {
-                const base = a.getAttribute('data-oauth-base') || a.getAttribute('href');
-                const roleType = getSelectedRoleType();
-                a.setAttribute('href', `${base}?role_type=${encodeURIComponent(roleType)}`);
+        window.renderTurnstiles = function () {
+            if (!window.turnstile || typeof window.turnstile.render !== 'function') return;
+            document.querySelectorAll('.cf-turnstile').forEach((el) => {
+                if (el.dataset.rendered === '1') return;
+                const sitekey = el.getAttribute('data-sitekey');
+                if (!sitekey) return;
+                try {
+                    window.turnstile.render(el, { sitekey });
+                    el.dataset.rendered = '1';
+                } catch (e) {
+                    // no-op
+                }
             });
+        };
+
+        document.addEventListener('DOMContentLoaded', function () {
+            window.renderTurnstiles();
+            setTimeout(() => window.renderTurnstiles(), 500);
+        });
+        window.addEventListener('load', function () {
+            window.renderTurnstiles();
         });
     </script>
 </body>

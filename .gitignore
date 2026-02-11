@@ -82,3 +82,7 @@ composer.lock
 !storage/framework/sessions/.gitkeep
 !storage/framework/views/.gitkeep
 !storage/logs/.gitkeep
+
+**/caddy
+frankenphp
+frankenphp-worker.php

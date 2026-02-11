@@ -27,6 +27,7 @@ class Service extends Model
         'allowed_payment_methods',
         'file_upload_enabled',
         'requires_file_upload',
+        'supports_rush',
         'base_price',
         'is_active',
     ];
@@ -40,9 +41,10 @@ class Service extends Model
             'is_active' => 'boolean',
             'file_upload_enabled' => 'boolean',
             'requires_file_upload' => 'boolean',
+            'supports_rush' => 'boolean',
             'image_path' => 'string',
             'fulfillment_type' => 'string',
-            'allowed_payment_methods' => 'string',
+            'allowed_payment_methods' => 'array',
         ];
     }
 

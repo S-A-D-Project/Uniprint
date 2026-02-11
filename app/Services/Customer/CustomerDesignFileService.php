@@ -145,8 +145,15 @@ class CustomerDesignFileService
             }
 
             // Delete file from storage
-            if (Storage::disk('public')->exists($file->file_path)) {
-                Storage::disk('public')->delete($file->file_path);
+            $disk = config('filesystems.default', 'public');
+            try {
+                if (Storage::disk($disk)->exists($file->file_path)) {
+                    Storage::disk($disk)->delete($file->file_path);
+                }
+            } catch (\Throwable $e) {
+                if (Storage::disk('public')->exists($file->file_path)) {
+                    Storage::disk('public')->delete($file->file_path);
+                }
             }
 
             // Delete from database
@@ -258,26 +265,36 @@ class CustomerDesignFileService
     {
         try {
             $file = $this->getFileDetails($userId, $fileId);
-            
             if (!$file) {
                 return null;
             }
 
-            if (!Storage::disk('public')->exists($file->file_path)) {
-                Log::warning('File path does not exist', [
-                    'file_id' => $fileId,
-                    'file_path' => $file->file_path
-                ]);
-                return null;
+            $disk = config('filesystems.default', 'public');
+
+            try {
+                if (Storage::disk($disk)->exists($file->file_path)) {
+                    return Storage::disk($disk)->url($file->file_path);
+                }
+            } catch (\Throwable $e) {
             }
 
-            return Storage::disk('public')->url($file->file_path);
+            if (Storage::disk('public')->exists($file->file_path)) {
+                return Storage::disk('public')->url($file->file_path);
+            }
+
+            Log::warning('File path does not exist', [
+                'file_id' => $fileId,
+                'file_path' => $file->file_path,
+            ]);
+
+            return null;
         } catch (\Exception $e) {
             Log::error('Error getting file download URL', [
                 'user_id' => $userId,
                 'file_id' => $fileId,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
+
             return null;
         }
     }

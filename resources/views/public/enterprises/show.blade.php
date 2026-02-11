@@ -49,14 +49,21 @@
                     <div class="flex flex-col items-end gap-3">
                         <div class="flex items-center gap-1 bg-primary/10 px-3 py-2 rounded-lg">
                             <i data-lucide="star" class="h-5 w-5 fill-primary text-primary"></i>
-                            <span class="text-lg font-semibold">4.8</span>
+                            <span class="text-lg font-semibold">{{ !empty($enterprise->review_count) ? number_format((float) ($enterprise->rating ?? 0), 1) : '—' }}</span>
                         </div>
 
                         @if(session('user_id'))
-                            <a href="{{ route('chat.enterprise', $enterprise->enterprise_id) }}" class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground font-medium rounded-md hover:shadow-glow transition-smooth">
+                            <a href="{{ route('chat.enterprise', $enterprise->enterprise_id) }}" class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground font-medium rounded-md hover:shadow-glow transition-smooth js-open-enterprise-chat" data-enterprise-id="{{ $enterprise->enterprise_id }}">
                                 <i data-lucide="message-circle" class="h-4 w-4"></i>
                                 Message this shop
                             </a>
+
+                            @if(auth()->check() && auth()->user()->getUserRoleType() === 'customer')
+                                <button type="button" class="inline-flex items-center justify-center gap-2 px-4 py-2 border border-destructive text-destructive font-medium rounded-md hover:bg-destructive/10 transition-smooth" data-up-report data-entity-type="enterprise" data-enterprise-id="{{ $enterprise->enterprise_id }}">
+                                    <i data-lucide="flag" class="h-4 w-4"></i>
+                                    Report
+                                </button>
+                            @endif
                         @else
                             <a href="{{ route('login', ['tab' => 'signup']) }}" class="inline-flex items-center justify-center gap-2 px-4 py-2 border border-input rounded-md hover:bg-secondary transition-smooth">
                                 <i data-lucide="log-in" class="h-4 w-4"></i>

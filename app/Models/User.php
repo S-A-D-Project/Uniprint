@@ -5,10 +5,13 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
+use App\Traits\SendsTwoFactorCode;
 
 class User extends Authenticatable
 {
-    use HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable;
+    use SendsTwoFactorCode;
 
     protected $primaryKey = 'user_id';
     protected $keyType = 'string';
@@ -34,6 +37,8 @@ class User extends Authenticatable
         return [
             'is_active' => 'boolean',
             'password_hash' => 'hashed',
+            'two_factor_enabled' => 'boolean',
+            'two_factor_expires_at' => 'datetime',
         ];
     }
 

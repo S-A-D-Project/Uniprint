@@ -5,10 +5,12 @@
 @section('page-subtitle', 'Manage and track all customer orders')
 
 @section('header-actions')
-    <a href="{{ route('business.orders.walk-in.create') }}" class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:shadow-glow transition-smooth">
+    <button type="button" 
+            onclick="openWalkInModal()"
+            class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:shadow-glow transition-smooth">
         <i data-lucide="plus" class="h-4 w-4"></i>
         Walk-in Order
-    </a>
+    </button>
 @endsection
 
 @section('content')
@@ -68,6 +70,7 @@
                         <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Date</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Due</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Total</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Payment</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Status</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Actions</th>
                     </tr>
@@ -102,6 +105,16 @@
                             </td>
                             <td class="px-6 py-4 font-medium">₱{{ number_format($order->total, 2) }}</td>
                             <td class="px-6 py-4">
+                                <div class="flex flex-col gap-1">
+                                    <span class="text-xs text-muted-foreground">{{ $order->payment_method ?? '—' }}</span>
+                                    @if(!empty($order->is_paid_calc))
+                                        <span class="inline-block px-2 py-0.5 text-xs font-medium rounded-md bg-success/10 text-success">Paid</span>
+                                    @else
+                                        <span class="inline-block px-2 py-0.5 text-xs font-medium rounded-md bg-warning/10 text-warning">Unpaid</span>
+                                    @endif
+                                </div>
+                            </td>
+                            <td class="px-6 py-4">
                                 @if($order->status_name)
                                     <span class="inline-block px-2 py-1 text-xs font-medium rounded-md
                                         @if($order->status_name == 'Pending') bg-warning/10 text-warning
@@ -118,15 +131,22 @@
                                 @endif
                             </td>
                             <td class="px-6 py-4">
-                                <a href="{{ route('business.orders.details', $order->purchase_order_id) }}" 
-                                   class="text-primary hover:text-primary/80 font-medium text-sm">
-                                    View Details →
-                                </a>
+                                <div class="flex items-center gap-3">
+                                    <button type="button"
+                                            onclick="openBusinessOrderReviewModal('{{ route('business.orders.details', $order->purchase_order_id, false) }}')"
+                                            class="text-sm font-medium text-primary hover:text-primary/80">
+                                        Review
+                                    </button>
+                                    <a href="{{ route('business.orders.details', $order->purchase_order_id) }}" 
+                                       class="text-primary hover:text-primary/80 font-medium text-sm">
+                                        View Details →
+                                    </a>
+                                </div>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="px-6 py-12 text-center text-muted-foreground">
+                            <td colspan="8" class="px-6 py-12 text-center text-muted-foreground">
                                 <i data-lucide="inbox" class="h-12 w-12 mx-auto mb-4 text-muted-foreground"></i>
                                 <p>No orders yet</p>
                             </td>
@@ -143,4 +163,84 @@
         @endif
     </div>
 </div>
+
+<x-ui.modal id="businessOrderReviewModal" title="Order Review" size="xl" scrollable>
+    <div id="businessOrderReviewModalBody" class="min-h-[200px]"></div>
+</x-ui.modal>
+
+<x-ui.modal id="walkInOrderModal" title="Create Walk-in Order" size="xl" scrollable>
+    <div id="walkInOrderModalBody" class="min-h-[200px]"></div>
+</x-ui.modal>
+
+@push('scripts')
+<script>
+function openWalkInModal() {
+    const modalEl = document.getElementById('walkInOrderModal');
+    const bodyEl = document.getElementById('walkInOrderModalBody');
+    if (!modalEl || !bodyEl) return;
+
+    const url = "{{ route('business.orders.walk-in.create') }}";
+    
+    bodyEl.innerHTML = '<div class="py-10 text-center text-muted-foreground">Loading form…</div>';
+
+    let bsModal = window.modal_walkInOrderModal;
+    if (!bsModal && typeof bootstrap !== 'undefined') {
+        bsModal = new bootstrap.Modal(modalEl);
+        window.modal_walkInOrderModal = bsModal;
+    }
+    if (bsModal) bsModal.show();
+
+    fetch(url, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'text/html' }
+    })
+    .then(res => res.text())
+    .then(html => {
+        bodyEl.innerHTML = html;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    })
+    .catch(err => {
+        bodyEl.innerHTML = '<div class="alert alert-danger">Failed to load form.</div>';
+    });
+}
+
+function openBusinessOrderReviewModal(url) {
+    const modalEl = document.getElementById('businessOrderReviewModal');
+    const bodyEl = document.getElementById('businessOrderReviewModalBody');
+    if (!modalEl || !bodyEl) return;
+
+    bodyEl.innerHTML = '<div class="py-10 text-center text-muted-foreground">Loading details…</div>';
+
+    let bsModal = window.modal_businessOrderReviewModal;
+    if (!bsModal && typeof bootstrap !== 'undefined') {
+        bsModal = new bootstrap.Modal(modalEl);
+        window.modal_businessOrderReviewModal = bsModal;
+    }
+
+    if (bsModal) {
+        bsModal.show();
+    }
+
+    fetch(url, {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'text/html'
+        },
+        credentials: 'same-origin'
+    })
+        .then((res) => {
+            if (!res.ok) throw new Error('Failed to load order details');
+            return res.text();
+        })
+        .then((html) => {
+            bodyEl.innerHTML = html;
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+        })
+        .catch((err) => {
+            bodyEl.innerHTML = `<div class="alert alert-danger mb-0">${String(err.message || 'Failed to load order details')}</div>`;
+        });
+}
+</script>
+@endpush
 @endsection

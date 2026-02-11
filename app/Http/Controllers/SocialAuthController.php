@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
 use Exception;
@@ -130,6 +132,12 @@ class SocialAuthController extends Controller
             if (!$name) {
                 $name = 'User ' . substr($providerId, 0, 8);
             }
+
+            if (!$email) {
+                return redirect()->route('login')->withErrors([
+                    'social' => 'Your ' . ucfirst($provider) . ' account did not provide an email address. Please use a provider/account with an email or sign up using email/password.',
+                ]);
+            }
             
             // Check if social login already exists
             $socialLogin = DB::table('social_logins')
@@ -185,11 +193,6 @@ class SocialAuthController extends Controller
             // Create new user
             $userId = Str::uuid();
             $username = $this->generateUniqueUsername($name);
-            
-            // Generate email if not provided
-            if (!$email) {
-                $email = $provider . '_' . $providerId . '@uniprint.local';
-            }
 
             // Create user record
             DB::table('users')->insert([
@@ -267,6 +270,54 @@ class SocialAuthController extends Controller
             ->select('role_types.user_role_type')
             ->first();
 
+        $roleType = (string) ($role?->user_role_type ?? '');
+        if ($roleType !== '' && $roleType !== 'admin' && !session('two_factor_passed')) {
+            $user = DB::table('users')->where('user_id', $userId)->first();
+
+            if (!empty($user) && !empty($user->two_factor_enabled)) {
+                $intendedUrl = $roleType === 'business_user'
+                    ? route('business.dashboard')
+                    : ($roleType === 'customer' ? route('customer.dashboard') : route('home'));
+
+                session(['two_factor_intended' => $intendedUrl]);
+
+                try {
+                    $eloquentUser = User::find($userId);
+                    if ($eloquentUser) {
+                        $eloquentUser->generateTwoFactorCode();
+                    }
+                } catch (\Throwable $e) {
+                    Log::error('Failed to generate/send DB 2FA code after social login', [
+                        'error' => $e->getMessage(),
+                        'user_id' => $userId,
+                        'mailer' => (string) config('mail.default'),
+                    ]);
+
+                    return redirect()->route('login')->withErrors([
+                        'social' => 'Unable to send verification code. Please try again.',
+                    ]);
+                }
+
+                return redirect()->route('two-factor.verify');
+            }
+
+            $hasAnyTwoFactorEnabled = !empty($user)
+                && (
+                    !empty($user->two_factor_totp_enabled)
+                    || !empty($user->two_factor_email_enabled)
+                    || !empty($user->two_factor_sms_enabled)
+                );
+
+            if ($hasAnyTwoFactorEnabled) {
+            $intendedUrl = $roleType === 'business_user'
+                ? route('business.dashboard')
+                : ($roleType === 'customer' ? route('customer.dashboard') : route('home'));
+
+            session(['two_factor_intended' => $intendedUrl]);
+            return redirect()->route('two-factor.challenge');
+            }
+        }
+
         if ($role && $role->user_role_type === 'business_user') {
             $hasEnterprise = DB::table('enterprises')->where('owner_user_id', $userId)->exists();
             if (! $hasEnterprise) {
@@ -318,8 +369,12 @@ class SocialAuthController extends Controller
             'last_activity' => now(),
         ]);
 
+        session()->forget('two_factor_passed');
+
         request()->session()->regenerate();
         request()->session()->regenerateToken();
+
+        Auth::loginUsingId($user->user_id);
     }
 
     /**

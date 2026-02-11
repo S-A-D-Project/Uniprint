@@ -5,6 +5,7 @@ const csrfToken=()=>{const el=document.querySelector('meta[name="csrf-token"]');
 
 async function apiFetch(url,options){
   const opts=options||{};
+  if(!opts.credentials) opts.credentials='same-origin';
   const headers=new Headers(opts.headers||{});
   if(!headers.has('Accept')) headers.set('Accept','application/json');
   if(!headers.has('X-Requested-With')) headers.set('X-Requested-With','XMLHttpRequest');
@@ -350,12 +351,23 @@ function bindPusherToConversation(conversationId){
   });
 
   state.channel.bind('user-typing',(data)=>{
-    const ind=document.querySelector('#activeChat #typingIndicator');
-    if(!ind) return;
+    const indInput=document.querySelector('#activeChat #typingIndicator');
+    const indHeader=document.querySelector('#activeChat #typingIndicatorHeader');
+    if(!indInput && !indHeader) return;
     if(data && data.user_id===window.Laravel?.user?.id) return;
-    ind.style.display=data?.is_typing?'block':'none';
-    if(data?.is_typing){
-      ind.innerHTML='<i class="bi bi-three-dots"></i> '+escapeHtml(data.user_name||'Someone')+' is typing...';
+
+    const visible=!!data?.is_typing;
+    if(indInput){
+      indInput.style.display=visible?'block':'none';
+      if(visible){
+        indInput.innerHTML='<i class="bi bi-three-dots"></i> '+escapeHtml(data.user_name||'Someone')+' is typing...';
+      }
+    }
+    if(indHeader){
+      indHeader.style.display=visible?'block':'none';
+      if(visible){
+        indHeader.innerHTML='<i class="bi bi-three-dots"></i> '+escapeHtml(data.user_name||'Someone')+' is typing...';
+      }
     }
   });
 }

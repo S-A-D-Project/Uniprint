@@ -17,7 +17,12 @@
                 </div>
             @endif
 
-            <form method="POST" action="{{ route('business.onboarding.store') }}" class="space-y-4">
+            @php
+                $proofEnabled = \Illuminate\Support\Facades\Schema::hasColumn('enterprises', 'verification_document_path')
+                    && \Illuminate\Support\Facades\Schema::hasColumn('enterprises', 'verification_submitted_at');
+            @endphp
+
+            <form method="POST" action="{{ route('business.onboarding.store') }}" class="space-y-4" enctype="multipart/form-data">
                 @csrf
 
                 <div>
@@ -77,6 +82,33 @@
                         @enderror
                     </div>
                 </div>
+
+                @if($proofEnabled)
+                    <div class="pt-2">
+                        <div class="text-sm font-semibold text-gray-900">Business verification</div>
+                        <div class="text-sm text-gray-600 mt-1">Upload proof that you are a legitimate printing business (e.g., business permit). Your account will remain pending until approved.</div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1" for="verification_document">Verification Document</label>
+                        <input id="verification_document" name="verification_document" type="file" required accept="image/*,.pdf"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary">
+                        @error('verification_document')
+                            <p class="text-sm text-red-600 mt-1">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    @if(\Illuminate\Support\Facades\Schema::hasColumn('enterprises', 'verification_notes'))
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1" for="verification_notes">Notes (optional)</label>
+                            <textarea id="verification_notes" name="verification_notes" rows="3"
+                                      class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary">{{ old('verification_notes') }}</textarea>
+                            @error('verification_notes')
+                                <p class="text-sm text-red-600 mt-1">{{ $message }}</p>
+                            @enderror
+                        </div>
+                    @endif
+                @endif
 
                 <div class="pt-2">
                     <button type="submit"

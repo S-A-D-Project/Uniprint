@@ -45,7 +45,7 @@
         <div class="flex items-center justify-between mb-2">
             <span class="text-sm font-medium text-muted-foreground">Total Revenue</span>
             <div class="w-8 h-8 bg-success/10 rounded-lg flex items-center justify-center">
-                <i data-lucide="peso-sign" class="h-4 w-4 text-success"></i>
+                <i data-lucide="philippine-peso" class="h-4 w-4 text-success"></i>
             </div>
         </div>
         <p class="text-2xl lg:text-3xl font-bold text-success">₱{{ number_format($stats['total_revenue'] ?? 0, 0) }}</p>

@@ -80,43 +80,7 @@
     <!-- Category Navigation -->
     <div class="bg-white border-b border-gray-200">
         <div class="container mx-auto px-4">
-            <div class="flex items-center gap-6 overflow-x-auto py-3">
-                <button class="category-btn flex items-center gap-2 px-3 py-2 text-sm font-medium text-orange-600 border-b-2 border-orange-600 whitespace-nowrap" 
-                        data-category="all">
-                    <i data-lucide="grid" class="h-4 w-4"></i>
-                    All Services
-                </button>
-                <button class="category-btn flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 border-b-2 border-transparent whitespace-nowrap" 
-                        data-category="business">
-                    <i data-lucide="briefcase" class="h-4 w-4"></i>
-                    Business Services
-                </button>
-                <button class="category-btn flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 border-b-2 border-transparent whitespace-nowrap" 
-                        data-category="design">
-                    <i data-lucide="palette" class="h-4 w-4"></i>
-                    Design & Creative
-                </button>
-                <button class="category-btn flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 border-b-2 border-transparent whitespace-nowrap" 
-                        data-category="marketing">
-                    <i data-lucide="megaphone" class="h-4 w-4"></i>
-                    Marketing
-                </button>
-                <button class="category-btn flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 border-b-2 border-transparent whitespace-nowrap" 
-                        data-category="printing">
-                    <i data-lucide="printer" class="h-4 w-4"></i>
-                    Printing & Production
-                </button>
-                <button class="category-btn flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 border-b-2 border-transparent whitespace-nowrap" 
-                        data-category="digital">
-                    <i data-lucide="monitor" class="h-4 w-4"></i>
-                    Digital Services
-                </button>
-                <button class="category-btn flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 border-b-2 border-transparent whitespace-nowrap" 
-                        data-category="consulting">
-                    <i data-lucide="users" class="h-4 w-4"></i>
-                    Consulting
-                </button>
-            </div>
+            <div id="category-nav" class="flex items-center gap-6 overflow-x-auto py-3"></div>
         </div>
     </div>
 
@@ -125,22 +89,44 @@
         <div class="container mx-auto px-4 py-3">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-4">
+                    <!-- Provider Filter (Searchable) -->
+                    <div class="relative">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="store" class="h-4 w-4 text-gray-500"></i>
+                            <div class="relative">
+                                <input id="provider-filter" type="text" autocomplete="off" placeholder="Search printing shop..."
+                                       class="text-sm border border-gray-300 rounded-lg px-3 py-1 pr-8 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 w-56">
+                                <button id="provider-clear" type="button" class="absolute right-1 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 hidden" aria-label="Clear provider">
+                                    <i data-lucide="x" class="h-4 w-4"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div id="provider-suggestions" class="absolute left-0 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg hidden z-50">
+                            <div class="max-h-64 overflow-y-auto"></div>
+                        </div>
+                    </div>
+
                     <!-- Location Filter -->
                     <div class="flex items-center gap-2">
                         <i data-lucide="map-pin" class="h-4 w-4 text-gray-500"></i>
                         <select id="location-filter" class="text-sm border border-gray-300 rounded-lg px-3 py-1 focus:ring-2 focus:ring-orange-500 focus:border-orange-500">
                             <option value="">All Locations</option>
-                            <option value="manila">Manila</option>
-                            <option value="quezon">Quezon City</option>
-                            <option value="makati">Makati</option>
-                            <option value="pasig">Pasig</option>
-                            <option value="taguig">Taguig</option>
                         </select>
+                    </div>
+
+                    <!-- Min/Max Price -->
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="philippine-peso" class="h-4 w-4 text-gray-500"></i>
+                        <input id="min-price-filter" type="number" min="0" step="1" placeholder="Min"
+                               class="text-sm border border-gray-300 rounded-lg px-3 py-1 w-24 focus:ring-2 focus:ring-orange-500 focus:border-orange-500">
+                        <span class="text-xs text-gray-400">-</span>
+                        <input id="max-price-filter" type="number" min="0" step="1" placeholder="Max"
+                               class="text-sm border border-gray-300 rounded-lg px-3 py-1 w-24 focus:ring-2 focus:ring-orange-500 focus:border-orange-500">
                     </div>
 
                     <!-- Price Range Filter -->
                     <div class="flex items-center gap-2">
-                        <i data-lucide="peso-sign" class="h-4 w-4 text-gray-500"></i>
+                        <i data-lucide="philippine-peso" class="h-4 w-4 text-gray-500"></i>
                         <select id="price-range-filter" class="text-sm border border-gray-300 rounded-lg px-3 py-1 focus:ring-2 focus:ring-orange-500 focus:border-orange-500">
                             <option value="">Any Price</option>
                             <option value="0-500">Under ₱500</option>
@@ -166,9 +152,9 @@
                         <i data-lucide="tag" class="h-4 w-4 text-gray-500"></i>
                         <select id="service-type-filter" class="text-sm border border-gray-300 rounded-lg px-3 py-1 focus:ring-2 focus:ring-orange-500 focus:border-orange-500">
                             <option value="">All Types</option>
-                            <option value="online">Online Service</option>
-                            <option value="onsite">On-site Service</option>
-                            <option value="delivery">With Delivery</option>
+                            <option value="pickup">Pickup</option>
+                            <option value="delivery">Delivery</option>
+                            <option value="both">Pickup + Delivery</option>
                         </select>
                     </div>
                 </div>
@@ -192,7 +178,7 @@
         <div class="flex items-center justify-between mb-6">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900">
-                    <span id="results-count">Loading...</span> Services Found
+                    <span id="results-count">0</span> Services Found
                 </h1>
                 <p class="text-gray-600 mt-1">Discover the best services for your needs</p>
             </div>
@@ -210,11 +196,8 @@
 
         <!-- Services Grid/List Container -->
         <div id="services-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            <!-- Loading State -->
             <div class="col-span-full">
-                <div class="flex justify-center items-center py-12">
-                    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
-                </div>
+                <div class="py-12"></div>
             </div>
         </div>
 
@@ -326,13 +309,21 @@ class ServiceMarketplace {
     constructor() {
         this.currentPage = 1;
         this.hasMorePages = true;
+        this.categoriesLoaded = false;
+        this.providerSearchTimeout = null;
+        this.providerSelected = null;
+        this.locationsLoaded = false;
+        this.priceInputTimeout = null;
         this.currentFilters = {
             category: 'all',
+            enterpriseId: '',
             search: '',
             location: '',
             priceRange: '',
+            minPrice: '',
+            maxPrice: '',
             rating: '',
-            serviceType: '',
+            fulfillmentType: '',
             sortBy: 'relevance'
         };
         this.viewMode = 'grid';
@@ -342,26 +333,62 @@ class ServiceMarketplace {
 
     init() {
         this.setupEventListeners();
+        this.loadCategories();
+        this.loadLocations();
         this.loadServices();
         this.initializeSearch();
     }
 
     setupEventListeners() {
-        // Category buttons
-        document.querySelectorAll('.category-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                this.setActiveCategory(e.currentTarget.dataset.category);
-            });
+        // Category buttons (delegated)
+        document.getElementById('category-nav')?.addEventListener('click', (e) => {
+            const btn = e.target.closest('.category-btn');
+            if (!btn) return;
+            this.setActiveCategory(btn.dataset.category);
         });
 
         // Filters
+        this.setupProviderFilter();
+
         document.getElementById('location-filter')?.addEventListener('change', (e) => {
             this.currentFilters.location = e.target.value;
             this.resetAndLoad();
         });
 
+        const minPriceEl = document.getElementById('min-price-filter');
+        const maxPriceEl = document.getElementById('max-price-filter');
+
+        const onPriceInput = () => {
+            clearTimeout(this.priceInputTimeout);
+            this.priceInputTimeout = setTimeout(() => {
+                this.currentFilters.minPrice = minPriceEl?.value ?? '';
+                this.currentFilters.maxPrice = maxPriceEl?.value ?? '';
+
+                // If custom min/max is set, clear the preset price range dropdown
+                const preset = document.getElementById('price-range-filter');
+                if (preset && (this.currentFilters.minPrice !== '' || this.currentFilters.maxPrice !== '')) {
+                    preset.value = '';
+                    this.currentFilters.priceRange = '';
+                }
+
+                this.resetAndLoad();
+            }, 350);
+        };
+
+        minPriceEl?.addEventListener('input', onPriceInput);
+        maxPriceEl?.addEventListener('input', onPriceInput);
+
         document.getElementById('price-range-filter')?.addEventListener('change', (e) => {
             this.currentFilters.priceRange = e.target.value;
+
+            // If preset range is chosen, clear custom min/max
+            if (this.currentFilters.priceRange !== '') {
+                if (minPriceEl) minPriceEl.value = '';
+                if (maxPriceEl) maxPriceEl.value = '';
+                this.currentFilters.minPrice = '';
+                this.currentFilters.maxPrice = '';
+            }
+
             this.resetAndLoad();
         });
 
@@ -371,7 +398,7 @@ class ServiceMarketplace {
         });
 
         document.getElementById('service-type-filter')?.addEventListener('change', (e) => {
-            this.currentFilters.serviceType = e.target.value;
+            this.currentFilters.fulfillmentType = e.target.value;
             this.resetAndLoad();
         });
 
@@ -458,6 +485,38 @@ class ServiceMarketplace {
         }
     }
 
+    async loadLocations() {
+        try {
+            const res = await fetch('/api/marketplace/locations');
+            const locations = await res.json();
+            this.renderLocations(Array.isArray(locations) ? locations : []);
+            this.locationsLoaded = true;
+        } catch (e) {
+            this.renderLocations([]);
+        }
+    }
+
+    renderLocations(locations) {
+        const select = document.getElementById('location-filter');
+        if (!select) return;
+
+        const current = select.value;
+        select.innerHTML = '<option value="">All Locations</option>';
+
+        (locations || []).forEach((loc) => {
+            const name = (loc && (loc.name || loc.id)) ? String(loc.name || loc.id) : '';
+            if (!name) return;
+            const opt = document.createElement('option');
+            opt.value = name;
+            opt.textContent = name;
+            select.appendChild(opt);
+        });
+
+        if (current) {
+            select.value = current;
+        }
+    }
+
     setActiveCategory(category) {
         this.currentFilters.category = category;
         
@@ -473,6 +532,45 @@ class ServiceMarketplace {
         });
 
         this.resetAndLoad();
+    }
+
+    async loadCategories() {
+        try {
+            const res = await fetch('/api/marketplace/categories');
+            const categories = await res.json();
+            this.renderCategories(Array.isArray(categories) ? categories : []);
+            this.categoriesLoaded = true;
+        } catch (e) {
+            this.renderCategories([
+                { id: 'all', name: 'All Services', icon: 'grid', count: 0 },
+            ]);
+        }
+    }
+
+    renderCategories(categories) {
+        const nav = document.getElementById('category-nav');
+        if (!nav) return;
+
+        const safe = categories.length ? categories : [{ id: 'all', name: 'All Services', icon: 'grid', count: 0 }];
+
+        nav.innerHTML = safe.map((cat, idx) => {
+            const active = (idx === 0 && this.currentFilters.category === 'all') || this.currentFilters.category === cat.id;
+            const base = 'category-btn flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2 whitespace-nowrap';
+            const classes = active
+                ? 'text-orange-600 border-orange-600'
+                : 'text-gray-600 hover:text-gray-900 border-transparent';
+
+            return `
+                <button class="${base} ${classes}" data-category="${cat.id}">
+                    <i data-lucide="${cat.icon || 'grid'}" class="h-4 w-4"></i>
+                    ${cat.name}
+                </button>
+            `;
+        }).join('');
+
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
     }
 
     setViewMode(mode) {
@@ -513,11 +611,14 @@ class ServiceMarketplace {
             const params = new URLSearchParams({
                 page: this.currentPage,
                 category: this.currentFilters.category,
+                enterprise_id: this.currentFilters.enterpriseId,
                 search: this.currentFilters.search,
                 location: this.currentFilters.location,
                 price_range: this.currentFilters.priceRange,
+                min_price: this.currentFilters.minPrice,
+                max_price: this.currentFilters.maxPrice,
                 rating: this.currentFilters.rating,
-                service_type: this.currentFilters.serviceType,
+                fulfillment_type: this.currentFilters.fulfillmentType,
                 sort_by: this.currentFilters.sortBy
             });
 

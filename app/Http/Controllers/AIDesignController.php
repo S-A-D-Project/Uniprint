@@ -6,6 +6,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class AIDesignController extends Controller
@@ -16,6 +18,44 @@ class AIDesignController extends Controller
     public function index()
     {
         return view('ai-design.index');
+    }
+
+    public function usage(Request $request)
+    {
+        $userId = session('user_id');
+        if (! $userId) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $roleType = null;
+        try {
+            $roleType = DB::table('roles')
+                ->join('role_types', 'roles.role_type_id', '=', 'role_types.role_type_id')
+                ->where('roles.user_id', $userId)
+                ->value('role_types.user_role_type');
+        } catch (\Throwable $e) {
+            $roleType = null;
+        }
+
+        $dailyLimit = ($roleType === 'business_user' || $roleType === 'admin') ? 50 : 5;
+        $today = now()->toDateString();
+
+        $usedToday = 0;
+        if (Schema::hasTable('ai_generation_daily_usages')) {
+            $usedToday = (int) (DB::table('ai_generation_daily_usages')
+                ->where('user_id', $userId)
+                ->where('usage_date', $today)
+                ->value('generation_count') ?? 0);
+        }
+
+        $remainingToday = max(0, $dailyLimit - $usedToday);
+
+        return response()->json([
+            'success' => true,
+            'daily_limit' => $dailyLimit,
+            'used_today' => $usedToday,
+            'remaining_today' => $remainingToday,
+        ]);
     }
 
     /**
@@ -59,11 +99,13 @@ class AIDesignController extends Controller
             
             // Save to temporary storage
             $filename = 'ai-design-' . Str::uuid() . '.png';
+            $mimeType = $this->detectImageMimeType($imageContents) ?? 'image/png';
             $base64Png = base64_encode($imageContents);
             
             return response()->json([
                 'success' => true,
                 'image_base64' => $base64Png,
+                'mime_type' => $mimeType,
                 'filename' => $filename,
                 'prompt' => $prompt,
                 'style' => $style,
@@ -172,9 +214,8 @@ class AIDesignController extends Controller
     public function save(Request $request)
     {
         $request->validate([
-            'image_url' => 'required|string',
+            'image_base64' => 'required|string',
             'filename' => 'required|string',
-            'storage_path' => 'nullable|string',
             'title' => 'required|string|max:255',
             'description' => 'nullable|string|max:1000'
         ]);
@@ -189,50 +230,34 @@ class AIDesignController extends Controller
                 ], 401);
             }
 
-            $imageUrl = $request->image_url;
+            $base64 = (string) $request->input('image_base64');
+            $base64 = preg_replace('/^data:image\/(png|jpeg|jpg);base64,/', '', $base64) ?? $base64;
+            $binary = base64_decode($base64, true);
 
-            // Legacy local storage flow (backward compatible)
-            if (str_contains($imageUrl, '/storage/')) {
-                $tempPath = str_replace('/storage/', 'public/', $imageUrl);
-                $permanentPath = 'designs/' . $userId . '/' . $request->filename;
-
-                if (Storage::exists($tempPath)) {
-                    Storage::move($tempPath, $permanentPath);
-
-                    $designId = Str::uuid();
-                    \DB::table('user_designs')->insert([
-                        'design_id' => $designId,
-                        'user_id' => $userId,
-                        'title' => $request->title,
-                        'description' => $request->description,
-                        'file_path' => $permanentPath,
-                        'file_url' => Storage::url($permanentPath),
-                        'created_at' => now(),
-                        'updated_at' => now()
-                    ]);
-
-                    return response()->json([
-                        'success' => true,
-                        'message' => 'Design saved successfully!',
-                        'design_id' => $designId
-                    ]);
-                }
-
+            if ($binary === false) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Design file not found'
-                ], 404);
+                    'message' => 'Invalid image data'
+                ], 422);
             }
 
-            // Supabase/public URL flow
+            $filename = (string) $request->input('filename');
+            if (trim($filename) === '') {
+                $filename = 'ai-design-' . Str::uuid() . '.png';
+            }
+
+            $disk = config('filesystems.default', 'public');
+            $permanentPath = 'designs/' . $userId . '/' . $filename;
+            Storage::disk($disk)->put($permanentPath, $binary);
+
             $designId = Str::uuid();
             \DB::table('user_designs')->insert([
                 'design_id' => $designId,
                 'user_id' => $userId,
                 'title' => $request->title,
                 'description' => $request->description,
-                'file_path' => $request->storage_path,
-                'file_url' => $imageUrl,
+                'file_path' => $permanentPath,
+                'file_url' => Storage::disk($disk)->url($permanentPath),
                 'created_at' => now(),
                 'updated_at' => now()
             ]);
@@ -301,8 +326,17 @@ class AIDesignController extends Controller
             }
 
             // Delete file from storage
-            if (Storage::exists($design->file_path)) {
-                Storage::delete($design->file_path);
+            $disk = config('filesystems.default', 'public');
+            if (!empty($design->file_path)) {
+                try {
+                    if (Storage::disk($disk)->exists($design->file_path)) {
+                        Storage::disk($disk)->delete($design->file_path);
+                    }
+                } catch (\Throwable $e) {
+                    if (Storage::disk('public')->exists($design->file_path)) {
+                        Storage::disk('public')->delete($design->file_path);
+                    }
+                }
             }
 
             // Delete from database
@@ -344,5 +378,28 @@ class AIDesignController extends Controller
         // Using an external generator avoids unrelated images (e.g. random Unsplash) when Gemini is not configured.
         $encoded = rawurlencode($safePrompt);
         return "https://image.pollinations.ai/prompt/{$encoded}?width={$w}&height={$h}&nologo=true";
+    }
+
+    private function detectImageMimeType($contents): ?string
+    {
+        if (!is_string($contents) || $contents === '') {
+            return null;
+        }
+
+        $head = substr($contents, 0, 12);
+
+        if (strncmp($head, "\x89PNG\r\n\x1a\n", 8) === 0) {
+            return 'image/png';
+        }
+
+        if (strncmp($head, "\xFF\xD8\xFF", 3) === 0) {
+            return 'image/jpeg';
+        }
+
+        if (strlen($head) >= 12 && substr($head, 0, 4) === 'RIFF' && substr($head, 8, 4) === 'WEBP') {
+            return 'image/webp';
+        }
+
+        return null;
     }
 }

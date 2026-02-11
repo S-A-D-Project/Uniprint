@@ -12,15 +12,17 @@ $breadcrumbs = [
 @endphp
 
 @section('header-actions')
-    <x-admin.button variant="outline" icon="refresh-cw" size="sm" onclick="location.reload()">
-        Refresh Data
-    </x-admin.button>
-    <x-admin.button variant="outline" icon="download" size="sm">
-        Export Report
-    </x-admin.button>
-    <x-admin.button variant="primary" icon="bar-chart-3" size="sm">
-        Analytics
-    </x-admin.button>
+    <div class="flex items-center gap-2">
+        <x-admin.button variant="outline" icon="refresh-cw" size="sm" onclick="location.reload()">
+            Refresh Data
+        </x-admin.button>
+        <x-admin.button variant="outline" icon="download" size="sm">
+            Export Report
+        </x-admin.button>
+        <x-admin.button variant="primary" icon="bar-chart-3" size="sm">
+            Analytics
+        </x-admin.button>
+    </div>
 @endsection
 
 @section('content')
@@ -85,7 +87,7 @@ $breadcrumbs = [
                 <h3 class="text-3xl font-bold">₱{{ number_format($stats['total_revenue'] ?? 0, 2) }}</h3>
             </div>
             <div class="bg-white/20 p-3 rounded-lg">
-                <i data-lucide="peso-sign" class="h-6 w-6"></i>
+                <i data-lucide="philippine-peso" class="h-6 w-6"></i>
             </div>
         </div>
         <div class="flex items-center gap-1 text-sm text-white/80">
@@ -131,6 +133,7 @@ $breadcrumbs = [
                         <th class="p-4">Revenue</th>
                         <th class="p-4">Staff</th>
                         <th class="p-4">Status</th>
+                        <th class="p-4">Verification</th>
                         <th class="p-4">Actions</th>
                     </tr>
                 </thead>
@@ -197,6 +200,22 @@ $breadcrumbs = [
                                 <span class="inline-flex items-center gap-1 px-2 py-1 text-xs bg-secondary text-secondary-foreground rounded-md font-medium">
                                     <i data-lucide="x-circle" class="h-3 w-3"></i>
                                     Inactive
+                                </span>
+                            @endif
+                        </td>
+                        <td class="p-4">
+                            @php
+                                $isVerified = isset($enterprise->is_verified) ? (bool) $enterprise->is_verified : true;
+                            @endphp
+                            @if($isVerified)
+                                <span class="inline-flex items-center gap-1 px-2 py-1 text-xs bg-success/10 text-success rounded-md font-medium">
+                                    <i data-lucide="badge-check" class="h-3 w-3"></i>
+                                    Verified
+                                </span>
+                            @else
+                                <span class="inline-flex items-center gap-1 px-2 py-1 text-xs bg-secondary text-secondary-foreground rounded-md font-medium">
+                                    <i data-lucide="clock" class="h-3 w-3"></i>
+                                    Pending
                                 </span>
                             @endif
                         </td>
@@ -297,256 +316,33 @@ function openEnterpriseDetailsModal(url) {
     const bodyEl = document.getElementById('enterpriseDetailsModalBody');
     if (!modalEl || !bodyEl) return;
 
-    modalEl.dataset.currentDetailsUrl = url;
-    bodyEl.innerHTML = '<div class="p-4 text-muted">Loading...</div>';
+    bodyEl.innerHTML = '<div class="py-10 text-center text-muted-foreground">Loading details…</div>';
 
-    const modal = new bootstrap.Modal(modalEl);
-    modal.show();
+    let bsModal = window.modal_enterpriseDetailsModal;
+    if (!bsModal && typeof bootstrap !== 'undefined') {
+        bsModal = new bootstrap.Modal(modalEl);
+        window.modal_enterpriseDetailsModal = bsModal;
+    }
+    if (bsModal) bsModal.show();
 
     fetch(url, {
-        method: 'GET',
-        headers: {
-            'X-Requested-With': 'XMLHttpRequest',
-            'Accept': 'text/html'
-        }
+        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'text/html' }
     })
-    .then(async (res) => {
-        if (!res.ok) throw new Error('Failed to load');
-        return await res.text();
+    .then(res => res.text())
+    .then(html => {
+        bodyEl.innerHTML = html;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
     })
-    .then((html) => {
-        bodyEl.innerHTML = html || '<div class="p-4 text-muted">No content</div>';
-        if (typeof lucide !== 'undefined') {
-            lucide.createIcons();
-        }
-    })
-    .catch((err) => {
-        console.error(err);
-        bodyEl.innerHTML = '<div class="p-4 text-danger">Failed to load enterprise details.</div>';
+    .catch(err => {
+        bodyEl.innerHTML = '<div class="alert alert-danger">Failed to load enterprise details.</div>';
     });
 }
 
-document.addEventListener('DOMContentLoaded', function () {
-    document.querySelectorAll('.js-enterprise-details').forEach((a) => {
-        a.addEventListener('click', function (e) {
-            e.preventDefault();
-            const url = a.getAttribute('data-enterprise-details-url') || a.getAttribute('href');
-            if (!url) return;
-            openEnterpriseDetailsModal(url);
-        });
-    });
-
-    const modalEl = document.getElementById('enterpriseDetailsModal');
-    const bodyEl = document.getElementById('enterpriseDetailsModalBody');
-    if (!modalEl || !bodyEl) return;
-
-    bodyEl.addEventListener('click', function (e) {
-        const link = e.target.closest('a');
-        if (!link) return;
-
-        const href = link.getAttribute('href');
-        if (href && href === `{{ route('admin.enterprises') }}`) {
-            e.preventDefault();
-            const modal = bootstrap.Modal.getInstance(modalEl);
-            if (modal) modal.hide();
-        }
-    });
-
-    bodyEl.addEventListener('submit', async function (e) {
-        const form = e.target;
-        if (!(form instanceof HTMLFormElement)) return;
-
-        e.preventDefault();
-
-        const url = form.getAttribute('action');
-        if (!url) return;
-
-        try {
-            const res = await fetch(url, {
-                method: (form.getAttribute('method') || 'POST').toUpperCase(),
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'Accept': 'application/json'
-                },
-                body: new FormData(form)
-            });
-
-            const data = await res.json().catch(() => null);
-            if (!res.ok || !data || data.success !== true) {
-                throw new Error(data?.message || 'Request failed');
-            }
-
-            if (window.UniPrintUI && typeof window.UniPrintUI.toast === 'function') {
-                window.UniPrintUI.toast(data.message || 'Updated.', { variant: 'success' });
-            }
-
-            const currentUrl = modalEl.dataset.currentDetailsUrl;
-            if (currentUrl) {
-                openEnterpriseDetailsModal(currentUrl);
-            }
-        } catch (err) {
-            console.error(err);
-            if (window.UniPrintUI && typeof window.UniPrintUI.toast === 'function') {
-                window.UniPrintUI.toast('Failed to update enterprise.', { variant: 'danger' });
-            }
-        }
-    });
-});
-
-// Enterprise management functionality
-class EnterpriseManager {
-    constructor() {
-        this.init();
-    }
-
-    init() {
-        // Initialize Lucide icons
-        if (typeof lucide !== 'undefined') {
-            lucide.createIcons();
-        }
-
-        // Setup event listeners
-        this.setupEventListeners();
-        
-        // Auto-refresh statistics every 60 seconds
-        this.startAutoRefresh();
-    }
-
-    setupEventListeners() {
-        // Refresh button
-        const refreshBtn = document.querySelector('[onclick="location.reload()"]');
-        if (refreshBtn) {
-            refreshBtn.removeAttribute('onclick');
-            refreshBtn.addEventListener('click', () => this.refreshData());
-        }
-
-        // Action buttons
-        document.querySelectorAll('button[title="View Details"]').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const row = e.target.closest('tr');
-                const enterpriseName = row.querySelector('.font-semibold').textContent;
-                this.viewEnterpriseDetails(enterpriseName);
-            });
-        });
-
-        document.querySelectorAll('button[title="Manage Services"]').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const row = e.target.closest('tr');
-                const enterpriseName = row.querySelector('.font-semibold').textContent;
-                this.manageServices(enterpriseName);
-            });
-        });
-
-        document.querySelectorAll('button[title="View Orders"]').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const row = e.target.closest('tr');
-                const enterpriseName = row.querySelector('.font-semibold').textContent;
-                this.viewOrders(enterpriseName);
-            });
-        });
-    }
-
-    async refreshData() {
-        const refreshBtn = document.querySelector('button[onclick*="reload"]') || 
-                          document.querySelector('x-admin\\.button[icon="refresh-cw"]');
-        
-        try {
-            if (refreshBtn) {
-                refreshBtn.disabled = true;
-                const originalContent = refreshBtn.innerHTML;
-                refreshBtn.innerHTML = '<i data-lucide="loader-2" class="h-4 w-4 animate-spin mr-2"></i>Refreshing...';
-                lucide.createIcons();
-            }
-
-            // Simulate API call - in real implementation, this would fetch fresh data
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
-            this.showNotification('Enterprise data refreshed successfully', 'success');
-            
-            // Reload page to get fresh data
-            setTimeout(() => {
-                window.location.reload();
-            }, 500);
-
-        } catch (error) {
-            console.error('Refresh error:', error);
-            this.showNotification('Failed to refresh data', 'error');
-        }
-    }
-
-    viewEnterpriseDetails(enterpriseName) {
-        this.showNotification(`Viewing details for ${enterpriseName}`, 'info');
-        // In real implementation, this would open a modal or navigate to details page
-    }
-
-    manageServices(enterpriseName) {
-        this.showNotification(`Managing services for ${enterpriseName}`, 'info');
-        // In real implementation, this would navigate to services management
-    }
-
-    viewOrders(enterpriseName) {
-        this.showNotification(`Viewing orders for ${enterpriseName}`, 'info');
-        // In real implementation, this would filter orders by enterprise
-    }
-
-    startAutoRefresh() {
-        // Auto-refresh every 5 minutes
-        setInterval(() => {
-            this.updateStatistics();
-        }, 300000);
-    }
-
-    async updateStatistics() {
-        try {
-            // In real implementation, this would fetch updated statistics
-            console.log('Updating enterprise statistics...');
-        } catch (error) {
-            console.error('Statistics update error:', error);
-        }
-    }
-
-    showNotification(message, type = 'info') {
-        const notification = document.createElement('div');
-        notification.className = `fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg max-w-sm transition-all duration-300 transform translate-x-full`;
-        
-        switch (type) {
-            case 'success':
-                notification.classList.add('bg-green-500', 'text-white');
-                break;
-            case 'error':
-                notification.classList.add('bg-red-500', 'text-white');
-                break;
-            default:
-                notification.classList.add('bg-blue-500', 'text-white');
-        }
-
-        notification.innerHTML = `
-            <div class="flex items-center gap-2">
-                <i data-lucide="${type === 'success' ? 'check-circle' : type === 'error' ? 'alert-circle' : 'info'}" class="h-5 w-5"></i>
-                <span>${message}</span>
-            </div>
-        `;
-
-        document.body.appendChild(notification);
-        lucide.createIcons();
-
-        setTimeout(() => {
-            notification.classList.remove('translate-x-full');
-        }, 100);
-
-        setTimeout(() => {
-            notification.classList.add('translate-x-full');
-            setTimeout(() => {
-                document.body.removeChild(notification);
-            }, 300);
-        }, 3000);
-    }
-}
-
-// Initialize when DOM is ready
-document.addEventListener('DOMContentLoaded', function() {
-    window.enterpriseManager = new EnterpriseManager();
+document.addEventListener('click', function (e) {
+    const link = e.target.closest('a.js-enterprise-details');
+    if (!link) return;
+    e.preventDefault();
+    openEnterpriseDetailsModal(link.getAttribute('href'));
 });
 </script>
 @endpush

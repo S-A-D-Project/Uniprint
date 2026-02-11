@@ -95,17 +95,18 @@
                     </div>
 
                     <div class="mb-3">
-                        <label for="image" class="form-label fw-semibold">
+                        <label for="images" class="form-label fw-semibold">
                             <i data-lucide="image" class="h-4 w-4 me-1"></i>
-                            Service Image
+                            Service Images
                         </label>
                         <input type="file"
-                               class="form-control form-control-enhanced @error('image') is-invalid @enderror"
-                               id="image"
-                               name="image"
-                               accept="image/png,image/jpeg,image/webp">
-                        <div class="form-text">Upload an image to advertise this service (JPG/PNG/WebP).</div>
-                        @error('image')
+                               class="form-control form-control-enhanced @error('images') is-invalid @enderror"
+                               id="images"
+                               name="images[]"
+                               accept="image/png,image/jpeg,image/webp"
+                               multiple>
+                        <div class="form-text">Upload one or more images to advertise this service (JPG/PNG/WebP).</div>
+                        @error('images')
                             <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
                     </div>
@@ -131,6 +132,10 @@
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox" name="allowed_payment_methods[]" id="pm_cash" value="cash" {{ in_array('cash', old('allowed_payment_methods', ['gcash','cash'])) ? 'checked' : '' }}>
                                     <label class="form-check-label" for="pm_cash">Cash</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="allowed_payment_methods[]" id="pm_paypal" value="paypal" {{ in_array('paypal', old('allowed_payment_methods', ['gcash','cash'])) ? 'checked' : '' }}>
+                                    <label class="form-check-label" for="pm_paypal">PayPal</label>
                                 </div>
                             </div>
                             <div class="form-text">If none selected, customers may not be able to checkout.</div>
@@ -219,6 +224,18 @@
                                                     <div class="invalid-feedback">{{ $message }}</div>
                                                 @enderror
                                             </div>
+                                        </div>
+                                    @endif
+
+                                    @if(\Illuminate\Support\Facades\Schema::hasColumn('services', 'supports_rush'))
+                                        <div class="mt-3">
+                                            <x-ui.form.switch
+                                                name="supports_rush"
+                                                id="supports_rush"
+                                                :checked="old('supports_rush', true)"
+                                                label="Supports Rush"
+                                                help="If enabled, customers can select rush pickup options for this service."
+                                            />
                                         </div>
                                     @endif
                                 </div>

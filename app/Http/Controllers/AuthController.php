@@ -5,12 +5,46 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
+    private function validateTurnstile(Request $request): void
+    {
+        $secret = (string) config('services.turnstile.secret_key');
+        if ($secret === '') {
+            return;
+        }
+
+        $token = (string) $request->input('cf-turnstile-response', '');
+        if ($token === '') {
+            $request->validate([
+                'cf-turnstile-response' => 'required',
+            ], [
+                'cf-turnstile-response.required' => 'Please complete the security check.',
+            ]);
+        }
+
+        $res = Http::asForm()->post('https://challenges.cloudflare.com/turnstile/v0/siteverify', [
+            'secret' => $secret,
+            'response' => $token,
+            'remoteip' => $request->ip(),
+        ]);
+
+        $ok = (bool) ($res->json('success') ?? false);
+        if (!$res->ok() || !$ok) {
+            $request->validate([
+                'cf-turnstile-response' => 'required',
+            ], [
+                'cf-turnstile-response.required' => 'Security check failed. Please try again.',
+            ]);
+        }
+    }
+
     public function showLogin()
     {
         if (Auth::check()) {
@@ -30,6 +64,8 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         try {
+            $this->validateTurnstile($request);
+
             $request->merge([
                 'username' => is_string($request->input('username')) ? trim($request->input('username')) : $request->input('username'),
             ]);
@@ -90,6 +126,45 @@ class AuthController extends Controller
                     'last_activity' => now(),
                 ]);
                 $request->session()->regenerateToken();
+
+                Auth::loginUsingId($user->user_id);
+
+                // Always require a fresh 2FA challenge per new login session
+                $request->session()->forget('two_factor_passed');
+
+                $role = DB::table('roles')
+                    ->join('role_types', 'roles.role_type_id', '=', 'role_types.role_type_id')
+                    ->where('roles.user_id', $user->user_id)
+                    ->first();
+                $roleType = (string) ($role?->user_role_type ?? '');
+
+                if (in_array($roleType, ['business_user', 'customer'], true)) {
+                    try {
+                        $eloquentUser = \App\Models\User::find($user->user_id);
+                        if ($eloquentUser && !empty($eloquentUser->two_factor_enabled)) {
+                            $mailer = (string) config('mail.default');
+                            if (in_array($mailer, ['log', 'array'], true)) {
+                                return redirect()->route('two-factor.verify')
+                                    ->with('error', 'Email delivery is not configured. Please configure Gmail SMTP to receive verification codes.');
+                            }
+                            try {
+                                $eloquentUser->generateTwoFactorCode();
+                            } catch (\RuntimeException $e) {
+                                return $this->redirectToDashboard()->with('error', $e->getMessage());
+                            }
+                            return redirect()->route('two-factor.verify');
+                        }
+                    } catch (\Throwable $e) {
+                        Log::error('Failed to generate/send DB 2FA code after login', [
+                            'error' => $e->getMessage(),
+                            'user_id' => $user->user_id,
+                            'mailer' => (string) config('mail.default'),
+                        ]);
+
+                        return redirect()->route('two-factor.verify')
+                            ->with('error', 'Unable to send verification code. Please try again.');
+                    }
+                }
 
                 try {
                     DB::table('audit_logs')->insert([
@@ -165,6 +240,7 @@ class AuthController extends Controller
             \Log::error('Failed to write audit log (logout)', ['error' => $e->getMessage()]);
         }
 
+        Auth::logout();
         $request->session()->flush();
         $request->session()->regenerateToken();
         return redirect()->route('login');
@@ -177,6 +253,8 @@ class AuthController extends Controller
 
     public function register(Request $request)
     {
+        $this->validateTurnstile($request);
+
         $request->validate([
             'name' => 'required|string|max:200',
             'email' => 'required|email|unique:users,email|max:255',
@@ -252,6 +330,42 @@ class AuthController extends Controller
         ]);
         $request->session()->regenerateToken();
 
+        Auth::loginUsingId($userId);
+
+        $role = DB::table('roles')
+            ->join('role_types', 'roles.role_type_id', '=', 'role_types.role_type_id')
+            ->where('roles.user_id', $userId)
+            ->first();
+        $roleType = (string) ($role?->user_role_type ?? '');
+        if (in_array($roleType, ['business_user', 'customer'], true)) {
+            try {
+                $eloquentUser = \App\Models\User::find($userId);
+                if ($eloquentUser && !empty($eloquentUser->two_factor_enabled)) {
+                    $mailer = (string) config('mail.default');
+                    if (in_array($mailer, ['log', 'array'], true)) {
+                        return redirect()->route('two-factor.verify')
+                            ->with('error', 'Email delivery is not configured. Please configure Gmail SMTP to receive verification codes.');
+                    }
+                    try {
+                        $eloquentUser->generateTwoFactorCode();
+                    } catch (\RuntimeException $e) {
+                        return $this->redirectToDashboard()->with('error', $e->getMessage());
+                    }
+                    return redirect()->route('two-factor.verify');
+                }
+            } catch (\Throwable $e) {
+                Log::error('Failed to generate/send DB 2FA code after register', [
+                    'error' => $e->getMessage(),
+                    'user_id' => $userId,
+                    'mailer' => (string) config('mail.default'),
+                ]);
+
+                return redirect()->route('two-factor.verify')
+                    ->with('error', 'Unable to send verification code. Please try again.');
+            }
+
+        }
+
         return $this->redirectToDashboard();
     }
 
@@ -275,21 +389,32 @@ class AuthController extends Controller
                     return redirect()->route('admin.dashboard');
                 case 'business_user':
                     $hasEnterprise = false;
+                    $isVerified = true;
 
                     if (\Illuminate\Support\Facades\Schema::hasColumn('enterprises', 'owner_user_id')) {
-                        $hasEnterprise = DB::table('enterprises')
-                            ->where('owner_user_id', $userId)
-                            ->exists();
+                        $enterpriseQuery = DB::table('enterprises')->where('owner_user_id', $userId);
+                        $hasEnterprise = $enterpriseQuery->exists();
+
+                        if ($hasEnterprise && \Illuminate\Support\Facades\Schema::hasColumn('enterprises', 'is_verified')) {
+                            $isVerified = (bool) $enterpriseQuery->value('is_verified');
+                        }
                     }
 
                     if (! $hasEnterprise && \Illuminate\Support\Facades\Schema::hasTable('staff')) {
                         // Backward-compatibility for legacy data
-                        $hasEnterprise = DB::table('staff')
-                            ->where('user_id', $userId)
-                            ->exists();
+                        $enterpriseId = DB::table('staff')->where('user_id', $userId)->value('enterprise_id');
+                        $hasEnterprise = ! empty($enterpriseId);
+
+                        if ($hasEnterprise && \Illuminate\Support\Facades\Schema::hasColumn('enterprises', 'is_verified')) {
+                            $isVerified = (bool) DB::table('enterprises')->where('enterprise_id', $enterpriseId)->value('is_verified');
+                        }
                     }
                     if (!$hasEnterprise) {
                         return redirect()->route('business.onboarding');
+                    }
+
+                    if (\Illuminate\Support\Facades\Schema::hasColumn('enterprises', 'is_verified') && ! $isVerified) {
+                        return redirect()->route('business.pending');
                     }
                     return redirect()->route('business.dashboard');
                 case 'customer':

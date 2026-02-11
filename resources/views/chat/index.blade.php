@@ -1,4 +1,4 @@
-@extends('layouts.app')
+@extends('layouts.public')
 
 @section('content')
 <div class="container-fluid py-4">
@@ -62,7 +62,6 @@
 
 <!-- Include scripts -->
 @push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://js.pusher.com/7.0/pusher.min.js"></script>
 <script>
     // Make user data and Pusher config available to JavaScript

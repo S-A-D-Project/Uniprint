@@ -122,6 +122,43 @@
             </form>
         </div>
 
+        <!-- Payment Settings -->
+        <div class="bg-white rounded-lg shadow-sm p-6 mb-6">
+            <div class="flex items-center gap-2 mb-6">
+                <i data-lucide="credit-card" class="h-5 w-5 text-primary"></i>
+                <h3 class="text-lg font-semibold text-gray-900">Payment Settings</h3>
+            </div>
+
+            <div class="p-4 border border-gray-200 rounded-lg">
+                <div class="flex items-center justify-between gap-3">
+                    <div>
+                        <div class="font-semibold text-gray-900">PayPal</div>
+                        <div class="text-sm text-gray-600">Link your PayPal account to activate PayPal payments.</div>
+                        @if(!empty($paypalAccountEmail))
+                            <div class="text-xs text-gray-500 mt-1">Connected as: {{ $paypalAccountEmail }}</div>
+                        @endif
+                    </div>
+                    <div class="flex items-center gap-2">
+                        @if(!empty($paypalConnected))
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-success/10 text-success">Connected</span>
+                            <form method="POST" action="{{ route('profile.paypal.disconnect') }}" data-up-button-loader>
+                                @csrf
+                                <button type="submit" data-up-loading-text="Disconnecting..." class="inline-flex items-center gap-2 px-4 py-2 bg-destructive text-destructive-foreground rounded-lg hover:opacity-90 transition-colors">
+                                    <i data-lucide="unlink" class="h-4 w-4"></i>
+                                    Disconnect
+                                </button>
+                            </form>
+                        @else
+                            <a href="{{ route('profile.paypal.connect') }}" class="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
+                                <i data-lucide="link" class="h-4 w-4"></i>
+                                Link / Activate
+                            </a>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Connected Accounts -->
         <div class="bg-white rounded-lg shadow-sm p-6 mb-6">
             <div class="flex items-center gap-2 mb-6">
@@ -169,6 +206,20 @@
                 <i data-lucide="shield" class="h-5 w-5 text-primary"></i>
                 <h3 class="text-lg font-semibold text-gray-900">Security Settings</h3>
             </div>
+
+            <div class="mb-6 p-4 border border-gray-200 rounded-lg">
+                <div class="flex items-center justify-between gap-3">
+                    <div>
+                        <div class="font-semibold text-gray-900">Two-Factor Authentication</div>
+                        <div class="text-sm text-gray-600">Enable or disable Email 2FA for your account.</div>
+                    </div>
+                    <a href="{{ route('security.settings') }}" class="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
+                        <i data-lucide="shield-check" class="h-4 w-4"></i>
+                        Manage
+                    </a>
+                </div>
+            </div>
+
             <form id="password-form" class="space-y-4">
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
@@ -247,7 +298,7 @@
                         <i data-lucide="shopping-cart" class="h-6 w-6 text-muted-foreground"></i>
                     </div>
                     <p class="text-gray-600 mt-3">No orders yet</p>
-                    <a href="{{ route('customer.enterprises') }}"
+                    <a href="{{ route('customer.marketplace') }}"
                        class="inline-flex items-center gap-2 mt-4 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
                         <i data-lucide="sparkles" class="h-4 w-4"></i>
                         Start Shopping

@@ -21,6 +21,7 @@
                     <thead class="bg-secondary/50">
                         <tr>
                             <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Rule Name</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Applies To</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Type</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Method</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Value</th>
@@ -33,6 +34,15 @@
                         @foreach($rules as $rule)
                             <tr class="hover:bg-secondary/30">
                                 <td class="px-6 py-4 font-medium">{{ $rule->rule_name }}</td>
+                                <td class="px-6 py-4 text-sm">
+                                    @if(!empty($rule->service_id))
+                                        <span class="inline-block px-2 py-1 text-xs bg-secondary text-secondary-foreground rounded-md">
+                                            {{ $rule->service_name ?? 'Specific service' }}
+                                        </span>
+                                    @else
+                                        <span class="inline-block px-2 py-1 text-xs bg-secondary text-secondary-foreground rounded-md">All orders</span>
+                                    @endif
+                                </td>
                                 <td class="px-6 py-4">
                                     <span class="inline-block px-2 py-1 text-xs bg-primary/10 text-primary rounded-md">
                                         {{ str_replace('_', ' ', $rule->rule_type) }}
@@ -255,6 +265,25 @@ window.UPPricingRule = window.UPPricingRule || (function () {
     };
 })();
 
+function initPricingScopeControls(rootEl) {
+    const scopeEl = rootEl?.querySelector?.('#apply_scope');
+    const field = rootEl?.querySelector?.('#serviceScopeField');
+    const serviceEl = rootEl?.querySelector?.('#service_id');
+    if (!scopeEl || !field) return;
+
+    const sync = function () {
+        const isService = scopeEl.value === 'service';
+        field.style.display = isService ? 'block' : 'none';
+        if (serviceEl) {
+            serviceEl.required = isService;
+            if (!isService) serviceEl.value = '';
+        }
+    };
+
+    scopeEl.addEventListener('change', sync);
+    sync();
+}
+
 window.toggleFormulaField = window.toggleFormulaField || function toggleFormulaField() {
     const methodEl = document.getElementById('calculation_method');
     if (!methodEl) return;
@@ -280,11 +309,41 @@ function openPricingRuleModal(url) {
     const bodyEl = document.getElementById('pricingRuleModalBody');
     if (!modalEl || !bodyEl) return;
 
-    modalEl.dataset.currentFormUrl = url;
-    bodyEl.innerHTML = '<div class="p-4 text-muted">Loading...</div>';
+    const __upModalCache = (window.__upModalCache = window.__upModalCache || {});
+    const cacheKey = `GET:${url}`;
 
-    const modal = new bootstrap.Modal(modalEl);
-    modal.show();
+    modalEl.dataset.currentFormUrl = url;
+    bodyEl.innerHTML = '<div class="p-4"></div>';
+
+    let modal = window.modal_pricingRuleModal;
+    if (!modal && typeof bootstrap !== 'undefined') {
+        modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+        window.modal_pricingRuleModal = modal;
+    }
+    if (modal && !modalEl.classList.contains('show')) {
+        modal.show();
+    }
+
+    if (__upModalCache[cacheKey]) {
+        bodyEl.innerHTML = __upModalCache[cacheKey];
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+        const methodEl = bodyEl.querySelector('#calculation_method');
+        if (methodEl) {
+            try {
+                toggleFormulaField();
+            } catch (e) {
+                // no-op
+            }
+        }
+        if (window.UPPricingRule && typeof window.UPPricingRule.initBuilder === 'function') {
+            window.UPPricingRule.initBuilder(bodyEl);
+        }
+
+        initPricingScopeControls(bodyEl);
+        return;
+    }
 
     fetch(url, {
         method: 'GET',
@@ -298,7 +357,9 @@ function openPricingRuleModal(url) {
         return await res.text();
     })
     .then((html) => {
-        bodyEl.innerHTML = html || '<div class="p-4 text-muted">No content</div>';
+        const next = html || '<div class="p-4 text-muted">No content</div>';
+        __upModalCache[cacheKey] = next;
+        bodyEl.innerHTML = next;
         if (typeof lucide !== 'undefined') {
             lucide.createIcons();
         }
@@ -315,6 +376,8 @@ function openPricingRuleModal(url) {
         if (window.UPPricingRule && typeof window.UPPricingRule.initBuilder === 'function') {
             window.UPPricingRule.initBuilder(bodyEl);
         }
+
+        initPricingScopeControls(bodyEl);
     })
     .catch((err) => {
         console.error(err);

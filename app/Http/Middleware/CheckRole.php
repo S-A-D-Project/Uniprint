@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -11,9 +12,12 @@ class CheckRole
 {
     public function handle(Request $request, Closure $next, string $role): Response
     {
-        $userId = session('user_id');
+        $userId = Auth::user()?->user_id ?? session('user_id');
 
         if (!$userId) {
+            if ($request->expectsJson() || $request->ajax() || $request->is('api') || $request->is('api/*')) {
+                return response()->json(['error' => 'Unauthorized'], 401);
+            }
             if ($request->is('admin') || $request->is('admin/*')) {
                 return redirect()->route('admin.login');
             }
@@ -32,6 +36,9 @@ class CheckRole
         }
 
         if (!$userRole || !in_array($userRole->user_role_type, $allowedRoles, true)) {
+            if ($request->expectsJson() || $request->ajax() || $request->is('api') || $request->is('api/*')) {
+                return response()->json(['error' => 'Forbidden'], 403);
+            }
             abort(403, 'Unauthorized action.');
         }
 

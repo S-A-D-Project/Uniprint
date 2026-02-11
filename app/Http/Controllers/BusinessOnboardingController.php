@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
@@ -65,14 +66,26 @@ class BusinessOnboardingController extends Controller
             return redirect()->route('business.dashboard');
         }
 
-        $request->validate([
+        $proofEnabled = Schema::hasColumn('enterprises', 'verification_document_path')
+            && Schema::hasColumn('enterprises', 'verification_submitted_at');
+
+        $rules = [
             'name' => 'required|string|max:255',
             'address' => 'nullable|string',
             'email' => 'nullable|email|max:255',
             'contact_person' => 'nullable|string|max:100',
             'contact_number' => 'nullable|string|max:20',
             'category' => 'nullable|string|max:255',
-        ]);
+        ];
+
+        if ($proofEnabled) {
+            $rules['verification_document'] = 'required|file|max:5120|mimes:jpg,jpeg,png,pdf';
+            if (Schema::hasColumn('enterprises', 'verification_notes')) {
+                $rules['verification_notes'] = 'nullable|string|max:2000';
+            }
+        }
+
+        $request->validate($rules);
 
         DB::beginTransaction();
         try {
@@ -102,6 +115,25 @@ class BusinessOnboardingController extends Controller
 
             if (Schema::hasColumn('enterprises', 'is_active')) {
                 $enterpriseData['is_active'] = true;
+            }
+
+            if (Schema::hasColumn('enterprises', 'is_verified')) {
+                $enterpriseData['is_verified'] = false;
+            }
+
+            if ($proofEnabled) {
+                $disk = config('filesystems.default', 'public');
+                $path = $request->file('verification_document')->store('business-verification', $disk);
+
+                if (Schema::hasColumn('enterprises', 'verification_document_path')) {
+                    $enterpriseData['verification_document_path'] = $path;
+                }
+                if (Schema::hasColumn('enterprises', 'verification_notes')) {
+                    $enterpriseData['verification_notes'] = $request->input('verification_notes');
+                }
+                if (Schema::hasColumn('enterprises', 'verification_submitted_at')) {
+                    $enterpriseData['verification_submitted_at'] = now();
+                }
             }
 
             // Legacy schema compatibility: some DBs still have VAT columns/constraints.
@@ -144,6 +176,10 @@ class BusinessOnboardingController extends Controller
             }
 
             DB::commit();
+
+            if (Schema::hasColumn('enterprises', 'is_verified')) {
+                return redirect()->route('business.pending')->with('success', 'Business profile created. Your account is pending verification.');
+            }
 
             return redirect()->route('business.dashboard')->with('success', 'Business profile created successfully.');
         } catch (\Throwable $e) {

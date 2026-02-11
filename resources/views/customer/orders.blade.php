@@ -108,7 +108,22 @@ use Illuminate\Support\Facades\DB;
                 </div>
 
                 <div class="flex items-center gap-2 flex-shrink-0">
-                    <span class="text-sm font-medium text-primary">{{ $order->status_name ?? 'Pending' }}</span>
+                    @php
+                        $statusName = (string) ($order->status_name ?? 'Pending');
+                        $statusStyles = [
+                            'Pending' => 'bg-warning/10 text-warning border border-warning/20',
+                            'Confirmed' => 'bg-primary/10 text-primary border border-primary/20',
+                            'Processing' => 'bg-primary/10 text-primary border border-primary/20',
+                            'In Progress' => 'bg-primary/10 text-primary border border-primary/20',
+                            'Ready for Pickup' => 'bg-accent/10 text-accent border border-accent/20',
+                            'Shipped' => 'bg-accent/10 text-accent border border-accent/20',
+                            'Delivered' => 'bg-success/10 text-success border border-success/20',
+                            'Completed' => 'bg-success/10 text-success border border-success/20',
+                            'Cancelled' => 'bg-destructive/10 text-destructive border border-destructive/20',
+                        ];
+                        $badgeClass = $statusStyles[$statusName] ?? 'bg-secondary/50 text-gray-700 border border-gray-200';
+                    @endphp
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold {{ $badgeClass }}">{{ $statusName }}</span>
                 </div>
             </div>
 
@@ -157,7 +172,14 @@ use Illuminate\Support\Facades\DB;
                             <i data-lucide="message-circle" class="h-4 w-4 mr-1"></i>
                             Chat
                         </button>
-                        <a href="{{ route('customer.order.details', $order->purchase_order_id) }}"
+                        @if(($order->status_name ?? 'Pending') === 'Completed')
+                            <a href="{{ route('customer.orders.reviews.fragment', $order->purchase_order_id) }}"
+                               class="inline-flex items-center px-3 py-2 border border-gray-200 text-gray-700 text-sm font-medium rounded-md hover:bg-white transition-colors js-customer-order-review">
+                                <i data-lucide="star" class="h-4 w-4 mr-1"></i>
+                                Review
+                            </a>
+                        @endif
+                        <a href="{{ route('customer.order.details', $order->purchase_order_id, false) }}"
                            class="inline-flex items-center px-3 py-2 border border-gray-200 text-gray-700 text-sm font-medium rounded-md hover:bg-white transition-colors js-customer-order-details">
                             <i data-lucide="eye" class="h-4 w-4 mr-1"></i>
                             View
@@ -199,9 +221,6 @@ use Illuminate\Support\Facades\DB;
                 <i data-lucide="package-x" class="h-16 w-16 text-gray-400 mx-auto mb-4"></i>
                 <h3 class="text-lg font-semibold text-gray-900 mb-2">No orders yet</h3>
                 <p class="text-gray-600 mb-6">You haven't placed any orders</p>
-                <a href="{{ route('customer.enterprises') }}" class="customer-button-primary">
-                    <i data-lucide="shopping-bag" class="h-4 w-4 mr-2"></i>Start Shopping
-                </a>
             </div>
         </div>
         @endforelse
@@ -217,6 +236,10 @@ use Illuminate\Support\Facades\DB;
 
 <x-ui.modal id="customerOrderDetailsModal" title="Order Details" size="xl" scrollable>
     <div id="customerOrderDetailsModalBody" class="min-h-[200px]"></div>
+</x-ui.modal>
+
+<x-ui.modal id="customerOrderReviewModal" title="Order Review" size="xl" scrollable>
+    <div id="customerOrderReviewModalBody" class="min-h-[200px]"></div>
 </x-ui.modal>
 
 <!-- Chat Modal -->
@@ -295,6 +318,15 @@ use Illuminate\Support\Facades\DB;
 
 @push('scripts')
 <script>
+function normalizeSameOriginUrl(url) {
+    try {
+        const u = new URL(url, window.location.href);
+        return u.pathname + u.search + u.hash;
+    } catch (e) {
+        return url;
+    }
+}
+
 function openCustomerOrderDetailsModal(url) {
     const modalEl = document.getElementById('customerOrderDetailsModal');
     const bodyEl = document.getElementById('customerOrderDetailsModalBody');
@@ -302,6 +334,8 @@ function openCustomerOrderDetailsModal(url) {
         window.location.href = url;
         return;
     }
+
+    const __upModalCache = (window.__upModalCache = window.__upModalCache || {});
 
     bodyEl.innerHTML = '<div class="py-5 text-center text-muted">Loading…</div>';
 
@@ -315,17 +349,31 @@ function openCustomerOrderDetailsModal(url) {
         bsModal.show();
     }
 
-    fetch(url, {
+    const fetchUrl = normalizeSameOriginUrl(url);
+    modalEl.dataset.currentUrl = fetchUrl;
+    const cacheKey = `GET:${fetchUrl}`;
+
+    if (__upModalCache[cacheKey]) {
+        bodyEl.innerHTML = __upModalCache[cacheKey];
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+        return;
+    }
+
+    fetch(fetchUrl, {
         headers: {
             'X-Requested-With': 'XMLHttpRequest',
             'Accept': 'text/html'
-        }
+        },
+        credentials: 'same-origin'
     })
         .then((res) => {
             if (!res.ok) throw new Error('Failed to load order details');
             return res.text();
         })
         .then((html) => {
+            __upModalCache[cacheKey] = html;
             bodyEl.innerHTML = html;
             if (typeof lucide !== 'undefined') {
                 lucide.createIcons();
@@ -336,11 +384,94 @@ function openCustomerOrderDetailsModal(url) {
         });
 }
 
+function openCustomerOrderReviewModal(url) {
+    const modalEl = document.getElementById('customerOrderReviewModal');
+    const bodyEl = document.getElementById('customerOrderReviewModalBody');
+    if (!modalEl || !bodyEl) {
+        window.location.href = url;
+        return;
+    }
+
+    const __upModalCache = (window.__upModalCache = window.__upModalCache || {});
+
+    bodyEl.innerHTML = '<div class="py-5 text-center text-muted">Loading…</div>';
+
+    let bsModal = window.modal_customerOrderReviewModal;
+    if (!bsModal && typeof bootstrap !== 'undefined') {
+        bsModal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+        window.modal_customerOrderReviewModal = bsModal;
+    }
+
+    if (bsModal && !modalEl.classList.contains('show')) {
+        bsModal.show();
+    }
+
+    const fetchUrl = normalizeSameOriginUrl(url);
+    modalEl.dataset.currentUrl = fetchUrl;
+
+    const cacheKey = `GET:${fetchUrl}`;
+
+    if (__upModalCache[cacheKey]) {
+        bodyEl.innerHTML = __upModalCache[cacheKey];
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+        return;
+    }
+
+    fetch(fetchUrl, {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'text/html'
+        },
+        credentials: 'same-origin'
+    })
+        .then((res) => {
+            if (!res.ok) throw new Error('Failed to load order review');
+            return res.text();
+        })
+        .then((html) => {
+            __upModalCache[cacheKey] = html;
+            bodyEl.innerHTML = html;
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+        })
+        .catch((err) => {
+            bodyEl.innerHTML = `<div class="alert alert-danger mb-0">${escapeHtml(err.message || 'Failed to load order review')}</div>`;
+        });
+}
+
 document.addEventListener('click', function (e) {
     const link = e.target.closest('a.js-customer-order-details');
     if (!link) return;
     e.preventDefault();
     openCustomerOrderDetailsModal(link.getAttribute('href'));
+});
+
+document.addEventListener('click', function (e) {
+    const link = e.target.closest('a.js-customer-order-review');
+    if (!link) return;
+    e.preventDefault();
+    openCustomerOrderReviewModal(link.getAttribute('href'));
+});
+
+// Best-effort: invalidate cached review modal content after any review form submission inside the modal
+document.addEventListener('submit', function (e) {
+    const form = e.target;
+    if (!(form instanceof HTMLFormElement)) return;
+    if (!form.closest('#customerOrderReviewModal')) return;
+
+    try {
+        const modalEl = document.getElementById('customerOrderReviewModal');
+        const currentUrl = modalEl ? modalEl.dataset.currentUrl : null;
+        const __upModalCache = (window.__upModalCache = window.__upModalCache || {});
+        if (currentUrl) {
+            delete __upModalCache[`GET:${normalizeSameOriginUrl(currentUrl)}`];
+        }
+    } catch (e) {
+        // no-op
+    }
 });
 
 // Chat functionality variables

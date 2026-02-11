@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     
-    <title>@yield('title', 'Business Dashboard') - UniPrint</title>
+    <title>@yield('title', 'Business Dashboard') - {{ system_brand_name() }}</title>
     
     <script>
         (function () {
@@ -124,11 +124,18 @@
                 <!-- Logo -->
                 <div class="p-6 border-b border-border">
                     <a href="{{ route('home') }}" class="flex items-center gap-3">
-                        <div class="w-10 h-10 gradient-primary rounded-xl flex items-center justify-center">
-                            <i data-lucide="store" class="h-6 w-6 text-white"></i>
-                        </div>
+                        @php
+                            $systemBrandLogoUrl = system_brand_logo_url();
+                        @endphp
+                        @if($systemBrandLogoUrl)
+                            <img src="{{ $systemBrandLogoUrl }}" alt="{{ system_brand_name() }}" class="w-10 h-10 rounded-xl object-cover border border-border" />
+                        @else
+                            <div class="w-10 h-10 gradient-primary rounded-xl flex items-center justify-center">
+                                <i data-lucide="store" class="h-6 w-6 text-white"></i>
+                            </div>
+                        @endif
                         <div>
-                            <h1 class="text-xl font-bold gradient-primary bg-clip-text">UniPrint</h1>
+                            <h1 class="text-xl font-bold gradient-primary bg-clip-text">{{ system_brand_name() }}</h1>
                             <p class="text-xs text-muted-foreground">Business Portal</p>
                         </div>
                     </a>
@@ -228,14 +235,12 @@
                         @yield('header-actions')
                         
                         <!-- Notifications -->
-                        <a href="{{ route('business.notifications') }}" class="relative p-2 hover:bg-secondary rounded-lg transition-smooth">
+                        <button type="button" class="relative p-2 hover:bg-secondary rounded-lg transition-smooth" data-bs-toggle="modal" data-bs-target="#businessNotificationsModal">
                             <i data-lucide="bell" class="h-5 w-5"></i>
-                            @if(isset($unreadNotificationsCount) && $unreadNotificationsCount > 0)
-                                <span class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-destructive text-destructive-foreground text-[11px] leading-[18px] rounded-full text-center">
-                                    {{ $unreadNotificationsCount > 99 ? '99+' : $unreadNotificationsCount }}
-                                </span>
-                            @endif
-                        </a>
+                            <span class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-destructive text-destructive-foreground text-[11px] leading-[18px] rounded-full text-center" id="businessNotificationsBadge" @if(empty($unreadNotificationsCount)) style="display:none;" @endif>
+                                {{ !empty($unreadNotificationsCount) ? ($unreadNotificationsCount > 99 ? '99+' : $unreadNotificationsCount) : '' }}
+                            </span>
+                        </button>
                     </div>
                 </div>
             </header>
@@ -282,6 +287,27 @@
             </main>
         </div>
     </div>
+
+    <div class="modal fade" id="businessNotificationsModal" tabindex="-1" aria-hidden="true" data-notifications-url="{{ route('business.notifications') }}" data-notification-read-url-template="{{ route('business.notifications.read', ['id' => '___ID___']) }}">
+        <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered" style="max-width: 560px;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title d-flex align-items-center gap-2"><i class="bi bi-bell"></i> Notifications</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <div id="businessNotificationsEmpty" class="p-5 text-center" style="display:none;">
+                        <div class="text-muted small">No notifications</div>
+                    </div>
+                    <div id="businessNotificationsList"></div>
+                </div>
+                <div class="modal-footer justify-content-between">
+                    <div></div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="businessNotificationsRefresh">Refresh</button>
+                </div>
+            </div>
+        </div>
+    </div>
     
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
@@ -318,6 +344,152 @@
                 overlay.classList.add('hidden');
             }
         });
+    </script>
+
+    <script>
+        (function(){
+            const modalEl = document.getElementById('businessNotificationsModal');
+            if(!modalEl) return;
+
+            const listEl = document.getElementById('businessNotificationsList');
+            const loadingEl = document.getElementById('businessNotificationsLoading');
+            const emptyEl = document.getElementById('businessNotificationsEmpty');
+            const refreshBtn = document.getElementById('businessNotificationsRefresh');
+
+            const badgeEl = document.getElementById('businessNotificationsBadge');
+            const notificationsUrl = modalEl.getAttribute('data-notifications-url');
+            const readTpl = modalEl.getAttribute('data-notification-read-url-template');
+
+            const csrfToken = () => document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+            function iconFor(type){
+                if(type === 'deadline_warning') return 'exclamation-triangle';
+                if(type === 'status_change') return 'bell';
+                if(type === 'file_upload') return 'file-earmark';
+                return 'chat-dots';
+            }
+
+            function formatTime(ts){
+                if(!ts) return '';
+                const d = new Date(ts);
+                if(Number.isNaN(d.getTime())) return String(ts);
+                return d.toLocaleString();
+            }
+
+            function setBadge(count){
+                if(!badgeEl) return;
+                if(typeof count !== 'number' || count <= 0){
+                    badgeEl.style.display = 'none';
+                    return;
+                }
+                badgeEl.style.display = 'inline-block';
+                badgeEl.textContent = count > 99 ? '99+' : String(count);
+            }
+
+            async function markRead(id, btn){
+                if(!readTpl) return;
+                const url = readTpl.replace('___ID___', id);
+                try{
+                    const res = await fetch(url, {
+                        method:'POST',
+                        credentials: 'same-origin',
+                        headers:{
+                            'Accept':'application/json',
+                            'Content-Type':'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            ...(csrfToken() ? {'X-CSRF-TOKEN': csrfToken()} : {})
+                        },
+                        body: JSON.stringify({})
+                    });
+                    const data = await res.json();
+                    if(data && data.success){
+                        if(btn){
+                            btn.disabled = true;
+                            btn.textContent = 'Read';
+                        }
+                        await load();
+                    }
+                }catch(_){
+                }
+            }
+
+            function render(items){
+                if(!listEl) return;
+                listEl.innerHTML = '';
+
+                if(!items || !items.length){
+                    if(emptyEl) emptyEl.style.display = 'block';
+                    return;
+                }
+                if(emptyEl) emptyEl.style.display = 'none';
+
+                items.forEach(n => {
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'p-3 border-bottom d-flex gap-3 align-items-start';
+
+                    const icon = document.createElement('div');
+                    icon.className = 'rounded-circle d-flex align-items-center justify-content-center flex-shrink-0';
+                    icon.style.width = '36px';
+                    icon.style.height = '36px';
+                    icon.style.background = 'rgba(99,102,241,0.10)';
+                    icon.innerHTML = `<i class="bi bi-${iconFor(n.notification_type)}"></i>`;
+
+                    const body = document.createElement('div');
+                    body.className = 'flex-grow-1';
+                    const viewUrl = n.purchase_order_id ? `{{ route('business.orders.details', ['id' => '___ID___']) }}`.replace('___ID___', n.purchase_order_id) : '';
+                    body.innerHTML = `
+                        <div class="d-flex justify-content-between gap-2">
+                            <div class="fw-semibold">${(n.title||'')}</div>
+                            <div class="text-muted small">${formatTime(n.created_at)}</div>
+                        </div>
+                        <div class="text-muted small mt-1">${(n.message||'')}</div>
+                        ${viewUrl ? `<div class=\"mt-2\"><a class=\"text-primary small\" href=\"${viewUrl}\">View order →</a></div>` : ''}
+                    `;
+
+                    const actions = document.createElement('div');
+                    actions.className = 'flex-shrink-0';
+                    if(!n.is_read){
+                        const btn = document.createElement('button');
+                        btn.type = 'button';
+                        btn.className = 'btn btn-sm btn-outline-primary';
+                        btn.textContent = 'Mark read';
+                        btn.addEventListener('click', () => markRead(n.notification_id, btn));
+                        actions.appendChild(btn);
+                    }
+
+                    wrapper.appendChild(icon);
+                    wrapper.appendChild(body);
+                    wrapper.appendChild(actions);
+                    listEl.appendChild(wrapper);
+                });
+            }
+
+            async function load(){
+                if(!notificationsUrl) return;
+                if(loadingEl) loadingEl.style.display = 'block';
+                if(emptyEl) emptyEl.style.display = 'none';
+                try{
+                    const res = await fetch(notificationsUrl, {
+                        credentials: 'same-origin',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+                    const data = await res.json();
+                    if(data && data.success){
+                        render(Array.isArray(data.notifications) ? data.notifications : []);
+                        setBadge(typeof data.unread_count === 'number' ? data.unread_count : null);
+                    }
+                }catch(_){
+                }finally{
+                    if(loadingEl) loadingEl.style.display = 'none';
+                }
+            }
+
+            modalEl.addEventListener('show.bs.modal', load);
+            if(refreshBtn) refreshBtn.addEventListener('click', load);
+        })();
     </script>
 
     <script src="{{ asset('js/uniprint-ui.js') }}"></script>

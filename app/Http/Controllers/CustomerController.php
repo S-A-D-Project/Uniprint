@@ -3,10 +3,12 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Storage;
 
 use App\Models\DesignAsset;
 use App\Models\Enterprise;
@@ -18,21 +20,6 @@ use App\Models\OrderStatusHistory;
 
 class CustomerController extends Controller
 {
-    public function enterprises()
-    {
-        $userName = session('user_name');
-
-        $enterprises = Enterprise::query()
-            ->where('is_active', true)
-            ->withCount(['services' => function ($q) {
-                $q->where('is_active', true);
-            }])
-            ->orderBy('name')
-            ->paginate(12);
-
-        return view('customer.enterprises', compact('enterprises', 'userName'));
-    }
-
     public function dashboard()
     {
         $userId = session('user_id');
@@ -71,6 +58,114 @@ class CustomerController extends Controller
             ->get();
 
         return view('customer.dashboard', compact('stats', 'recent_orders', 'userName'));
+    }
+
+    public function respondOrderExtension(Request $request, $orderId, $requestId)
+    {
+        $userId = session('user_id');
+        if (!$userId) {
+            return redirect()->route('login');
+        }
+
+        $request->validate([
+            'decision' => 'required|in:accept,decline',
+        ]);
+
+        if (!Schema::hasTable('order_extension_requests')) {
+            return redirect()->back()->with('error', 'Extension requests are not available. Please run migrations.');
+        }
+
+        $ext = DB::table('order_extension_requests')
+            ->where('request_id', $requestId)
+            ->where('purchase_order_id', $orderId)
+            ->where('customer_id', $userId)
+            ->first();
+
+        if (!$ext) {
+            abort(404);
+        }
+
+        if (($ext->status ?? null) !== 'pending') {
+            return redirect()->back()->with('error', 'This extension request is no longer pending.');
+        }
+
+        $order = DB::table('customer_orders')
+            ->where('purchase_order_id', $orderId)
+            ->where('customer_id', $userId)
+            ->first();
+
+        if (!$order) {
+            abort(404);
+        }
+
+        $decision = (string) $request->decision;
+
+        // Determine business recipient (owner preferred; fallback to staff)
+        $businessRecipientId = null;
+        if (Schema::hasColumn('enterprises', 'owner_user_id')) {
+            $businessRecipientId = DB::table('enterprises')->where('enterprise_id', $order->enterprise_id)->value('owner_user_id');
+        }
+        if (!$businessRecipientId && Schema::hasTable('staff')) {
+            $businessRecipientId = DB::table('staff')
+                ->where('enterprise_id', $order->enterprise_id)
+                ->orderByRaw("CASE WHEN position = 'Owner' THEN 0 ELSE 1 END")
+                ->value('user_id');
+        }
+
+        DB::transaction(function () use ($decision, $orderId, $requestId, $userId, $order, $ext) {
+            DB::table('order_extension_requests')
+                ->where('request_id', $requestId)
+                ->update([
+                    'status' => $decision === 'accept' ? 'accepted' : 'declined',
+                    'responded_by' => $userId,
+                    'responded_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+            if ($decision === 'accept') {
+                $dueExpr = 'date_requested';
+                if (Schema::hasColumn('customer_orders', 'pickup_date')) {
+                    $dueExpr = 'pickup_date';
+                } elseif (Schema::hasColumn('customer_orders', 'requested_fulfillment_date')) {
+                    $dueExpr = 'requested_fulfillment_date';
+                } elseif (Schema::hasColumn('customer_orders', 'delivery_date')) {
+                    $dueExpr = 'delivery_date';
+                }
+
+                $newDue = null;
+                if (!empty($ext->proposed_due_date)) {
+                    $newDue = $ext->proposed_due_date;
+                }
+
+                if ($newDue) {
+                    DB::table('customer_orders')
+                        ->where('purchase_order_id', $orderId)
+                        ->where('customer_id', $userId)
+                        ->update([
+                            $dueExpr => $newDue,
+                            'updated_at' => now(),
+                        ]);
+                }
+            }
+
+            // Notification insertion is handled after transaction to allow correct recipient resolution.
+        });
+
+        if ($businessRecipientId && Schema::hasTable('order_notifications')) {
+            DB::table('order_notifications')->insert([
+                'notification_id' => (string) Str::uuid(),
+                'purchase_order_id' => $orderId,
+                'recipient_id' => $businessRecipientId,
+                'notification_type' => 'extension_response',
+                'title' => 'Extension Request Response',
+                'message' => "Customer {$decision}ed the extension request for order #{$order->order_no}.",
+                'is_read' => false,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        return redirect()->back()->with('success', $decision === 'accept' ? 'Extension accepted.' : 'Extension declined.');
     }
 
     public function orders(Request $request)
@@ -168,6 +263,17 @@ class CustomerController extends Controller
             abort(404);
         }
 
+        $extensionRequests = collect();
+        $pendingExtensionRequest = null;
+        if (Schema::hasTable('order_extension_requests')) {
+            $extensionRequests = DB::table('order_extension_requests')
+                ->where('purchase_order_id', $id)
+                ->where('customer_id', $userId)
+                ->orderBy('created_at', 'desc')
+                ->get();
+            $pendingExtensionRequest = $extensionRequests->firstWhere('status', 'pending');
+        }
+
         // Get order items with service info
         $itemsQuery = DB::table('order_items')
             ->join('services', 'order_items.service_id', '=', 'services.service_id')
@@ -177,11 +283,11 @@ class CustomerController extends Controller
         $hasFileUploadEnabledColumn = \Illuminate\Support\Facades\Schema::hasColumn('services', 'file_upload_enabled');
 
         if ($hasRequiresFileUploadColumn && $hasFileUploadEnabledColumn) {
-            $orderItems = $itemsQuery->select('order_items.*', 'services.service_name', 'services.requires_file_upload', 'services.file_upload_enabled')->get();
+            $orderItems = $itemsQuery->select('order_items.*', 'services.service_name', 'services.description as service_description', 'services.requires_file_upload', 'services.file_upload_enabled')->get();
         } elseif ($hasRequiresFileUploadColumn) {
-            $orderItems = $itemsQuery->select('order_items.*', 'services.service_name', 'services.requires_file_upload')->get();
+            $orderItems = $itemsQuery->select('order_items.*', 'services.service_name', 'services.description as service_description', 'services.requires_file_upload')->get();
         } else {
-            $orderItems = $itemsQuery->select('order_items.*', 'services.service_name')->get();
+            $orderItems = $itemsQuery->select('order_items.*', 'services.service_name', 'services.description as service_description')->get();
         }
 
         $requiresFileUpload = $hasRequiresFileUploadColumn
@@ -249,11 +355,195 @@ class CustomerController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
-        $view = view('customer.order-details', compact('order', 'orderItems', 'statusHistory', 'transaction', 'designFiles', 'userName', 'currentStatusName', 'requiresFileUpload', 'fileUploadEnabled'));
+        $reviewsByServiceId = collect();
+        if (Schema::hasTable('reviews')) {
+            $serviceIds = $orderItems->pluck('service_id')->filter()->unique()->values()->all();
+            if (!empty($serviceIds)) {
+                $reviewsByServiceId = DB::table('reviews')
+                    ->where('customer_id', $userId)
+                    ->whereIn('service_id', $serviceIds)
+                    ->get()
+                    ->keyBy('service_id');
+            }
+        }
+
+        $view = view('customer.order-details', compact('order', 'orderItems', 'statusHistory', 'transaction', 'designFiles', 'userName', 'currentStatusName', 'requiresFileUpload', 'fileUploadEnabled', 'reviewsByServiceId', 'extensionRequests', 'pendingExtensionRequest'));
 
         if ($request->ajax()) {
             $sections = $view->renderSections();
             return $sections['content'] ?? $view->render();
+        }
+
+        return $view;
+    }
+
+    public function storeReview(Request $request, $id)
+    {
+        $userId = session('user_id');
+        if (!$userId) {
+            return redirect()->route('login');
+        }
+
+        if (!Schema::hasTable('reviews')) {
+            return redirect()->back()->with('error', 'Reviews are not available. Please run migrations and try again.');
+        }
+
+        $request->validate([
+            'service_id' => 'required|uuid',
+            'rating' => 'required|integer|min:1|max:5',
+            'comment' => 'nullable|string|max:2000',
+            'review_files' => 'nullable|array',
+            'review_files.*' => 'file|mimes:jpg,jpeg,png,webp,pdf|max:51200',
+        ]);
+
+        $order = DB::table('customer_orders')
+            ->where('purchase_order_id', $id)
+            ->where('customer_id', $userId)
+            ->first();
+
+        if (!$order) {
+            abort(404);
+        }
+
+        $currentStatusName = DB::table('order_status_history')
+            ->join('statuses', 'order_status_history.status_id', '=', 'statuses.status_id')
+            ->where('order_status_history.purchase_order_id', $id)
+            ->orderBy('order_status_history.timestamp', 'desc')
+            ->value('statuses.status_name') ?? 'Pending';
+
+        if ($currentStatusName !== 'Completed') {
+            return redirect()->back()->with('error', 'You can only review an order after it is completed.');
+        }
+
+        $serviceId = (string) $request->input('service_id');
+        $belongsToOrder = DB::table('order_items')
+            ->where('purchase_order_id', $id)
+            ->where('service_id', $serviceId)
+            ->exists();
+
+        if (!$belongsToOrder) {
+            return redirect()->back()->with('error', 'You can only review services that are part of this order.');
+        }
+
+        $existing = DB::table('reviews')
+            ->where('customer_id', $userId)
+            ->where('service_id', $serviceId)
+            ->first();
+
+        $payload = [
+            'rating' => (int) $request->input('rating'),
+            'comment' => $request->input('comment'),
+            'updated_at' => now(),
+        ];
+
+        $reviewId = null;
+
+        if ($existing) {
+            DB::table('reviews')
+                ->where('review_id', $existing->review_id)
+                ->update($payload);
+
+            $reviewId = (string) $existing->review_id;
+
+        } else {
+            $reviewId = (string) Str::uuid();
+            $payload['review_id'] = $reviewId;
+            $payload['service_id'] = $serviceId;
+            $payload['customer_id'] = $userId;
+            $payload['created_at'] = now();
+
+            DB::table('reviews')->insert($payload);
+        }
+
+        if ($reviewId && $request->hasFile('review_files') && Schema::hasTable('review_files')) {
+            foreach ((array) $request->file('review_files') as $file) {
+                if (!$file) {
+                    continue;
+                }
+
+                $fileName = time() . '_' . $file->getClientOriginalName();
+                $disk = config('filesystems.default', 'public');
+                $filePath = $file->storeAs('review_files/' . $reviewId, $fileName, $disk);
+
+                DB::table('review_files')->insert([
+                    'file_id' => (string) Str::uuid(),
+                    'review_id' => $reviewId,
+                    'file_name' => $fileName,
+                    'file_path' => $filePath,
+                    'file_type' => $file->getClientOriginalExtension(),
+                    'file_size' => $file->getSize(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+        }
+
+        return redirect()->back()->with('success', $existing ? 'Review updated. Thank you!' : 'Review submitted. Thank you!');
+    }
+
+    public function orderReviewsFragment(Request $request, $id)
+    {
+        $userId = session('user_id');
+        if (!$userId) {
+            abort(401);
+        }
+
+        $order = DB::table('customer_orders')
+            ->join('enterprises', 'customer_orders.enterprise_id', '=', 'enterprises.enterprise_id')
+            ->where('customer_orders.purchase_order_id', $id)
+            ->where('customer_orders.customer_id', $userId)
+            ->select('customer_orders.*', 'enterprises.name as enterprise_name')
+            ->first();
+
+        if (! $order) {
+            abort(404);
+        }
+
+        $currentStatusName = DB::table('order_status_history')
+            ->join('statuses', 'order_status_history.status_id', '=', 'statuses.status_id')
+            ->where('order_status_history.purchase_order_id', $id)
+            ->orderBy('order_status_history.timestamp', 'desc')
+            ->value('statuses.status_name') ?? 'Pending';
+
+        $orderItems = DB::table('order_items')
+            ->join('services', 'order_items.service_id', '=', 'services.service_id')
+            ->where('order_items.purchase_order_id', $id)
+            ->select('order_items.service_id', 'services.service_name')
+            ->orderBy('order_items.created_at', 'asc')
+            ->get();
+
+        $reviewsByServiceId = collect();
+        if (Schema::hasTable('reviews')) {
+            $serviceIds = $orderItems->pluck('service_id')->filter()->unique()->values()->all();
+            if (!empty($serviceIds)) {
+                $reviewsByServiceId = DB::table('reviews')
+                    ->where('customer_id', $userId)
+                    ->whereIn('service_id', $serviceIds)
+                    ->get()
+                    ->keyBy('service_id');
+            }
+        }
+
+        $reviewFilesByReviewId = [];
+        if (Schema::hasTable('review_files') && $reviewsByServiceId->isNotEmpty()) {
+            $reviewIds = $reviewsByServiceId->pluck('review_id')->filter()->unique()->values()->all();
+            if (!empty($reviewIds)) {
+                $files = DB::table('review_files')
+                    ->whereIn('review_id', $reviewIds)
+                    ->orderBy('created_at', 'asc')
+                    ->get();
+
+                $reviewFilesByReviewId = $files
+                    ->groupBy('review_id')
+                    ->map(fn ($rows) => $rows->values())
+                    ->toArray();
+            }
+        }
+
+        $view = view('customer.order-reviews-fragment', compact('order', 'orderItems', 'reviewsByServiceId', 'currentStatusName', 'reviewFilesByReviewId'));
+
+        if ($request->ajax()) {
+            return $view->render();
         }
 
         return $view;
@@ -480,7 +770,8 @@ class CustomerController extends Controller
         // Handle file upload
         $file = $request->file('design_file');
         $fileName = time() . '_' . $file->getClientOriginalName();
-        $filePath = $file->storeAs('design_files/' . $orderId, $fileName, 'public');
+        $disk = config('filesystems.default', 'public');
+        $filePath = $file->storeAs('design_files/' . $orderId, $fileName, $disk);
 
         // Get file version (count existing files + 1)
         $version = DB::table('order_design_files')
@@ -556,7 +847,19 @@ class CustomerController extends Controller
         }
 
         // Delete file from storage
-        \Illuminate\Support\Facades\Storage::disk('public')->delete($file->file_path);
+        $disk = config('filesystems.default', 'public');
+        try {
+            if (Storage::disk($disk)->exists($file->file_path)) {
+                Storage::disk($disk)->delete($file->file_path);
+            }
+        } catch (\Throwable $e) {
+            try {
+                if (Storage::disk('public')->exists($file->file_path)) {
+                    Storage::disk('public')->delete($file->file_path);
+                }
+            } catch (\Throwable $e2) {
+            }
+        }
 
         // Delete from database
         DB::table('order_design_files')->where('file_id', $fileId)->delete();
@@ -587,9 +890,7 @@ class CustomerController extends Controller
             ]);
         }
 
-        $notifications = $query->paginate(20);
-
-        return view('customer.notifications', compact('notifications', 'userName'));
+        return redirect()->route('customer.dashboard');
     }
 
     public function markNotificationRead(Request $request, $id)
@@ -616,9 +917,12 @@ class CustomerController extends Controller
 
     public function enterpriseServices($id)
     {
-        $enterprise = Enterprise::where('enterprise_id', $id)
-            ->where('is_active', true)
-            ->firstOrFail();
+        $enterpriseQuery = Enterprise::where('enterprise_id', $id)
+            ->where('is_active', true);
+        if (Schema::hasColumn('enterprises', 'is_verified')) {
+            $enterpriseQuery->where('is_verified', true);
+        }
+        $enterprise = $enterpriseQuery->firstOrFail();
 
         $services = Service::where('enterprise_id', $id)
             ->where('is_active', true)
@@ -630,14 +934,36 @@ class CustomerController extends Controller
 
     public function serviceDetails($id)
     {
-        $service = Service::where('service_id', $id)
+        $serviceQuery = Service::where('service_id', $id)
             ->where('is_active', true)
-            ->with(['enterprise', 'customizationOptions', 'customFields'])
-            ->firstOrFail();
+            ->with(['enterprise', 'customizationOptions', 'customFields']);
+
+        if (Schema::hasColumn('enterprises', 'is_verified')) {
+            $serviceQuery->whereHas('enterprise', function ($q) {
+                $q->where('is_active', true)->where('is_verified', true);
+            });
+        } else {
+            $serviceQuery->whereHas('enterprise', function ($q) {
+                $q->where('is_active', true);
+            });
+        }
+
+        $service = $serviceQuery->firstOrFail();
 
         $customizationGroups = $service->customizationOptions->groupBy('option_type');
 
-        return view('customer.service-details', compact('service', 'customizationGroups'));
+        $reviews = collect();
+        if (Schema::hasTable('reviews')) {
+            $reviews = DB::table('reviews')
+                ->leftJoin('users', 'reviews.customer_id', '=', 'users.user_id')
+                ->where('reviews.service_id', $id)
+                ->orderBy('reviews.created_at', 'desc')
+                ->select('reviews.*', 'users.name as customer_name')
+                ->limit(20)
+                ->get();
+        }
+
+        return view('customer.service-details', compact('service', 'customizationGroups', 'reviews'));
     }
 
 

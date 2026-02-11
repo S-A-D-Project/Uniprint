@@ -45,6 +45,21 @@ $breadcrumbs = [
                         @endif
                     </div>
                 </div>
+                @if(!empty($user->enterprise_id) && \Illuminate\Support\Facades\Schema::hasColumn('enterprises', 'is_verified'))
+                    @php
+                        $enterpriseIsVerified = isset($user->enterprise_is_verified) ? (bool) $user->enterprise_is_verified : true;
+                    @endphp
+                    <div>
+                        <div class="text-sm text-muted-foreground">Enterprise Verification</div>
+                        <div class="mt-1">
+                            @if($enterpriseIsVerified)
+                                <x-admin.badge variant="success" icon="check-circle">Verified</x-admin.badge>
+                            @else
+                                <x-admin.badge variant="secondary" icon="clock">Pending</x-admin.badge>
+                            @endif
+                        </div>
+                    </div>
+                @endif
                 <div>
                     <div class="text-sm text-muted-foreground">Created</div>
                     <div class="font-semibold">
@@ -53,6 +68,39 @@ $breadcrumbs = [
                 </div>
             </div>
         </x-admin.card>
+
+        @if(!empty($user->enterprise_id) && \Illuminate\Support\Facades\Schema::hasColumn('enterprises', 'verification_document_path'))
+            <x-admin.card title="Verification Proof" icon="file-check">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <div class="text-sm text-muted-foreground">Submitted</div>
+                        <div class="font-semibold">
+                            @if(!empty($user->enterprise_verification_submitted_at))
+                                {{ is_string($user->enterprise_verification_submitted_at) ? date('M d, Y H:i', strtotime($user->enterprise_verification_submitted_at)) : \Carbon\Carbon::parse($user->enterprise_verification_submitted_at)->format('M d, Y H:i') }}
+                            @else
+                                —
+                            @endif
+                        </div>
+                    </div>
+                    <div>
+                        <div class="text-sm text-muted-foreground">Document</div>
+                        <div class="font-semibold">
+                            @if(!empty($user->enterprise_verification_document_path))
+                                <a class="text-primary hover:text-primary/80" href="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($user->enterprise_verification_document_path) }}" target="_blank" rel="noopener">View document</a>
+                            @else
+                                —
+                            @endif
+                        </div>
+                    </div>
+                </div>
+
+                @if(isset($enterpriseIsVerified) && !$enterpriseIsVerified)
+                    <div class="mt-4">
+                        @include('admin.partials.enterprise-verification-actions', ['enterprise' => (object) ['enterprise_id' => $user->enterprise_id, 'is_verified' => $enterpriseIsVerified]])
+                    </div>
+                @endif
+            </x-admin.card>
+        @endif
 
         <x-admin.card title="Customer Activity" icon="shopping-cart">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -82,6 +130,22 @@ $breadcrumbs = [
                     </div>
                 </div>
 
+                @if(($user->role_type ?? '') !== 'admin' && \Illuminate\Support\Facades\Schema::hasColumn('users', 'two_factor_enabled'))
+                    @php
+                        $emailTwoFactorEnabled = (bool) ($user->two_factor_enabled ?? false);
+                    @endphp
+                    <div>
+                        <div class="text-sm text-muted-foreground">Email 2FA</div>
+                        <div class="mt-1">
+                            @if($emailTwoFactorEnabled)
+                                <x-admin.badge variant="success" icon="check-circle">Enabled</x-admin.badge>
+                            @else
+                                <x-admin.badge variant="secondary" icon="x-circle">Disabled</x-admin.badge>
+                            @endif
+                        </div>
+                    </div>
+                @endif
+
                 @if(($hasUserIsActive ?? false))
                     <form method="POST" action="{{ route('admin.users.toggle-active', $user->user_id) }}">
                         @csrf
@@ -90,6 +154,25 @@ $breadcrumbs = [
                         @else
                             <x-admin.button type="submit" variant="success" icon="check-circle" class="w-full">Activate User</x-admin.button>
                         @endif
+                    </form>
+                @endif
+
+                @if(($user->role_type ?? '') !== 'admin' && \Illuminate\Support\Facades\Schema::hasColumn('users', 'two_factor_enabled'))
+                    @php
+                        $emailTwoFactorEnabled = (bool) ($user->two_factor_enabled ?? false);
+                    @endphp
+                    @if($emailTwoFactorEnabled)
+                        <form method="POST" action="{{ route('admin.users.disable-email-2fa', $user->user_id) }}">
+                            @csrf
+                            <x-admin.button type="submit" variant="outline" icon="shield-off" class="w-full">Disable Email 2FA</x-admin.button>
+                        </form>
+                    @endif
+                @endif
+
+                @if(($user->role_type ?? '') !== 'admin')
+                    <form method="POST" action="{{ route('admin.users.delete', $user->user_id) }}" onsubmit="return confirm('Delete this user permanently? This cannot be undone.');">
+                        @csrf
+                        <x-admin.button type="submit" variant="destructive" icon="trash-2" class="w-full">Delete User</x-admin.button>
                     </form>
                 @endif
 

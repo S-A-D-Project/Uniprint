@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Home Controller
@@ -17,6 +18,50 @@ use Illuminate\Support\Facades\Log;
  */
 class HomeController extends Controller
 {
+    private function landingData(): array
+    {
+        return Cache::remember('home.landing_data', 300, function () {
+            $stats = [
+                'total_enterprises' => DB::table('enterprises')->count(),
+                'total_services' => DB::table('services')->count(),
+                'categories' => DB::table('services')->distinct()->count('category'),
+            ];
+
+            $enterprises = DB::table('enterprises')
+                ->leftJoin('services', 'enterprises.enterprise_id', '=', 'services.enterprise_id')
+                ->select(
+                    'enterprises.enterprise_id',
+                    DB::raw('enterprises.name as enterprise_name'),
+                    'enterprises.category',
+                    DB::raw('enterprises.address as address_text'),
+                    'enterprises.is_active',
+                    'enterprises.created_at',
+                    'enterprises.updated_at',
+                    DB::raw('COUNT(services.service_id) as services_count')
+                )
+                ->where('enterprises.is_active', true)
+                ->when(Schema::hasColumn('enterprises', 'is_verified'), function ($q) {
+                    $q->where('enterprises.is_verified', true);
+                })
+                ->groupBy(
+                    'enterprises.enterprise_id',
+                    'enterprises.name',
+                    'enterprises.category',
+                    'enterprises.address',
+                    'enterprises.is_active',
+                    'enterprises.created_at',
+                    'enterprises.updated_at'
+                )
+                ->orderBy('services_count', 'desc')
+                ->limit(6)
+                ->get();
+
+            $recent_orders = null;
+
+            return [$stats, $enterprises, $recent_orders];
+        });
+    }
+
     /**
      * Display the landing page
      * 
@@ -47,6 +92,22 @@ class HomeController extends Controller
                     if (! $hasEnterprise) {
                         return redirect()->route('business.onboarding');
                     }
+
+                    $isVerified = true;
+                    if (DB::table('enterprises')->where('owner_user_id', $userId)->exists() && \Illuminate\Support\Facades\Schema::hasColumn('enterprises', 'is_verified')) {
+                        $isVerified = (bool) DB::table('enterprises')->where('owner_user_id', $userId)->value('is_verified');
+                    } elseif (\Illuminate\Support\Facades\Schema::hasTable('staff') && \Illuminate\Support\Facades\Schema::hasColumn('enterprises', 'is_verified')) {
+                        $enterpriseId = DB::table('staff')->where('user_id', $userId)->value('enterprise_id');
+                        if ($enterpriseId) {
+                            $isVerified = (bool) DB::table('enterprises')->where('enterprise_id', $enterpriseId)->value('is_verified');
+                        }
+                    }
+
+                    if (! $isVerified) {
+                        [$stats, $enterprises, $recent_orders] = $this->landingData();
+                        return view('home.index', compact('stats', 'enterprises', 'recent_orders'));
+                    }
+
                     return redirect()->route('business.dashboard');
                 }
 
@@ -62,40 +123,7 @@ class HomeController extends Controller
         }
 
         // Get basic statistics
-        $stats = [
-            'total_enterprises' => DB::table('enterprises')->count(),
-            'total_services' => DB::table('services')->count(),
-            'categories' => DB::table('services')->distinct()->count('category'),
-        ];
-
-        // Get featured enterprises (align with real columns: name, address)
-        $enterprises = DB::table('enterprises')
-            ->leftJoin('services', 'enterprises.enterprise_id', '=', 'services.enterprise_id')
-            ->select(
-                'enterprises.enterprise_id',
-                DB::raw('enterprises.name as enterprise_name'),
-                'enterprises.category',
-                DB::raw('enterprises.address as address_text'),
-                'enterprises.is_active',
-                'enterprises.created_at',
-                'enterprises.updated_at',
-                DB::raw('COUNT(services.service_id) as services_count')
-            )
-            ->where('enterprises.is_active', true)
-            ->groupBy(
-                'enterprises.enterprise_id',
-                'enterprises.name',
-                'enterprises.category',
-                'enterprises.address',
-                'enterprises.is_active',
-                'enterprises.created_at',
-                'enterprises.updated_at'
-            )
-            ->orderBy('services_count', 'desc')
-            ->limit(6)
-            ->get();
-
-        $recent_orders = null;
+        [$stats, $enterprises, $recent_orders] = $this->landingData();
 
         return view('home.index', compact('stats', 'enterprises', 'recent_orders'));
     }
@@ -139,6 +167,10 @@ class HomeController extends Controller
         $query = \App\Models\Enterprise::query()
             ->where('is_active', true);
 
+        if (Schema::hasColumn('enterprises', 'is_verified')) {
+            $query->where('is_verified', true);
+        }
+
         $driver = DB::connection()->getDriverName();
 
         if (request()->filled('category')) {
@@ -158,8 +190,37 @@ class HomeController extends Controller
             ->orderBy('name')
             ->paginate(12);
 
+        if (Schema::hasTable('reviews')) {
+            $enterpriseIds = $enterprises->pluck('enterprise_id')->filter()->values()->all();
+            if (!empty($enterpriseIds)) {
+                $ratings = DB::table('reviews')
+                    ->join('services', 'reviews.service_id', '=', 'services.service_id')
+                    ->whereIn('services.enterprise_id', $enterpriseIds)
+                    ->select(
+                        'services.enterprise_id',
+                        DB::raw('AVG(reviews.rating) as rating'),
+                        DB::raw('COUNT(*) as review_count')
+                    )
+                    ->groupBy('services.enterprise_id')
+                    ->get()
+                    ->keyBy('enterprise_id');
+
+                $enterprises->setCollection(
+                    $enterprises->getCollection()->map(function ($enterprise) use ($ratings) {
+                        $row = $ratings->get($enterprise->enterprise_id);
+                        $enterprise->rating = $row ? round((float) $row->rating, 1) : 0.0;
+                        $enterprise->review_count = $row ? (int) $row->review_count : 0;
+                        return $enterprise;
+                    })
+                );
+            }
+        }
+
         $categories = \App\Models\Enterprise::query()
             ->where('is_active', true)
+            ->when(Schema::hasColumn('enterprises', 'is_verified'), function ($q) {
+                $q->where('is_verified', true);
+            })
             ->whereNotNull('category')
             ->where('category', '!=', '')
             ->distinct()
@@ -180,6 +241,10 @@ class HomeController extends Controller
     {
         $query = Enterprise::where('is_active', true)
             ->withCount('services');
+
+        if (Schema::hasColumn('enterprises', 'is_verified')) {
+            $query->where('is_verified', true);
+        }
 
         $driver = DB::connection()->getDriverName();
 
@@ -214,6 +279,9 @@ class HomeController extends Controller
         $enterprises = $query->paginate(12);
         
         $categories = Enterprise::where('is_active', true)
+            ->when(Schema::hasColumn('enterprises', 'is_verified'), function ($q) {
+                $q->where('is_verified', true);
+            })
             ->distinct()
             ->pluck('category')
             ->sort();
@@ -229,7 +297,26 @@ class HomeController extends Controller
      */
     public function showEnterprise($id)
     {
-        $enterprise = \App\Models\Enterprise::where('enterprise_id', $id)->firstOrFail();
+        $enterpriseQuery = \App\Models\Enterprise::where('enterprise_id', $id)
+            ->where('is_active', true);
+        if (Schema::hasColumn('enterprises', 'is_verified')) {
+            $enterpriseQuery->where('is_verified', true);
+        }
+        $enterprise = $enterpriseQuery->firstOrFail();
+
+        if (Schema::hasTable('reviews')) {
+            $row = DB::table('reviews')
+                ->join('services', 'reviews.service_id', '=', 'services.service_id')
+                ->where('services.enterprise_id', $enterprise->enterprise_id)
+                ->select(
+                    DB::raw('AVG(reviews.rating) as rating'),
+                    DB::raw('COUNT(*) as review_count')
+                )
+                ->first();
+
+            $enterprise->rating = $row ? round((float) ($row->rating ?? 0), 1) : 0.0;
+            $enterprise->review_count = $row ? (int) ($row->review_count ?? 0) : 0;
+        }
         
         $services = \App\Models\Service::where('enterprise_id', $id)
             ->where('is_active', true)
@@ -247,10 +334,21 @@ class HomeController extends Controller
      */
     public function showService($id)
     {
-        $service = \App\Models\Service::where('service_id', $id)
+        $serviceQuery = \App\Models\Service::where('service_id', $id)
             ->where('is_active', true)
-            ->with(['enterprise', 'customizationOptions'])
-            ->firstOrFail();
+            ->with(['enterprise', 'customizationOptions']);
+
+        if (Schema::hasColumn('enterprises', 'is_verified')) {
+            $serviceQuery->whereHas('enterprise', function ($q) {
+                $q->where('is_active', true)->where('is_verified', true);
+            });
+        } else {
+            $serviceQuery->whereHas('enterprise', function ($q) {
+                $q->where('is_active', true);
+            });
+        }
+
+        $service = $serviceQuery->firstOrFail();
 
         // Group customization options by type
         $customizationGroups = $service->customizationOptions->groupBy('option_type');

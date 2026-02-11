@@ -16,6 +16,9 @@ $breadcrumbs = [
         <div class="text-sm text-muted-foreground">
             Total: {{ $users->total() }} users
         </div>
+        <x-admin.button variant="default" icon="user-plus" size="sm" onclick="openCreateUserModal()">
+            Add User
+        </x-admin.button>
         <x-admin.button variant="outline" icon="refresh-cw" size="sm" onclick="location.reload()">
             Refresh
         </x-admin.button>
@@ -124,36 +127,120 @@ $breadcrumbs = [
 <x-ui.modal id="userDetailsModal" title="User Details" size="xl" scrollable>
     <div id="userDetailsModalBody" class="min-h-[200px]"></div>
 </x-ui.modal>
+
+<x-ui.modal id="createUserModal" title="Add New User" size="lg" scrollable>
+    <div id="createUserModalBody" class="min-h-[200px]"></div>
+</x-ui.modal>
 @endsection
 
 @push('scripts')
 <script>
+    function openCreateUserModal() {
+        const modalEl = document.getElementById('createUserModal');
+        const bodyEl = document.getElementById('createUserModalBody');
+        if (!modalEl || !bodyEl) return;
+
+        const url = "{{ route('admin.users.create') }}";
+        bodyEl.innerHTML = '<div class="py-10 text-center text-muted-foreground">Loading form…</div>';
+
+        let bsModal = window.modal_createUserModal;
+        if (!bsModal && typeof bootstrap !== 'undefined') {
+            bsModal = new bootstrap.Modal(modalEl);
+            window.modal_createUserModal = bsModal;
+        }
+        if (bsModal) bsModal.show();
+
+        fetch(url, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'text/html' }
+        })
+        .then(res => res.text())
+        .then(html => {
+            bodyEl.innerHTML = html;
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        })
+        .catch(err => {
+            bodyEl.innerHTML = '<div class="alert alert-danger p-4">Failed to load form.</div>';
+        });
+    }
+
     lucide.createIcons();
+
+    const __upModalCache = (window.__upModalCache = window.__upModalCache || {});
+
+    function __cleanupBootstrapModalState() {
+        try {
+            document.querySelectorAll('.modal-backdrop').forEach((el) => el.remove());
+            document.body.classList.remove('modal-open');
+            document.body.style.removeProperty('overflow');
+            document.body.style.removeProperty('padding-right');
+
+            const upLoading = document.querySelector('.up-loading-overlay');
+            if (upLoading) {
+                upLoading.classList.remove('up-loading-overlay--show');
+                upLoading.remove();
+            }
+
+            const upModalRoot = document.querySelector('.up-modal-root');
+            if (upModalRoot) {
+                upModalRoot.querySelectorAll('.up-modal-wrapper').forEach((el) => el.remove());
+            }
+            document.documentElement.classList.remove('up-no-scroll');
+        } catch (e) {
+            // ignore
+        }
+    }
 
     function openUserDetailsModal(url) {
         const modalEl = document.getElementById('userDetailsModal');
         const bodyEl = document.getElementById('userDetailsModalBody');
         if (!modalEl || !bodyEl) return;
 
-        modalEl.dataset.currentDetailsUrl = url;
-        bodyEl.innerHTML = '<div class="p-4 text-muted">Loading...</div>';
+        if (!modalEl.dataset.upCleanupBound) {
+            modalEl.dataset.upCleanupBound = '1';
+            modalEl.addEventListener('hidden.bs.modal', function () {
+                __cleanupBootstrapModalState();
+            });
+        }
 
-        const modal = new bootstrap.Modal(modalEl);
-        modal.show();
+        modalEl.dataset.currentDetailsUrl = url;
+        const cacheKey = `GET:${url}`;
+
+        let modal = window.modal_userDetailsModal;
+        if (!modal && typeof bootstrap !== 'undefined') {
+            modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+            window.modal_userDetailsModal = modal;
+        }
+
+        if (modal && !modalEl.classList.contains('show')) {
+            modal.show();
+        }
+
+        if (__upModalCache[cacheKey]) {
+            bodyEl.innerHTML = __upModalCache[cacheKey];
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+            return;
+        }
+
+        bodyEl.innerHTML = '<div class="p-4"></div>';
 
         fetch(url, {
             method: 'GET',
             headers: {
                 'X-Requested-With': 'XMLHttpRequest',
                 'Accept': 'text/html'
-            }
+            },
+            credentials: 'same-origin'
         })
         .then(async (res) => {
             if (!res.ok) throw new Error('Failed to load');
             return await res.text();
         })
         .then((html) => {
-            bodyEl.innerHTML = html || '<div class="p-4 text-muted">No content</div>';
+            const next = html || '<div class="p-4 text-muted">No content</div>';
+            __upModalCache[cacheKey] = next;
+            bodyEl.innerHTML = next;
             if (typeof lucide !== 'undefined') {
                 lucide.createIcons();
             }
@@ -161,6 +248,9 @@ $breadcrumbs = [
         .catch((err) => {
             console.error(err);
             bodyEl.innerHTML = '<div class="p-4 text-danger">Failed to load user details.</div>';
+        })
+        .finally(() => {
+            __cleanupBootstrapModalState();
         });
     }
 
@@ -195,6 +285,10 @@ $breadcrumbs = [
             if (!(form instanceof HTMLFormElement)) return;
 
             e.preventDefault();
+            e.stopPropagation();
+            if (typeof e.stopImmediatePropagation === 'function') {
+                e.stopImmediatePropagation();
+            }
 
             const url = form.getAttribute('action');
             if (!url) return;
@@ -207,29 +301,50 @@ $breadcrumbs = [
                         'X-Requested-With': 'XMLHttpRequest',
                         'Accept': 'application/json'
                     },
-                    body: new FormData(form)
+                    body: new FormData(form),
+                    credentials: 'same-origin'
                 });
 
                 const data = await res.json().catch(() => null);
                 if (!res.ok || !data || data.success !== true) {
-                    throw new Error(data?.message || 'Request failed');
+                    const text = !data ? await res.text().catch(() => '') : '';
+                    throw new Error(data?.message || text || 'Request failed');
                 }
 
                 if (window.UniPrintUI && typeof window.UniPrintUI.toast === 'function') {
                     window.UniPrintUI.toast(data.message || 'Updated.', { variant: 'success' });
                 }
 
-                const currentUrl = modalEl.dataset.currentDetailsUrl;
-                if (currentUrl) {
-                    openUserDetailsModal(currentUrl);
+                const isDelete = url.includes('/delete');
+                if (isDelete) {
+                    const modal = bootstrap.Modal.getInstance(modalEl);
+                    if (modal) modal.hide();
+                    location.reload();
+                } else {
+                    const currentUrl = modalEl.dataset.currentDetailsUrl;
+                    if (currentUrl) {
+                        delete __upModalCache[`GET:${currentUrl}`];
+                        openUserDetailsModal(currentUrl);
+                    }
                 }
             } catch (err) {
                 console.error(err);
                 if (window.UniPrintUI && typeof window.UniPrintUI.toast === 'function') {
                     window.UniPrintUI.toast('Failed to update user.', { variant: 'danger' });
                 }
+            } finally {
+                __cleanupBootstrapModalState();
+
+                try {
+                    const modal = bootstrap.Modal.getInstance(modalEl);
+                    if (modalEl.classList.contains('show') && modal) {
+                        modal.handleUpdate();
+                    }
+                } catch (e) {
+                    // ignore
+                }
             }
-        });
+        }, true);
     });
 </script>
 @endpush

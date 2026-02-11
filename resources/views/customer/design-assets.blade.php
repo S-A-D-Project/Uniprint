@@ -1,23 +1,6 @@
-@extends('layouts.app')
+@extends('layouts.public')
 
 @section('title', 'My Design Assets')
-
-@section('dashboard-route', route('customer.dashboard'))
-
-@section('sidebar')
-    <a href="{{ route('customer.dashboard') }}" class="nav-link">
-        <i class="bi bi-speedometer2"></i>Dashboard
-    </a>
-    <a href="{{ route('customer.enterprises') }}" class="nav-link">
-        <i class="bi bi-shop"></i>Browse Shops
-    </a>
-    <a href="{{ route('customer.orders') }}" class="nav-link">
-        <i class="bi bi-bag"></i>My Orders
-    </a>
-    <a href="{{ route('customer.design-assets') }}" class="nav-link active">
-        <i class="bi bi-images"></i>My Designs
-    </a>
-@endsection
 
 @section('content')
 <div class="page-header d-flex justify-content-between align-items-center">
@@ -150,15 +133,8 @@ async function previewAsset(assetId, assetName) {
     const modal = new bootstrap.Modal(document.getElementById('assetPreviewModal'));
     const previewContent = document.getElementById('previewContent');
     const downloadBtn = document.getElementById('downloadFromPreview');
-    
-    // Show loading state
-    previewContent.innerHTML = `
-        <div class="d-flex justify-content-center align-items-center" style="height: 300px;">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Loading...</span>
-            </div>
-        </div>
-    `;
+
+    previewContent.innerHTML = `<div style="height: 300px;"></div>`;
     
     // Set download button action
     downloadBtn.onclick = () => downloadAsset(assetId, assetName);

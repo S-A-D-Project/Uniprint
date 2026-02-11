@@ -55,4 +55,16 @@ return [
         'imagen_model' => env('GEMINI_IMAGEN_MODEL', 'imagen-3.0-generate-001'),
     ],
 
+    'paypal' => [
+        'mode' => env('PAYPAL_MODE', 'sandbox'),
+        'currency' => env('PAYPAL_CURRENCY', 'PHP'),
+        'client_id' => env('PAYPAL_CLIENT_ID'),
+        'client_secret' => env('PAYPAL_CLIENT_SECRET'),
+    ],
+
+    'turnstile' => [
+        'site_key' => env('TURNSTILE_SITE_KEY'),
+        'secret_key' => env('TURNSTILE_SECRET_KEY'),
+    ],
+
 ];

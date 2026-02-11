@@ -13,7 +13,9 @@ return [
     |
     */
 
-    'default' => env('FILESYSTEM_DISK', 'local'),
+    'default' => (env('FILESYSTEM_DISK') === 'supabase' && (!env('SUPABASE_S3_KEY') || !env('SUPABASE_S3_SECRET')))
+        ? 'public'
+        : env('FILESYSTEM_DISK', 'local'),
 
     /*
     |--------------------------------------------------------------------------
@@ -56,6 +58,19 @@ return [
             'url' => env('AWS_URL'),
             'endpoint' => env('AWS_ENDPOINT'),
             'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
+            'throw' => false,
+            'report' => false,
+        ],
+
+        'supabase' => [
+            'driver' => 's3',
+            'key' => env('SUPABASE_S3_KEY', env('AWS_ACCESS_KEY_ID')),
+            'secret' => env('SUPABASE_S3_SECRET', env('AWS_SECRET_ACCESS_KEY')),
+            'region' => env('SUPABASE_S3_REGION', env('AWS_DEFAULT_REGION', 'auto')),
+            'bucket' => env('SUPABASE_STORAGE_BUCKET', env('AWS_BUCKET')),
+            'url' => env('SUPABASE_S3_URL', env('AWS_URL')),
+            'endpoint' => env('SUPABASE_S3_ENDPOINT', env('AWS_ENDPOINT')),
+            'use_path_style_endpoint' => env('SUPABASE_S3_PATH_STYLE', env('AWS_USE_PATH_STYLE_ENDPOINT', true)),
             'throw' => false,
             'report' => false,
         ],

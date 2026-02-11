@@ -1,15 +1,77 @@
 <header class="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
     <div class="container mx-auto flex h-16 items-center justify-between px-4">
-        <a href="{{ auth()->check() && session('user_id') ? route('customer.dashboard') : route('home') }}" class="flex items-center gap-3">
+        @php
+            $headerRoleType = null;
+            $showBusinessVerifyCta = false;
+            $isBusinessVerified = true;
+            try {
+                $u = \Illuminate\Support\Facades\Auth::user();
+                if ($u && method_exists($u, 'getUserRoleType')) {
+                    $headerRoleType = $u->getUserRoleType();
+
+                    if ($headerRoleType === 'business_user') {
+                        $uid = $u->user_id;
+                        if (\Illuminate\Support\Facades\Schema::hasColumn('enterprises', 'owner_user_id') && \Illuminate\Support\Facades\Schema::hasColumn('enterprises', 'is_verified')) {
+                            $enterpriseQuery = \Illuminate\Support\Facades\DB::table('enterprises')->where('owner_user_id', $uid);
+                            if ($enterpriseQuery->exists()) {
+                                $isBusinessVerified = (bool) $enterpriseQuery->value('is_verified');
+                            } elseif (\Illuminate\Support\Facades\Schema::hasTable('staff')) {
+                                $enterpriseId = \Illuminate\Support\Facades\DB::table('staff')->where('user_id', $uid)->value('enterprise_id');
+                                if ($enterpriseId) {
+                                    $isBusinessVerified = (bool) \Illuminate\Support\Facades\DB::table('enterprises')->where('enterprise_id', $enterpriseId)->value('is_verified');
+                                }
+                            }
+                        }
+
+                        if (! $isBusinessVerified) {
+                            $showBusinessVerifyCta = true;
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                $headerRoleType = null;
+                $showBusinessVerifyCta = false;
+                $isBusinessVerified = true;
+            }
+
+            if (! $headerRoleType && session('user_id')) {
+                try {
+                    $headerRoleType = \Illuminate\Support\Facades\DB::table('roles')
+                        ->join('role_types', 'roles.role_type_id', '=', 'role_types.role_type_id')
+                        ->where('roles.user_id', session('user_id'))
+                        ->value('role_types.user_role_type');
+                } catch (\Throwable $e) {
+                    $headerRoleType = null;
+                }
+            }
+
+            $brandHref = route('home');
+            if (session('user_id') && $headerRoleType === 'customer') {
+                $brandHref = route('customer.dashboard');
+            } elseif (session('user_id') && $headerRoleType === 'admin') {
+                $brandHref = route('admin.dashboard');
+            } elseif (session('user_id') && $headerRoleType === 'business_user' && $isBusinessVerified) {
+                $brandHref = route('business.dashboard');
+            }
+        @endphp
+
+        <a href="{{ $brandHref }}" class="flex items-center gap-3">
             <!-- Shop Logo/Branding -->
-            <div class="w-10 h-10 gradient-primary rounded-lg flex items-center justify-center">
-                <i data-lucide="printer" class="h-6 w-6 text-white"></i>
-            </div>
+            @php
+                $systemBrandLogoUrl = system_brand_logo_url();
+            @endphp
+            @if($systemBrandLogoUrl)
+                <img src="{{ $systemBrandLogoUrl }}" alt="{{ system_brand_name() }}" class="w-10 h-10 rounded-lg object-cover border border-border" />
+            @else
+                <div class="w-10 h-10 gradient-primary rounded-lg flex items-center justify-center">
+                    <i data-lucide="printer" class="h-6 w-6 text-white"></i>
+                </div>
+            @endif
             <div>
                 <span class="text-xl font-bold gradient-primary bg-clip-text text-transparent">
-                    UniPrint
+                    {{ system_brand_name() }}
                 </span>
-                <p class="text-xs text-foreground/70">Smart Printing Services</p>
+                <p class="text-xs text-foreground/70">{{ system_brand_tagline() }}</p>
             </div>
         </a>
 
@@ -20,7 +82,7 @@
             <a href="{{ route('ai-design.index') }}" class="text-sm font-medium text-foreground hover:text-primary transition-smooth">
                 AI Design
             </a>
-            @if(session('user_id'))
+            @if(session('user_id') && $headerRoleType === 'customer')
                 <a href="{{ route('customer.orders') }}" class="text-sm font-medium text-foreground hover:text-primary transition-smooth">
                     My Orders
                 </a>
@@ -60,19 +122,27 @@
                                 <i data-lucide="palette" class="h-5 w-5"></i>
                                 AI Design
                             </a>
+                            @if($showBusinessVerifyCta)
+                                <a href="{{ route('business.verification') }}" class="flex items-center gap-3 px-3 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-smooth">
+                                    <i data-lucide="badge-check" class="h-5 w-5"></i>
+                                    Verify now
+                                </a>
+                            @endif
                             @if(session('user_id'))
-                                <a href="{{ route('customer.dashboard') }}" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent transition-smooth">
-                                    <i data-lucide="layout-dashboard" class="h-5 w-5"></i>
-                                    Dashboard
-                                </a>
-                                <a href="{{ route('customer.orders') }}" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent transition-smooth">
-                                    <i data-lucide="package" class="h-5 w-5"></i>
-                                    My Orders
-                                </a>
-                                <a href="{{ route('customer.saved-services') }}" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent transition-smooth">
-                                    <i data-lucide="heart" class="h-5 w-5"></i>
-                                    Saved Services
-                                </a>
+                                @if($headerRoleType === 'customer')
+                                    <a href="{{ route('customer.dashboard') }}" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent transition-smooth">
+                                        <i data-lucide="layout-dashboard" class="h-5 w-5"></i>
+                                        Dashboard
+                                    </a>
+                                    <a href="{{ route('customer.orders') }}" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent transition-smooth">
+                                        <i data-lucide="package" class="h-5 w-5"></i>
+                                        My Orders
+                                    </a>
+                                    <a href="{{ route('customer.saved-services') }}" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent transition-smooth">
+                                        <i data-lucide="heart" class="h-5 w-5"></i>
+                                        Saved Services
+                                    </a>
+                                @endif
                                 <div class="border-t border-border my-2"></div>
                                 <a href="{{ route('profile.index') }}" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent transition-smooth">
                                     <i data-lucide="settings" class="h-5 w-5"></i>
@@ -96,44 +166,73 @@
                 </div>
             </div>
 
-            @if(session('user_id'))
-                <!-- Saved Services Button (replaces Cart) -->
-                <a href="{{ route('customer.saved-services') }}" class="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-border hover:bg-accent hover:text-accent-foreground transition-smooth relative">
-                    <i data-lucide="heart" class="h-5 w-5"></i>
-                    <span class="hidden md:inline text-sm font-medium">Saved Services</span>
-                    @php
-                        $savedServicesCount = \App\Models\SavedService::where('user_id', session('user_id'))->count();
-                    @endphp
-                    @if($savedServicesCount > 0)
-                        <span class="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center saved-services-count">
-                            {{ $savedServicesCount }}
-                        </span>
-                    @endif
+            @if($showBusinessVerifyCta)
+                <a href="{{ route('business.verification') }}" class="hidden md:inline-flex items-center gap-2 px-3 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-smooth">
+                    <i data-lucide="badge-check" class="h-5 w-5"></i>
+                    <span class="text-sm font-semibold">Verify now</span>
                 </a>
+            @endif
+
+            @if(session('user_id'))
+                @if($headerRoleType === 'customer')
+                    <!-- Saved Services Button (replaces Cart) -->
+                    <a href="{{ route('customer.saved-services') }}" class="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-border hover:bg-accent hover:text-accent-foreground transition-smooth relative">
+                        <i data-lucide="heart" class="h-5 w-5"></i>
+                        <span class="hidden md:inline text-sm font-medium">Saved Services</span>
+                        @php
+                            $savedServicesCount = \App\Models\SavedService::where('user_id', session('user_id'))->count();
+                        @endphp
+                        @if($savedServicesCount > 0)
+                            <span class="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center saved-services-count">
+                                {{ $savedServicesCount }}
+                            </span>
+                        @endif
+                    </a>
+                @endif
 
                 <!-- Notifications -->
                 @php
-                    $unreadNotificationsCount = \Illuminate\Support\Facades\Schema::hasTable('order_notifications')
-                        ? \Illuminate\Support\Facades\DB::table('order_notifications')
-                            ->where('recipient_id', session('user_id'))
-                            ->where('is_read', false)
-                            ->count()
-                        : 0;
+                    $roleType = $headerRoleType;
+
+                    $notificationsRouteName = 'customer.notifications';
+                    $notificationsReadRouteName = 'customer.notifications.read';
+                    if ($roleType === 'business_user') {
+                        $notificationsRouteName = 'business.notifications';
+                        $notificationsReadRouteName = 'business.notifications.read';
+                    } elseif ($roleType === 'admin') {
+                        $notificationsRouteName = 'profile.notifications';
+                        $notificationsReadRouteName = 'profile.notifications.read';
+                    }
+
+                    $unreadNotificationsCount = 0;
+                    if ($roleType === 'admin') {
+                        $unreadNotificationsCount = \Illuminate\Support\Facades\Schema::hasTable('notifications')
+                            ? \Illuminate\Support\Facades\DB::table('notifications')
+                                ->where('user_id', session('user_id'))
+                                ->where('is_read', false)
+                                ->count()
+                            : 0;
+                    } else {
+                        $unreadNotificationsCount = \Illuminate\Support\Facades\Schema::hasTable('order_notifications')
+                            ? \Illuminate\Support\Facades\DB::table('order_notifications')
+                                ->where('recipient_id', session('user_id'))
+                                ->where('is_read', false)
+                                ->count()
+                            : 0;
+                    }
                 @endphp
                 <div x-data="notificationsModal()" class="relative">
                     <button type="button"
                             @click="open()"
                             class="inline-flex items-center justify-center h-10 w-10 rounded-md hover:bg-accent hover:text-accent-foreground transition-smooth relative"
                             aria-label="Notifications"
-                            data-notifications-url="{{ route('customer.notifications') }}"
-                            data-notification-read-url-template="{{ route('customer.notifications.read', ['id' => '___ID___']) }}">
+                            data-notifications-url="{{ route($notificationsRouteName, [], false) }}"
+                            data-notification-read-url-template="{{ route($notificationsReadRouteName, ['id' => '___ID___'], false) }}">
                         <i data-lucide="bell" class="h-5 w-5"></i>
-                        @if($unreadNotificationsCount > 0)
-                            <span class="absolute -top-1 -right-1 bg-destructive text-white text-xs font-bold rounded-full h-4 min-w-4 px-1 flex items-center justify-center"
-                                  x-ref="badge">
-                                {{ $unreadNotificationsCount > 9 ? '9+' : $unreadNotificationsCount }}
-                            </span>
-                        @endif
+                        <span class="absolute -top-1 -right-1 bg-destructive text-white text-xs font-bold rounded-full h-4 min-w-4 px-1 flex items-center justify-center"
+                              x-ref="badge" @if($unreadNotificationsCount <= 0) style="display: none;" @endif>
+                            {{ $unreadNotificationsCount > 9 ? '9+' : $unreadNotificationsCount }}
+                        </span>
                     </button>
 
                     <div x-show="isOpen" x-transition.opacity
@@ -153,15 +252,13 @@
                             </div>
 
                             <div class="max-h-[70vh] overflow-auto">
-                                <template x-if="loading">
-                                    <div class="p-6 text-sm text-muted-foreground">Loading...</div>
-                                </template>
-
-                                <template x-if="!loading && items.length === 0">
+                                <template x-if="loadedOnce && items.length === 0">
                                     <div class="p-8 text-center">
-                                        <i data-lucide="bell-off" class="h-12 w-12 mx-auto mb-3 text-muted-foreground"></i>
-                                        <div class="text-sm font-semibold">No notifications</div>
-                                        <div class="text-xs text-muted-foreground mt-1">You're all caught up.</div>
+                                        <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-accent/50 mb-4">
+                                            <i data-lucide="bell-off" class="h-7 w-7 text-muted-foreground"></i>
+                                        </div>
+                                        <p class="font-semibold">No notifications</p>
+                                        <p class="text-sm text-muted-foreground">You're all caught up.</p>
                                     </div>
                                 </template>
 
@@ -196,7 +293,7 @@
                             </div>
 
                             <div class="px-4 py-3 border-t border-border flex items-center justify-between">
-                                <a href="{{ route('customer.notifications') }}" class="text-xs text-muted-foreground hover:text-foreground transition-smooth">View all</a>
+                                <div></div>
                                 <button type="button" class="text-xs text-muted-foreground hover:text-foreground transition-smooth" @click="refresh()">Refresh</button>
                             </div>
                         </div>
@@ -282,8 +379,18 @@
         return {
             isOpen: false,
             loading: false,
+            loadedOnce: false,
             items: [],
             unreadCount: null,
+            pollId: null,
+            normalizeUrl(url) {
+                try {
+                    const u = new URL(url, window.location.href);
+                    return u.pathname + u.search + u.hash;
+                } catch (e) {
+                    return url;
+                }
+            },
             init() {
                 window.addEventListener('open-notifications', () => {
                     this.open();
@@ -292,6 +399,7 @@
             open() {
                 this.isOpen = true;
                 this.refresh();
+                this.startPolling();
                 this.$nextTick(() => {
                     if (typeof lucide !== 'undefined') {
                         lucide.createIcons();
@@ -300,6 +408,21 @@
             },
             close() {
                 this.isOpen = false;
+                this.stopPolling();
+            },
+            startPolling() {
+                this.stopPolling();
+                this.pollId = window.setInterval(() => {
+                    if (this.isOpen) {
+                        this.refresh();
+                    }
+                }, 8000);
+            },
+            stopPolling() {
+                if (this.pollId) {
+                    window.clearInterval(this.pollId);
+                    this.pollId = null;
+                }
             },
             notificationsUrl() {
                 return this.$el.querySelector('[data-notifications-url]')?.getAttribute('data-notifications-url');
@@ -313,9 +436,11 @@
                 if (!url) return;
                 this.loading = true;
                 try {
-                    const res = await fetch(url, {
+                    const res = await fetch(this.normalizeUrl(url), {
+                        credentials: 'same-origin',
                         headers: {
-                            'Accept': 'application/json'
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
                         }
                     });
                     const data = await res.json();
@@ -327,6 +452,7 @@
                 } catch (e) {
                 } finally {
                     this.loading = false;
+                    this.loadedOnce = true;
                     this.$nextTick(() => {
                         if (typeof lucide !== 'undefined') {
                             lucide.createIcons();
@@ -339,11 +465,13 @@
                 if (!url) return;
                 try {
                     const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-                    const res = await fetch(url, {
+                    const res = await fetch(this.normalizeUrl(url), {
                         method: 'POST',
+                        credentials: 'same-origin',
                         headers: {
                             'Accept': 'application/json',
                             'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
                             ...(token ? { 'X-CSRF-TOKEN': token } : {})
                         },
                         body: JSON.stringify({})
@@ -369,9 +497,10 @@
                 if (!el) return;
                 if (typeof this.unreadCount !== 'number') return;
                 if (this.unreadCount <= 0) {
-                    el.remove();
+                    el.style.display = 'none';
                     return;
                 }
+                el.style.display = 'flex';
                 el.textContent = this.unreadCount > 9 ? '9+' : String(this.unreadCount);
             },
             iconName(type) {

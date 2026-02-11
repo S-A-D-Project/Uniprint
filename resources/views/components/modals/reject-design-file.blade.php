@@ -1,5 +1,5 @@
 <x-ui.modal id="rejectDesignFileModal" title="Reject Design File" size="md" centered>
-    <form id="rejectDesignFileForm" method="POST" data-up-global-loader>
+    <form id="rejectDesignFileForm" method="POST">
         @csrf
         <div class="space-y-4">
             <div>

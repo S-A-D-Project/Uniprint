@@ -15,6 +15,52 @@ $breadcrumbs = [
 
 <!-- System Actions Grid -->
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+    <x-admin.card title="Branding" icon="image">
+        <p class="text-sm text-muted-foreground mb-4">
+            Update the system name and logo shown across the application.
+        </p>
+
+        <form action="{{ route('admin.settings.branding') }}" method="POST" enctype="multipart/form-data" class="space-y-3">
+            @csrf
+
+            <div>
+                <label class="block text-sm font-medium mb-2">System name</label>
+                <input
+                    type="text"
+                    name="brand_name"
+                    value="{{ old('brand_name', system_brand_name()) }}"
+                    class="admin-form-input w-full"
+                    required
+                />
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium mb-2">Tagline</label>
+                <input
+                    type="text"
+                    name="brand_tagline"
+                    value="{{ old('brand_tagline', system_brand_tagline()) }}"
+                    class="admin-form-input w-full"
+                />
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium mb-2">Logo</label>
+                <input type="file" name="brand_logo" accept="image/*" class="admin-form-input w-full" />
+                @if(system_brand_logo_url())
+                    <div class="mt-3">
+                        <img src="{{ system_brand_logo_url() }}" alt="{{ system_brand_name() }}" class="h-16 w-16 rounded-lg border border-border object-cover" />
+                    </div>
+                @endif
+                <div class="text-xs text-muted-foreground mt-2">Recommended: square image, at least 256x256.</div>
+            </div>
+
+            <x-admin.button type="submit" variant="primary" icon="save" class="w-full">
+                Save Branding
+            </x-admin.button>
+        </form>
+    </x-admin.card>
+
     <!-- Backup Management -->
     <x-admin.card title="Database Backup" icon="database">
         <p class="text-sm text-muted-foreground mb-4">
@@ -83,6 +129,62 @@ $breadcrumbs = [
 
             <x-admin.button type="submit" variant="primary" icon="save" class="w-full">
                 Save Automation Settings
+            </x-admin.button>
+        </form>
+    </x-admin.card>
+
+    <x-admin.card title="Overdue Orders" icon="alert-triangle">
+        <p class="text-sm text-muted-foreground mb-4">
+            Configure how the system handles orders that are overdue for too long.
+        </p>
+
+        <form action="{{ route('admin.settings.order-overdue-cancel-days') }}" method="POST" class="space-y-3">
+            @csrf
+            <div>
+                <label class="block text-sm font-medium mb-2">Auto-cancel after overdue (days)</label>
+                <input
+                    type="number"
+                    name="order_overdue_cancel_days"
+                    min="1"
+                    max="365"
+                    value="{{ (int) ($overdueCancelDays ?? 14) }}"
+                    class="admin-form-input w-full"
+                    required
+                />
+                <div class="text-xs text-muted-foreground mt-2">Default is 14 days.</div>
+            </div>
+
+            <x-admin.button type="submit" variant="primary" icon="save" class="w-full">
+                Save Overdue Settings
+            </x-admin.button>
+        </form>
+    </x-admin.card>
+
+    <!-- Tax Rate -->
+    <x-admin.card title="Tax Rate" icon="percent">
+        <p class="text-sm text-muted-foreground mb-4">
+            Configure the system-wide tax rate used during checkout and pricing.
+        </p>
+
+        <form action="{{ route('admin.settings.tax-rate') }}" method="POST" class="space-y-3">
+            @csrf
+            <div>
+                <label class="block text-sm font-medium mb-2">Tax rate (%)</label>
+                <input
+                    type="number"
+                    name="tax_rate"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value="{{ (float) ($taxRatePercent ?? 12) }}"
+                    class="admin-form-input w-full"
+                    required
+                />
+                <div class="text-xs text-muted-foreground mt-2">Example: 12 for 12% VAT.</div>
+            </div>
+
+            <x-admin.button type="submit" variant="primary" icon="save" class="w-full">
+                Save Tax Rate
             </x-admin.button>
         </form>
     </x-admin.card>

@@ -38,14 +38,32 @@
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium mb-2">Service Image</label>
-                    @if(!empty($service->image_path))
+                    <label class="block text-sm font-medium mb-2">Service Images</label>
+                    @if(isset($serviceImages) && $serviceImages->count() > 0)
+                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
+                            @foreach($serviceImages as $img)
+                                <div class="relative">
+                                    <img src="{{ \Illuminate\Support\Facades\Storage::url($img->image_path) }}" alt="Service image" class="w-full h-24 object-cover rounded-lg border border-border" />
+                                    @if(!empty($img->is_primary))
+                                        <span class="absolute top-2 left-2 text-[10px] bg-primary text-primary-foreground px-2 py-1 rounded-md">Primary</span>
+                                    @else
+                                        <button type="button"
+                                                class="absolute top-2 left-2 text-[10px] bg-secondary text-secondary-foreground px-2 py-1 rounded-md hover:opacity-90"
+                                                onclick="setServicePrimaryImage('{{ $service->service_id }}', '{{ $img->image_id }}')">
+                                            Set Primary
+                                        </button>
+                                    @endif
+                                </div>
+                            @endforeach
+                        </div>
+                    @elseif(!empty($service->image_path))
                         <div class="mb-3">
-                            <img src="{{ asset('storage/' . $service->image_path) }}" alt="Service image" class="w-full max-w-md rounded-lg border border-border" />
+                            <img src="{{ \Illuminate\Support\Facades\Storage::url($service->image_path) }}" alt="Service image" class="w-full max-w-md rounded-lg border border-border" />
                         </div>
                     @endif
-                    <input type="file" name="image" accept="image/png,image/jpeg,image/webp"
+                    <input type="file" name="images[]" accept="image/png,image/jpeg,image/webp" multiple
                            class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
+                    <div class="mt-2 text-xs text-muted-foreground">You can select multiple images at once to add to this service.</div>
                 </div>
 
                 <div>
@@ -85,6 +103,13 @@
                             value="cash"
                             :checked="in_array('cash', old('allowed_payment_methods', $allowedPaymentMethods))"
                             label="Cash"
+                        />
+                        <x-ui.form.checkbox
+                            name="allowed_payment_methods[]"
+                            id="pm_paypal"
+                            value="paypal"
+                            :checked="in_array('paypal', old('allowed_payment_methods', $allowedPaymentMethods))"
+                            label="PayPal"
                         />
                     </div>
                 </div>
@@ -129,6 +154,15 @@
                     </div>
                 @endif
 
+                @if(\Illuminate\Support\Facades\Schema::hasColumn('services', 'supports_rush'))
+                    <x-ui.form.switch
+                        name="supports_rush"
+                        id="supports_rush"
+                        :checked="old('supports_rush', !empty($service->supports_rush))"
+                        label="Supports Rush"
+                    />
+                @endif
+
                 <div class="flex gap-3 pt-4">
                     <a href="{{ route('business.services.index') }}" 
                        class="flex-1 px-6 py-3 text-center border border-input rounded-lg hover:bg-secondary transition-smooth">
@@ -143,4 +177,38 @@
         </form>
     </div>
 </div>
+
+<script>
+async function setServicePrimaryImage(serviceId, imageId) {
+    try {
+        const url = `{{ route('business.services.images.primary', [':serviceId', ':imageId']) }}`
+            .replace(':serviceId', serviceId)
+            .replace(':imageId', imageId);
+
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            }
+        });
+
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data || data.success !== true) {
+            throw new Error((data && data.message) ? data.message : 'Failed to set primary image');
+        }
+
+        if (window.UniPrintUI && typeof window.UniPrintUI.toast === 'function') {
+            window.UniPrintUI.toast(data.message || 'Updated.', { variant: 'success' });
+        }
+
+        window.location.reload();
+    } catch (err) {
+        if (window.UniPrintUI && typeof window.UniPrintUI.toast === 'function') {
+            window.UniPrintUI.toast(err.message || 'Failed to set primary image.', { variant: 'danger' });
+        }
+    }
+}
+</script>
 @endsection

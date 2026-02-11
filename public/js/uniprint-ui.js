@@ -246,19 +246,50 @@
         const form = e.target;
         if (!(form instanceof HTMLFormElement)) return;
 
-        if (form.hasAttribute('data-up-global-loader')) {
-          showLoading({
-            title: form.getAttribute('data-up-loader-title') || 'Processing…',
-            message: form.getAttribute('data-up-loader-message') || 'Please wait',
-          });
+        if (form.hasAttribute('data-up-no-loader') || form.hasAttribute('data-up-no-button-loader')) {
+          return;
         }
 
-        if (form.hasAttribute('data-up-button-loader')) {
-          const submitBtn = form.querySelector('button[type="submit"], input[type="submit"]');
-          if (submitBtn && submitBtn.tagName.toLowerCase() === 'button') {
-            setButtonLoading(submitBtn, true, { text: submitBtn.getAttribute('data-up-loading-text') || 'Working…' });
+        const method = String(form.getAttribute('method') || 'GET').toUpperCase();
+        if (method === 'GET') {
+          return;
+        }
+
+        if (form.hasAttribute('data-up-global-loader')) {
+          if (!form.closest('.modal')) {
+            showLoading({
+              title: form.getAttribute('data-up-loader-title') || 'Processing…',
+              message: form.getAttribute('data-up-loader-message') || 'Please wait',
+            });
           }
         }
+
+        const submitter = e.submitter;
+        const submitBtn = submitter && (submitter instanceof HTMLElement)
+          ? submitter
+          : form.querySelector('button[type="submit"], input[type="submit"]');
+
+        const loadingText =
+          (submitBtn && submitBtn.getAttribute && submitBtn.getAttribute('data-up-loading-text')) ||
+          form.getAttribute('data-up-loading-text') ||
+          'Working…';
+
+        if (submitBtn) {
+          const tag = submitBtn.tagName.toLowerCase();
+          if (tag === 'button') {
+            setButtonLoading(submitBtn, true, { text: loadingText });
+          } else if (tag === 'input') {
+            if (!submitBtn.dataset.upOrigValue) submitBtn.dataset.upOrigValue = submitBtn.value;
+            submitBtn.disabled = true;
+            submitBtn.value = loadingText;
+          }
+        }
+
+        const allSubmitControls = form.querySelectorAll('button[type="submit"], input[type="submit"]');
+        allSubmitControls.forEach((ctrl) => {
+          if (submitBtn && ctrl === submitBtn) return;
+          ctrl.disabled = true;
+        });
       },
       true
     );

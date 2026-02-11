@@ -76,7 +76,7 @@ return new class extends Migration
 
         // Pricing system indexes - skip, tables may not exist
 
-        // Inventory system indexes - skip, tables may not exist
+        
 
         // Order status tracking indexes
         if (Schema::hasTable('order_status_history')) {
@@ -174,7 +174,7 @@ return new class extends Migration
 
         // Pricing system indexes - skip
 
-        // Inventory system indexes - skip
+        
 
         // Order status tracking indexes
         if (Schema::hasTable('order_status_history')) {

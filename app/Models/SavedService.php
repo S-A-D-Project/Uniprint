@@ -142,6 +142,43 @@ class SavedService extends Model
         if (!empty($missing)) {
             throw new \InvalidArgumentException('Please fill in required fields: ' . implode(', ', $missing));
         }
+
+        if (\Illuminate\Support\Facades\Schema::hasColumn('services', 'supports_custom_size') && !empty($service->supports_custom_size)) {
+            $customSizeOptionId = DB::table('customization_options')
+                ->where('service_id', $serviceId)
+                ->whereRaw('LOWER(option_type) = ?', ['size'])
+                ->whereRaw('LOWER(option_name) = ?', ['custom size'])
+                ->value('option_id');
+
+            $customSizeSelected = $customSizeOptionId && in_array((string) $customSizeOptionId, $customizations, true);
+
+            if ($customSizeSelected) {
+                $wRaw = $customFields['custom_size_width'] ?? null;
+                $hRaw = $customFields['custom_size_height'] ?? null;
+
+                if ($wRaw === null || $hRaw === null) {
+                    throw new \InvalidArgumentException('Please enter both custom width and height.');
+                }
+
+                $w = (float) $wRaw;
+                $h = (float) $hRaw;
+
+                if ($w <= 0 || $h <= 0) {
+                    throw new \InvalidArgumentException('Custom width and height must be greater than 0.');
+                }
+
+                $minW = \Illuminate\Support\Facades\Schema::hasColumn('services', 'custom_size_min_width') ? (float) ($service->custom_size_min_width ?? 0) : 0;
+                $maxW = \Illuminate\Support\Facades\Schema::hasColumn('services', 'custom_size_max_width') ? (float) ($service->custom_size_max_width ?? 0) : 0;
+                $minH = \Illuminate\Support\Facades\Schema::hasColumn('services', 'custom_size_min_height') ? (float) ($service->custom_size_min_height ?? 0) : 0;
+                $maxH = \Illuminate\Support\Facades\Schema::hasColumn('services', 'custom_size_max_height') ? (float) ($service->custom_size_max_height ?? 0) : 0;
+
+                if (($minW > 0 && $w < $minW) || ($maxW > 0 && $w > $maxW) || ($minH > 0 && $h < $minH) || ($maxH > 0 && $h > $maxH)) {
+                    throw new \InvalidArgumentException('Custom size is out of the allowed range.');
+                }
+            } else {
+                unset($customFields['custom_size_width'], $customFields['custom_size_height']);
+            }
+        }
         
         // Calculate price including customizations
         $unitPrice = $service->base_price;

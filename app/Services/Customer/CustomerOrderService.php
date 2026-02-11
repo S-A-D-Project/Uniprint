@@ -315,16 +315,24 @@ class CustomerOrderService
             )
             ->get();
 
-        foreach ($items as $item) {
-            $item->customizations = DB::table('order_item_customizations')
+        $itemIds = $items->pluck('item_id')->filter()->values();
+        $customizationsByItemId = collect();
+        if ($itemIds->isNotEmpty()) {
+            $customizationsByItemId = DB::table('order_item_customizations')
                 ->join('customization_options', 'order_item_customizations.option_id', '=', 'customization_options.option_id')
-                ->where('order_item_customizations.order_item_id', $item->item_id)
+                ->whereIn('order_item_customizations.order_item_id', $itemIds)
                 ->select(
+                    'order_item_customizations.order_item_id',
                     'customization_options.option_name',
                     'customization_options.option_type',
                     'order_item_customizations.price_snapshot'
                 )
-                ->get();
+                ->get()
+                ->groupBy('order_item_id');
+        }
+
+        foreach ($items as $item) {
+            $item->customizations = $customizationsByItemId->get($item->item_id, collect());
         }
 
         return $items;
@@ -412,11 +420,35 @@ class CustomerOrderService
         $subtotal = 0;
         $processedItems = [];
 
-        foreach ($items as $item) {
-            $service = DB::table('services')
-                ->where('service_id', $item['service_id'])
+        $serviceIds = collect($items)->pluck('service_id')->filter()->unique()->values();
+        $servicesById = collect();
+        if ($serviceIds->isNotEmpty()) {
+            $servicesById = DB::table('services')
+                ->whereIn('service_id', $serviceIds)
                 ->where('is_active', true)
-                ->first();
+                ->get()
+                ->keyBy('service_id');
+        }
+
+        $allOptionIds = collect($items)
+            ->flatMap(function ($item) {
+                $ids = $item['customizations'] ?? [];
+                return is_array($ids) ? $ids : [];
+            })
+            ->filter()
+            ->unique()
+            ->values();
+
+        $optionsById = collect();
+        if ($allOptionIds->isNotEmpty()) {
+            $optionsById = DB::table('customization_options')
+                ->whereIn('option_id', $allOptionIds)
+                ->get()
+                ->keyBy('option_id');
+        }
+
+        foreach ($items as $item) {
+            $service = $servicesById->get($item['service_id']);
 
             if (!$service) {
                 throw new \Exception("Service {$item['service_id']} not available");
@@ -427,10 +459,7 @@ class CustomerOrderService
             // Calculate customization costs
             if (!empty($item['customizations'])) {
                 foreach ($item['customizations'] as $optionId) {
-                    $option = DB::table('customization_options')
-                        ->where('option_id', $optionId)
-                        ->first();
-                    
+                    $option = $optionsById->get($optionId);
                     if ($option) {
                         $itemSubtotal += $option->price_modifier * $item['quantity'];
                     }

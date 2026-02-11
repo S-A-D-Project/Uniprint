@@ -6,15 +6,15 @@
     <div class="min-h-screen bg-background">
         <main class="container mx-auto px-4 py-8">
             <div class="mb-6">
-                <div class="flex items-center gap-2 text-sm text-muted-foreground">
+                <nav class="flex items-center gap-2 text-sm text-muted-foreground" aria-label="Breadcrumb">
                     <a href="{{ route('home') }}" class="hover:text-primary">Home</a>
                     <i data-lucide="chevron-right" class="h-4 w-4"></i>
-                    <a href="{{ route('customer.enterprises') }}" class="hover:text-primary">Shops</a>
+                    <a href="{{ route('customer.marketplace') }}" class="hover:text-primary">Shops</a>
                     <i data-lucide="chevron-right" class="h-4 w-4"></i>
                     <a href="{{ route('customer.enterprise.services', $service->enterprise_id) }}" class="hover:text-primary">{{ $service->enterprise->name ?? 'Unknown Shop' }}</a>
                     <i data-lucide="chevron-right" class="h-4 w-4"></i>
-                    <span class="text-foreground">{{ $service->service_name }}</span>
-                </div>
+                    <span class="text-foreground font-medium">{{ $service->service_name }}</span>
+                </nav>
             </div>
 
             <div class="grid lg:grid-cols-2 gap-8">
@@ -35,10 +35,17 @@
                                 {{ $service->enterprise->name ?? 'Unknown Shop' }}
                             </a>
 
-                            <a href="{{ route('customer.enterprise.services', $service->enterprise_id) }}" class="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary">
-                                <i data-lucide="arrow-left" class="h-4 w-4"></i>
-                                Back to shop
-                            </a>
+                            <div class="flex items-center gap-2">
+                                <a href="{{ route('customer.enterprise.services', $service->enterprise_id) }}" class="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary">
+                                    <i data-lucide="arrow-left" class="h-4 w-4"></i>
+                                    Back to shop
+                                </a>
+
+                                <button type="button" class="inline-flex items-center gap-2 text-sm border border-destructive text-destructive px-3 py-2 rounded-md hover:bg-destructive/10 transition-smooth" data-up-report data-entity-type="service" data-service-id="{{ $service->service_id }}">
+                                    <i data-lucide="flag" class="h-4 w-4"></i>
+                                    Report
+                                </button>
+                            </div>
                         </div>
 
                         <div class="flex flex-wrap gap-2">
@@ -89,15 +96,21 @@
 
                             @if(isset($customizationGroups) && $customizationGroups->count() > 0)
                                 @foreach($customizationGroups as $type => $options)
-                                    @php
-                                        $groupKey = \Illuminate\Support\Str::slug($type);
-                                    @endphp
                                     <div>
                                         <div class="text-sm font-medium mb-2">{{ $type }}</div>
                                         <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                            @php
+                                                $oldSelected = old('customizations', []);
+                                                if (!is_array($oldSelected)) {
+                                                    $oldSelected = [];
+                                                }
+                                            @endphp
                                             @foreach($options as $option)
+                                                @php
+                                                    $isChecked = in_array($option->option_id, $oldSelected, true);
+                                                @endphp
                                                 <label class="cursor-pointer">
-                                                    <input type="radio" name="customizations[{{ $groupKey }}]" value="{{ $option->option_id }}" class="sr-only peer" data-price="{{ $option->price_modifier }}" onchange="updatePrice()">
+                                                    <input type="checkbox" name="customizations[]" value="{{ $option->option_id }}" class="sr-only peer" data-price="{{ $option->price_modifier }}" data-option-type="{{ $option->option_type }}" data-option-name="{{ $option->option_name }}" onchange="updatePrice()" {{ $isChecked ? 'checked' : '' }}>
                                                     <div class="border border-input rounded-md px-3 py-2 text-sm hover:bg-secondary transition-smooth peer-checked:border-primary peer-checked:bg-primary/5">
                                                         <div class="flex items-center justify-between gap-2">
                                                             <span class="line-clamp-1">{{ $option->option_name }}</span>
@@ -111,6 +124,58 @@
                                                 </label>
                                             @endforeach
                                         </div>
+
+                                        @php
+                                            $supportsCustomSize = \Illuminate\Support\Facades\Schema::hasColumn('services', 'supports_custom_size')
+                                                ? !empty($service->supports_custom_size)
+                                                : false;
+                                            $unit = $service->custom_size_unit ?? '';
+                                            $minW = $service->custom_size_min_width ?? null;
+                                            $maxW = $service->custom_size_max_width ?? null;
+                                            $minH = $service->custom_size_min_height ?? null;
+                                            $maxH = $service->custom_size_max_height ?? null;
+                                        @endphp
+
+                                        @if($supportsCustomSize && strtolower((string) $type) === 'size')
+                                            <div id="customSizeFields" class="mt-3 hidden" data-service-unit="{{ $unit }}" data-min-w="{{ $minW }}" data-max-w="{{ $maxW }}" data-min-h="{{ $minH }}" data-max-h="{{ $maxH }}">
+                                                <div class="text-sm font-medium mb-2">Custom Size</div>
+
+                                                <div class="mb-3">
+                                                    <label class="block text-xs text-muted-foreground mb-1" for="custom_size_unit_select">Unit</label>
+                                                    @php
+                                                        $serviceUnit = is_string($unit) && $unit !== '' ? strtolower($unit) : 'in';
+                                                    @endphp
+                                                    <select id="custom_size_unit_select" class="w-full px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
+                                                        <option value="in" {{ $serviceUnit === 'in' ? 'selected' : '' }}>in</option>
+                                                        <option value="cm" {{ $serviceUnit === 'cm' ? 'selected' : '' }}>cm</option>
+                                                        <option value="mm" {{ $serviceUnit === 'mm' ? 'selected' : '' }}>mm</option>
+                                                    </select>
+                                                    <div class="mt-1 text-[11px] text-muted-foreground">You can enter in any unit. We will convert it automatically.</div>
+                                                </div>
+
+                                                <div class="grid grid-cols-2 gap-3">
+                                                    <div>
+                                                        <label class="block text-xs text-muted-foreground mb-1" for="custom_size_width">Width <span id="custom_size_unit_label_w">{{ $unit ? "({$unit})" : '' }}</span></label>
+                                                        <input type="number"
+                                                               id="custom_size_width"
+                                                               name="custom_fields[custom_size_width]"
+                                                               step="0.01"
+                                                               class="w-full px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                                                               placeholder="" />
+                                                    </div>
+                                                    <div>
+                                                        <label class="block text-xs text-muted-foreground mb-1" for="custom_size_height">Height <span id="custom_size_unit_label_h">{{ $unit ? "({$unit})" : '' }}</span></label>
+                                                        <input type="number"
+                                                               id="custom_size_height"
+                                                               name="custom_fields[custom_size_height]"
+                                                               step="0.01"
+                                                               class="w-full px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                                                               placeholder="" />
+                                                    </div>
+                                                </div>
+                                                <div class="mt-2 text-xs text-muted-foreground" id="custom_size_range_help">Enter width and height within the allowed range.</div>
+                                            </div>
+                                        @endif
                                     </div>
                                 @endforeach
                             @endif
@@ -205,11 +270,13 @@
                                         <i data-lucide="images" class="h-4 w-4"></i>
                                         My Designs
                                     </a>
-                                    <a href="{{ route('customer.orders') }}"
-                                       class="inline-flex items-center gap-2 px-3 py-2 text-sm border border-input rounded-md hover:bg-accent hover:text-accent-foreground transition-smooth">
-                                        <i data-lucide="package" class="h-4 w-4"></i>
-                                        My Orders
-                                    </a>
+                                    <button type="button"
+                                            onclick="scrollToDesignUpload()"
+                                            class="inline-flex items-center gap-2 px-3 py-2 text-sm border border-input rounded-md hover:bg-accent hover:text-accent-foreground transition-smooth {{ $uploadEnabled ? '' : 'opacity-50 cursor-not-allowed' }}"
+                                            {{ $uploadEnabled ? '' : 'disabled' }}>
+                                        <i data-lucide="upload" class="h-4 w-4"></i>
+                                        Upload
+                                    </button>
                                 </div>
                             </div>
 
@@ -255,11 +322,52 @@
                     {{ $service->description ?? 'No description available.' }}
                 </div>
             </div>
+
+            <div class="mt-6 bg-card border border-border rounded-xl p-6">
+                <h3 class="text-xl font-bold mb-3">Reviews</h3>
+                @if(isset($reviews) && $reviews->count() > 0)
+                    <div class="space-y-4">
+                        @foreach($reviews as $review)
+                            <div class="border border-border rounded-lg p-4">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div>
+                                        <div class="font-semibold">{{ $review->customer_name ?? 'Customer' }}</div>
+                                        <div class="text-sm text-muted-foreground">
+                                            @for($i = 1; $i <= 5; $i++)
+                                                @if($i <= (int) ($review->rating ?? 0))
+                                                    <span class="text-yellow-500">★</span>
+                                                @else
+                                                    <span class="text-muted-foreground">★</span>
+                                                @endif
+                                            @endfor
+                                            @if(!empty($review->created_at))
+                                                <span class="ml-2">{{ is_string($review->created_at) ? date('M d, Y', strtotime($review->created_at)) : \Carbon\Carbon::parse($review->created_at)->format('M d, Y') }}</span>
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
+                                @if(!empty($review->comment))
+                                    <div class="mt-3 text-sm text-muted-foreground whitespace-pre-line">{{ $review->comment }}</div>
+                                @endif
+                            </div>
+                        @endforeach
+                    </div>
+                @else
+                    <div class="text-sm text-muted-foreground">No reviews yet.</div>
+                @endif
+            </div>
         </main>
     </div>
 
 <script>
 const basePrice = {{ (float) $service->base_price }};
+
+function scrollToDesignUpload() {
+    const el = document.getElementById('design_files');
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    try { el.focus(); } catch (e) {}
+}
 
 function changeQuantity(change) {
     const input = document.getElementById('quantity');
@@ -274,7 +382,7 @@ function updatePrice() {
     const qty = parseInt(document.getElementById('quantity')?.value || '1', 10);
     let total = basePrice;
 
-    document.querySelectorAll('#orderForm input[name^="customizations"]:checked').forEach((input) => {
+    document.querySelectorAll('#orderForm input[name="customizations[]"]:checked').forEach((input) => {
         const price = parseFloat(input.dataset.price || '0');
         if (!Number.isNaN(price)) total += price;
     });
@@ -282,6 +390,99 @@ function updatePrice() {
     total *= qty;
     const el = document.getElementById('totalPrice');
     if (el) el.textContent = total.toFixed(2);
+
+    updateCustomSizeVisibility();
+}
+
+function isCustomSizeSelected() {
+    const selected = Array.from(document.querySelectorAll('#orderForm input[name="customizations[]"]:checked[data-option-type][data-option-name]'));
+    if (!selected.length) return false;
+    return selected.some((el) => {
+        const type = String(el.dataset.optionType || '').trim().toLowerCase();
+        const name = String(el.dataset.optionName || '').trim().toLowerCase();
+        return type === 'size' && name === 'custom size';
+    });
+}
+
+function updateCustomSizeVisibility() {
+    const wrap = document.getElementById('customSizeFields');
+    if (!wrap) return;
+
+    const selected = isCustomSizeSelected();
+    wrap.classList.toggle('hidden', !selected);
+
+    const w = document.getElementById('custom_size_width');
+    const h = document.getElementById('custom_size_height');
+    if (w) w.required = selected;
+    if (h) h.required = selected;
+
+    if (selected) {
+        refreshCustomSizeUnitUI();
+    }
+}
+
+function convertUnit(value, fromUnit, toUnit) {
+    const v = parseFloat(String(value));
+    if (Number.isNaN(v)) return null;
+
+    const from = String(fromUnit || '').toLowerCase();
+    const to = String(toUnit || '').toLowerCase();
+    if (from === '' || to === '' || from === to) return v;
+
+    const toInches = (val, unit) => {
+        if (unit === 'in') return val;
+        if (unit === 'cm') return val / 2.54;
+        if (unit === 'mm') return val / 25.4;
+        return val;
+    };
+    const fromInches = (val, unit) => {
+        if (unit === 'in') return val;
+        if (unit === 'cm') return val * 2.54;
+        if (unit === 'mm') return val * 25.4;
+        return val;
+    };
+
+    const inVal = toInches(v, from);
+    return fromInches(inVal, to);
+}
+
+function refreshCustomSizeUnitUI() {
+    const wrap = document.getElementById('customSizeFields');
+    if (!wrap) return;
+
+    const serviceUnit = String(wrap.dataset.serviceUnit || 'in').toLowerCase();
+    const select = document.getElementById('custom_size_unit_select');
+    const chosen = String(select?.value || serviceUnit).toLowerCase();
+
+    const labelW = document.getElementById('custom_size_unit_label_w');
+    const labelH = document.getElementById('custom_size_unit_label_h');
+    if (labelW) labelW.textContent = chosen ? `(${chosen})` : '';
+    if (labelH) labelH.textContent = chosen ? `(${chosen})` : '';
+
+    const minW = wrap.dataset.minW !== '' ? parseFloat(String(wrap.dataset.minW || '')) : null;
+    const maxW = wrap.dataset.maxW !== '' ? parseFloat(String(wrap.dataset.maxW || '')) : null;
+    const minH = wrap.dataset.minH !== '' ? parseFloat(String(wrap.dataset.minH || '')) : null;
+    const maxH = wrap.dataset.maxH !== '' ? parseFloat(String(wrap.dataset.maxH || '')) : null;
+
+    const w = document.getElementById('custom_size_width');
+    const h = document.getElementById('custom_size_height');
+
+    const minWDisp = minW !== null ? convertUnit(minW, serviceUnit, chosen) : null;
+    const maxWDisp = maxW !== null ? convertUnit(maxW, serviceUnit, chosen) : null;
+    const minHDisp = minH !== null ? convertUnit(minH, serviceUnit, chosen) : null;
+    const maxHDisp = maxH !== null ? convertUnit(maxH, serviceUnit, chosen) : null;
+
+    if (w) {
+        w.placeholder = minWDisp !== null && maxWDisp !== null ? `${minWDisp.toFixed(2)} - ${maxWDisp.toFixed(2)}` : '';
+    }
+    if (h) {
+        h.placeholder = minHDisp !== null && maxHDisp !== null ? `${minHDisp.toFixed(2)} - ${maxHDisp.toFixed(2)}` : '';
+    }
+
+    const help = document.getElementById('custom_size_range_help');
+    if (help && minWDisp !== null && maxWDisp !== null && minHDisp !== null && maxHDisp !== null) {
+        help.textContent = `Allowed range: ${minWDisp.toFixed(2)}-${maxWDisp.toFixed(2)} x ${minHDisp.toFixed(2)}-${maxHDisp.toFixed(2)} ${chosen}`;
+    }
 }
 
 function saveServiceFromDetails() {
@@ -291,7 +492,7 @@ function saveServiceFromDetails() {
     const serviceId = form.querySelector('input[name="service_id"]')?.value;
     const quantity = parseInt(form.querySelector('input[name="quantity"]')?.value || '1', 10);
     const notes = form.querySelector('textarea[name="notes"]')?.value || '';
-    const customizations = Array.from(document.querySelectorAll('#orderForm input[name^="customizations"]:checked')).map(i => i.value);
+    const customizations = Array.from(document.querySelectorAll('#orderForm input[name="customizations[]"]:checked')).map(i => i.value);
 
     for (const input of Array.from(form.querySelectorAll('input[name^="custom_fields["]'))) {
         if (input.required && String(input.value || '').trim() === '') {
@@ -306,8 +507,20 @@ function saveServiceFromDetails() {
         const match = input.name.match(/^custom_fields\[(.+)\]$/);
         if (!match) continue;
         const key = match[1];
-        const value = String(input.value || '').trim();
-        if (value !== '') custom_fields[key] = value;
+        let value = String(input.value || '').trim();
+        if (value === '') continue;
+
+        if ((key === 'custom_size_width' || key === 'custom_size_height') && isCustomSizeSelected()) {
+            const wrap = document.getElementById('customSizeFields');
+            const serviceUnit = String(wrap?.dataset.serviceUnit || 'in').toLowerCase();
+            const chosenUnit = String(document.getElementById('custom_size_unit_select')?.value || serviceUnit).toLowerCase();
+            const conv = convertUnit(value, chosenUnit, serviceUnit);
+            if (conv !== null) {
+                value = String(conv.toFixed(2));
+            }
+        }
+
+        custom_fields[key] = value;
     }
 
     fetch('/saved-services/save', {
@@ -341,6 +554,35 @@ document.addEventListener('DOMContentLoaded', function() {
     updatePrice();
     if (window.lucide && typeof window.lucide.createIcons === 'function') {
         window.lucide.createIcons();
+    }
+
+    const unitSelect = document.getElementById('custom_size_unit_select');
+    if (unitSelect) {
+        unitSelect.addEventListener('change', function () {
+            refreshCustomSizeUnitUI();
+        });
+    }
+
+    const form = document.getElementById('orderForm');
+    if (form) {
+        form.addEventListener('submit', function () {
+            const wrap = document.getElementById('customSizeFields');
+            if (!wrap) return;
+            if (!isCustomSizeSelected()) return;
+
+            const serviceUnit = String(wrap.dataset.serviceUnit || 'in').toLowerCase();
+            const chosenUnit = String(document.getElementById('custom_size_unit_select')?.value || serviceUnit).toLowerCase();
+            if (serviceUnit === chosenUnit) return;
+
+            const w = document.getElementById('custom_size_width');
+            const h = document.getElementById('custom_size_height');
+            if (!w || !h) return;
+
+            const wConv = convertUnit(w.value, chosenUnit, serviceUnit);
+            const hConv = convertUnit(h.value, chosenUnit, serviceUnit);
+            if (wConv !== null) w.value = String(wConv.toFixed(2));
+            if (hConv !== null) h.value = String(hConv.toFixed(2));
+        });
     }
 });
 </script>

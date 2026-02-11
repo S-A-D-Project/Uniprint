@@ -81,11 +81,6 @@ class AuthServiceProvider extends ServiceProvider
             return false;
         });
 
-        // Custom authorization for Baguio City specific features
-        Gate::define('manage-local-inventory', function ($user) {
-            return in_array($user->role_type, ['admin', 'business_user']);
-        });
-
         Gate::define('configure-customizations', function ($user) {
             return in_array($user->role_type, ['admin', 'business_user']);
         });

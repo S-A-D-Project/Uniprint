@@ -1,23 +1,6 @@
-@extends('layouts.app')
+@extends('layouts.public')
 
 @section('title', 'Services')
-
-@section('dashboard-route', route('customer.dashboard'))
-
-@section('sidebar')
-    <a href="{{ route('customer.dashboard') }}" class="nav-link">
-        <i class="bi bi-speedometer2"></i>Dashboard
-    </a>
-    <a href="{{ route('customer.enterprises') }}" class="nav-link active">
-        <i class="bi bi-shop"></i>Browse Shops
-    </a>
-    <a href="{{ route('customer.orders') }}" class="nav-link">
-        <i class="bi bi-bag"></i>My Orders
-    </a>
-    <a href="{{ route('customer.design-assets') }}" class="nav-link">
-        <i class="bi bi-images"></i>My Designs
-    </a>
-@endsection
 
 @section('content')
 <div class="page-header d-flex justify-content-between align-items-center">
@@ -25,7 +8,7 @@
         <nav class="mb-2" aria-label="breadcrumb">
             <ol class="breadcrumb mb-0">
                 <li class="breadcrumb-item"><a href="{{ route('home') }}">Home</a></li>
-                <li class="breadcrumb-item"><a href="{{ route('customer.enterprises') }}">Shops</a></li>
+                <li class="breadcrumb-item"><a href="{{ route('customer.marketplace') }}">Shops</a></li>
                 <li class="breadcrumb-item active" aria-current="page">{{ $enterprise->name ?? 'Shop' }}</li>
             </ol>
         </nav>
@@ -35,9 +18,14 @@
             Browse available services
         </p>
     </div>
-    <a href="{{ route('customer.enterprises') }}" class="btn btn-outline-secondary">
-        <i class="bi bi-arrow-left me-2"></i>Back to Shops
-    </a>
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-outline-danger" data-up-report data-entity-type="enterprise" data-enterprise-id="{{ $enterprise->enterprise_id }}">
+            <i class="bi bi-flag me-2"></i>Report Shop
+        </button>
+        <a href="{{ route('customer.marketplace') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-2"></i>Back to Shops
+        </a>
+    </div>
 </div>
 
 <!-- Enterprise Info -->
@@ -104,7 +92,7 @@
                     <i class="bi bi-box-seam"></i>
                     <h5>No services available</h5>
                     <p class="text-muted">This shop hasn't added any services yet</p>
-                    <a href="{{ route('customer.enterprises') }}" class="btn btn-primary">
+                    <a href="{{ route('customer.marketplace') }}" class="btn btn-primary">
                         <i class="bi bi-shop me-2"></i>Browse Other Shops
                     </a>
                 </div>

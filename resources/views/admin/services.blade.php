@@ -58,16 +58,20 @@ $breadcrumbs = [
             <i data-lucide="tag" class="h-8 w-8 text-success/50"></i>
         </div>
 
-        <div class="flex items-center gap-2 mt-4 pt-4 border-t border-border">
-            <x-admin.button size="sm" variant="outline" icon="eye" class="flex-1" href="{{ route('admin.services.details', $service->service_id) }}">
-                View Details
-            </x-admin.button>
+        <div class="flex items-center gap-2">
+            <button type="button"
+                   onclick="openAdminServiceFormModal('{{ route('admin.services.details', $service->service_id) }}')"
+                   class="p-2 hover:bg-secondary rounded-md transition-colors"
+                   title="View Details">
+                <i data-lucide="eye" class="h-4 w-4 text-primary"></i>
+            </button>
 
-            <x-admin.button size="sm"
-                           variant="outline"
-                           icon="pencil"
-                           href="{{ route('business.services.edit', $service->service_id) }}?enterprise_id={{ $service->enterprise_id }}"
-                           class="js-admin-service-edit" />
+            <button type="button"
+                   onclick="openAdminServiceFormModal('{{ route('business.services.edit', $service->service_id) }}?enterprise_id={{ $service->enterprise_id }}')"
+                   class="p-2 hover:bg-secondary rounded-md transition-colors"
+                   title="Edit Service">
+                <i data-lucide="pencil" class="h-4 w-4 text-primary"></i>
+            </button>
 
             <form method="POST" action="{{ route('admin.services.toggle-active', $service->service_id) }}">
                 @csrf
@@ -106,114 +110,33 @@ $breadcrumbs = [
 <script>
     lucide.createIcons();
 
-    function openAdminServiceFormModal(url) {
-        const modalEl = document.getElementById('adminServiceFormModal');
-        const bodyEl = document.getElementById('adminServiceFormModalBody');
-        if (!modalEl || !bodyEl) return;
+    const __upModalCache = (window.__upModalCache = window.__upModalCache || {});
 
-        modalEl.dataset.currentFormUrl = url;
-        bodyEl.innerHTML = '<div class="p-4 text-muted">Loading...</div>';
+function openAdminServiceFormModal(url) {
+    const modalEl = document.getElementById('adminServiceFormModal');
+    const bodyEl = document.getElementById('adminServiceFormModalBody');
+    if (!modalEl || !bodyEl) return;
 
-        const modal = new bootstrap.Modal(modalEl);
-        modal.show();
+    bodyEl.innerHTML = '<div class="py-10 text-center text-muted-foreground">Loading…</div>';
 
-        fetch(url, {
-            method: 'GET',
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest',
-                'Accept': 'text/html'
-            }
-        })
-        .then(async (res) => {
-            if (!res.ok) throw new Error('Failed to load');
-            return await res.text();
-        })
-        .then((html) => {
-            bodyEl.innerHTML = html || '<div class="p-4 text-muted">No content</div>';
-            if (typeof lucide !== 'undefined') {
-                lucide.createIcons();
-            }
-        })
-        .catch((err) => {
-            console.error(err);
-            bodyEl.innerHTML = '<div class="p-4 text-danger">Failed to load service form.</div>';
-        });
+    let bsModal = window.modal_adminServiceFormModal;
+    if (!bsModal && typeof bootstrap !== 'undefined') {
+        bsModal = new bootstrap.Modal(modalEl);
+        window.modal_adminServiceFormModal = bsModal;
     }
+    if (bsModal) bsModal.show();
 
-    document.addEventListener('DOMContentLoaded', function () {
-        document.querySelectorAll('.js-admin-service-create').forEach((a) => {
-            a.addEventListener('click', function (e) {
-                e.preventDefault();
-                const url = a.getAttribute('href');
-                if (!url) return;
-                openAdminServiceFormModal(url);
-            });
-        });
-
-        document.querySelectorAll('.js-admin-service-edit').forEach((a) => {
-            a.addEventListener('click', function (e) {
-                e.preventDefault();
-                const url = a.getAttribute('href');
-                if (!url) return;
-                openAdminServiceFormModal(url);
-            });
-        });
-
-        const modalEl = document.getElementById('adminServiceFormModal');
-        const bodyEl = document.getElementById('adminServiceFormModalBody');
-        if (!modalEl || !bodyEl) return;
-
-        bodyEl.addEventListener('click', function (e) {
-            const link = e.target.closest('a');
-            if (!link) return;
-
-            const href = link.getAttribute('href');
-            if (href && href.includes('/business/services')) {
-                // prevent navigation back to business area when used inside admin modal
-                e.preventDefault();
-            }
-        });
-
-        bodyEl.addEventListener('submit', async function (e) {
-            const form = e.target;
-            if (!(form instanceof HTMLFormElement)) return;
-
-            e.preventDefault();
-
-            const url = form.getAttribute('action');
-            if (!url) return;
-
-            try {
-                const res = await fetch(url, {
-                    method: (form.getAttribute('method') || 'POST').toUpperCase(),
-                    headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'Accept': 'application/json'
-                    },
-                    body: new FormData(form)
-                });
-
-                const data = await res.json().catch(() => null);
-                if (!res.ok || !data || data.success !== true) {
-                    throw new Error(data?.message || 'Request failed');
-                }
-
-                if (window.UniPrintUI && typeof window.UniPrintUI.toast === 'function') {
-                    window.UniPrintUI.toast(data.message || 'Saved.', { variant: 'success' });
-                }
-
-                const modal = bootstrap.Modal.getInstance(modalEl);
-                if (modal) modal.hide();
-
-                window.location.reload();
-            } catch (err) {
-                console.error(err);
-                if (window.UniPrintUI && typeof window.UniPrintUI.toast === 'function') {
-                    window.UniPrintUI.toast(err?.message || 'Failed to save service.', { variant: 'danger' });
-                }
-            }
-        });
+    fetch(url, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'text/html' }
+    })
+    .then(res => res.text())
+    .then(html => {
+        bodyEl.innerHTML = html;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    })
+    .catch(err => {
+        bodyEl.innerHTML = '<div class="alert alert-danger">Failed to load content.</div>';
     });
+}
 </script>
 @endpush

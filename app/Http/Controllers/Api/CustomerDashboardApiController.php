@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Models\SavedService;
@@ -18,7 +19,7 @@ class CustomerDashboardApiController extends Controller
     public function getServices(Request $request)
     {
         try {
-            $userId = session('user_id');
+            $userId = Auth::user()?->user_id;
             
             if (!$userId) {
                 return response()->json(['error' => 'Unauthorized'], 401);
@@ -114,7 +115,7 @@ class CustomerDashboardApiController extends Controller
     public function getOrders(Request $request)
     {
         try {
-            $userId = session('user_id');
+            $userId = Auth::user()?->user_id;
             
             if (!$userId) {
                 return response()->json(['error' => 'Unauthorized'], 401);
@@ -158,7 +159,7 @@ class CustomerDashboardApiController extends Controller
     public function getPaymentHistory(Request $request)
     {
         try {
-            $userId = session('user_id');
+            $userId = Auth::user()?->user_id;
             
             if (!$userId) {
                 return response()->json(['error' => 'Unauthorized'], 401);
@@ -213,7 +214,7 @@ class CustomerDashboardApiController extends Controller
     public function updateProfile(Request $request)
     {
         try {
-            $userId = session('user_id');
+            $userId = Auth::user()?->user_id;
             
             if (!$userId) {
                 return response()->json(['error' => 'Unauthorized'], 401);
@@ -282,7 +283,7 @@ class CustomerDashboardApiController extends Controller
     public function getDashboardStats(Request $request)
     {
         try {
-            $userId = session('user_id');
+            $userId = Auth::user()?->user_id;
             
             if (!$userId) {
                 return response()->json(['error' => 'Unauthorized'], 401);
@@ -355,7 +356,7 @@ class CustomerDashboardApiController extends Controller
     public function getSavedServices(Request $request)
     {
         try {
-            $userId = session('user_id');
+            $userId = Auth::user()?->user_id;
             
             if (!$userId) {
                 return response()->json(['error' => 'Unauthorized'], 401);

@@ -1,6 +1,6 @@
 @extends('layouts.public')
 
-@section('title', 'Customer Dashboard - UniPrint')
+@section('title', 'Customer Dashboard - ' . system_brand_name())
 
 @section('content')
 <div class="min-h-screen bg-background">
@@ -210,7 +210,7 @@
                                 <p class="font-medium">Track Orders</p>
                                 <p class="text-xs text-muted-foreground">View order status</p>
                             </div>
-                        </div>
+                        </a>
                     </div>
                 </div>
             </div>

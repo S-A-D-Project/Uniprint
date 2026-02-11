@@ -5,13 +5,27 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
 
 class ProfileController extends Controller
 {
+    private function paypalWebBaseUrl(): string
+    {
+        $mode = (string) config('services.paypal.mode', 'sandbox');
+        return $mode === 'live' ? 'https://www.paypal.com' : 'https://www.sandbox.paypal.com';
+    }
+
+    private function paypalApiBaseUrl(): string
+    {
+        $mode = (string) config('services.paypal.mode', 'sandbox');
+        return $mode === 'live' ? 'https://api-m.paypal.com' : 'https://api-m.sandbox.paypal.com';
+    }
+
     /**
      * Show user profile
      */
@@ -33,6 +47,8 @@ class ProfileController extends Controller
         $orderStats = null;
         $recentOrders = collect();
         $linkedProviders = collect();
+        $paypalConnected = false;
+        $paypalAccountEmail = null;
 
         try {
             // Get user's role information
@@ -135,7 +151,196 @@ class ProfileController extends Controller
             ]);
         }
 
-        return view('profile.index', compact('user', 'roleInfo', 'enterprise', 'orderStats', 'recentOrders', 'linkedProviders'));
+        try {
+            if (Schema::hasTable('user_payment_accounts')) {
+                $paypal = DB::table('user_payment_accounts')
+                    ->where('user_id', $userId)
+                    ->where('provider', 'paypal')
+                    ->first();
+
+                $paypalConnected = !empty($paypal);
+                $paypalAccountEmail = $paypal?->email ?? null;
+            }
+        } catch (\Exception $e) {
+            Log::error('Profile View Error (paypal)', [
+                'user_id' => $userId,
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+            ]);
+        }
+
+        return view('profile.index', compact('user', 'roleInfo', 'enterprise', 'orderStats', 'recentOrders', 'linkedProviders', 'paypalConnected', 'paypalAccountEmail'));
+    }
+
+    public function redirectToPayPalConnect(Request $request)
+    {
+        $userId = session('user_id');
+        if (!$userId) {
+            return redirect()->route('login')->with('error', 'Please login to continue');
+        }
+
+        $clientId = (string) config('services.paypal.client_id');
+        $clientSecret = (string) config('services.paypal.client_secret');
+        if ($clientId === '' || $clientSecret === '') {
+            return redirect()->route('profile.index')->with('error', 'PayPal is not configured.');
+        }
+
+        $state = (string) Str::uuid();
+        session(['paypal_oauth_state' => $state]);
+
+        $redirectUri = route('profile.paypal.callback');
+        $scopes = [
+            'openid',
+            'email',
+            'https://uri.paypal.com/services/paypalattributes',
+        ];
+
+        $query = http_build_query([
+            'client_id' => $clientId,
+            'response_type' => 'code',
+            'scope' => implode(' ', $scopes),
+            'redirect_uri' => $redirectUri,
+            'state' => $state,
+        ]);
+
+        return redirect()->away($this->paypalWebBaseUrl() . '/signin/authorize?' . $query);
+    }
+
+    public function handlePayPalConnectCallback(Request $request)
+    {
+        $userId = session('user_id');
+        if (!$userId) {
+            return redirect()->route('login')->with('error', 'Please login to continue');
+        }
+
+        $clientId = (string) config('services.paypal.client_id');
+        $clientSecret = (string) config('services.paypal.client_secret');
+        if ($clientId === '' || $clientSecret === '') {
+            return redirect()->route('profile.index')->with('error', 'PayPal is not configured.');
+        }
+
+        $code = (string) $request->query('code', '');
+        $state = (string) $request->query('state', '');
+        $expectedState = (string) session('paypal_oauth_state', '');
+        session()->forget('paypal_oauth_state');
+
+        if ($code === '') {
+            $desc = (string) $request->query('error_description', $request->query('error', ''));
+            return redirect()->route('profile.index')->with('error', $desc !== '' ? $desc : 'PayPal authorization failed.');
+        }
+        if ($expectedState === '' || $state !== $expectedState) {
+            return redirect()->route('profile.index')->with('error', 'Invalid PayPal state. Please try again.');
+        }
+
+        try {
+            $redirectUri = route('profile.paypal.callback');
+            $tokenRes = Http::asForm()
+                ->withBasicAuth($clientId, $clientSecret)
+                ->post($this->paypalApiBaseUrl() . '/v1/oauth2/token', [
+                    'grant_type' => 'authorization_code',
+                    'code' => $code,
+                    'redirect_uri' => $redirectUri,
+                ]);
+
+            if (!$tokenRes->ok()) {
+                Log::error('PayPal connect token exchange failed', ['body' => $tokenRes->body()]);
+                return redirect()->route('profile.index')->with('error', 'Failed to connect PayPal.');
+            }
+
+            $accessToken = (string) ($tokenRes->json('access_token') ?? '');
+            $refreshToken = (string) ($tokenRes->json('refresh_token') ?? '');
+            $expiresIn = (int) ($tokenRes->json('expires_in') ?? 0);
+            $scope = (string) ($tokenRes->json('scope') ?? '');
+
+            if ($accessToken === '') {
+                return redirect()->route('profile.index')->with('error', 'PayPal access token missing.');
+            }
+
+            $userInfoRes = Http::withToken($accessToken)
+                ->get($this->paypalApiBaseUrl() . '/v1/identity/oauth2/userinfo', [
+                    'schema' => 'paypalv1.1',
+                ]);
+
+            if (!$userInfoRes->ok()) {
+                Log::error('PayPal connect userinfo failed', ['body' => $userInfoRes->body()]);
+                return redirect()->route('profile.index')->with('error', 'Failed to retrieve PayPal account information.');
+            }
+
+            $providerAccountId = (string) ($userInfoRes->json('user_id') ?? '');
+            $email = (string) ($userInfoRes->json('emails.0.value') ?? $userInfoRes->json('email') ?? '');
+
+            $expiresAt = null;
+            if ($expiresIn > 0) {
+                $expiresAt = now()->addSeconds($expiresIn);
+            }
+
+            $payload = [
+                'provider_account_id' => $providerAccountId !== '' ? $providerAccountId : null,
+                'email' => $email !== '' ? $email : null,
+                'access_token' => $accessToken,
+                'refresh_token' => $refreshToken !== '' ? $refreshToken : null,
+                'token_expires_at' => $expiresAt,
+                'scope' => $scope !== '' ? $scope : null,
+                'metadata' => json_encode($userInfoRes->json(), JSON_UNESCAPED_SLASHES),
+                'updated_at' => now(),
+            ];
+
+            if (!Schema::hasTable('user_payment_accounts')) {
+                return redirect()->route('profile.index')->with('error', 'Payment accounts table missing. Please run migrations.');
+            }
+
+            $existing = DB::table('user_payment_accounts')
+                ->where('user_id', $userId)
+                ->where('provider', 'paypal')
+                ->first();
+
+            if ($existing) {
+                DB::table('user_payment_accounts')
+                    ->where('user_payment_account_id', $existing->user_payment_account_id)
+                    ->update($payload);
+            } else {
+                DB::table('user_payment_accounts')->insert(array_merge($payload, [
+                    'user_payment_account_id' => (string) Str::uuid(),
+                    'user_id' => $userId,
+                    'provider' => 'paypal',
+                    'created_at' => now(),
+                ]));
+            }
+
+            return redirect()->route('profile.index')->with('success', 'PayPal account linked successfully.');
+        } catch (\Throwable $e) {
+            Log::error('PayPal connect callback error', [
+                'user_id' => $userId,
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+            ]);
+            return redirect()->route('profile.index')->with('error', 'Failed to connect PayPal. Please try again.');
+        }
+    }
+
+    public function disconnectPayPal(Request $request)
+    {
+        $userId = session('user_id');
+        if (!$userId) {
+            return redirect()->route('login')->with('error', 'Please login to continue');
+        }
+
+        try {
+            if (Schema::hasTable('user_payment_accounts')) {
+                DB::table('user_payment_accounts')
+                    ->where('user_id', $userId)
+                    ->where('provider', 'paypal')
+                    ->delete();
+            }
+            return redirect()->route('profile.index')->with('success', 'PayPal account disconnected.');
+        } catch (\Throwable $e) {
+            Log::error('PayPal disconnect error', [
+                'user_id' => $userId,
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+            ]);
+            return redirect()->route('profile.index')->with('error', 'Failed to disconnect PayPal.');
+        }
     }
 
     public function redirectToFacebookConnect()
@@ -378,7 +583,8 @@ class ProfileController extends Controller
                 $filename = 'profile-' . $userId . '-' . time() . '.' . $file->getClientOriginalExtension();
                 
                 // Store file
-                $path = $file->storeAs('profile-pictures', $filename, 'public');
+                $disk = config('filesystems.default', 'public');
+                $path = $file->storeAs('profile-pictures', $filename, $disk);
                 
                 // Update user profile picture
                 DB::table('users')

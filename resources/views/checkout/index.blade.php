@@ -14,11 +14,11 @@
 </div>
 
 <form id="checkout-form" class="space-y-8" data-up-global-loader data-up-loader-title="Placing your order…" data-up-loader-message="Processing checkout. Please wait.">
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Checkout Form -->
         <div class="lg:col-span-2 space-y-6">
             <!-- Contact Information -->
-            <div class="bg-white rounded-lg shadow-sm p-6">
+            <div class="bg-card border border-border rounded-xl shadow-card p-6">
                 <div class="flex items-center gap-2 mb-6">
                     <i data-lucide="user-circle" class="h-5 w-5 text-primary"></i>
                     <h3 class="text-lg font-semibold text-gray-900">Contact Information</h3>
@@ -43,7 +43,7 @@
             </div>
 
             <!-- Rush Pickup Options -->
-            <div class="bg-white rounded-lg shadow-sm p-6">
+            <div class="bg-card border border-border rounded-xl shadow-card p-6">
                 <div class="flex items-center gap-2 mb-6">
                     <i data-lucide="clock" class="h-5 w-5 text-primary"></i>
                     <h3 class="text-lg font-semibold text-gray-900">Pickup Timeline</h3>
@@ -80,111 +80,83 @@
                 </div>
                 
                 <div class="space-y-4" id="rush-options">
-                    <!-- Standard Pickup -->
-                    <label class="relative cursor-pointer block">
-                        <input type="radio" name="rush_option" value="standard" checked class="sr-only peer" data-days="2" data-fee="0">
-                        <div class="border-2 border-gray-200 rounded-lg p-4 transition-all peer-checked:border-primary peer-checked:bg-primary/5 hover:border-gray-300">
-                            <div class="flex items-center justify-between">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                                        <i data-lucide="calendar" class="h-5 w-5 text-blue-600"></i>
-                                    </div>
-                                    <div>
-                                        <h4 class="font-semibold text-gray-900">Standard Pickup</h4>
-                                        <p class="text-sm text-gray-600">Ready in 2-3 business days</p>
-                                    </div>
-                                </div>
-                                <div class="text-right">
-                                    <span class="text-lg font-bold text-green-600">FREE</span>
-                                    <p class="text-xs text-gray-500">No additional cost</p>
-                                </div>
-                            </div>
-                            <div class="absolute top-4 right-4 w-5 h-5 border-2 border-gray-300 rounded-full peer-checked:border-primary peer-checked:bg-primary flex items-center justify-center">
-                                <div class="w-2 h-2 bg-white rounded-full opacity-0 peer-checked:opacity-100"></div>
-                            </div>
-                        </div>
-                    </label>
+                    @php
+                        $rushAllowed = !isset($supportsRushAll) || $supportsRushAll;
+                        $rushOptions = $rushOptionsData ?? [
+                            'standard' => ['enabled' => true, 'fee' => 0, 'lead_hours' => 48],
+                            'express' => ['enabled' => false, 'fee' => 50, 'lead_hours' => 24],
+                            'rush' => ['enabled' => false, 'fee' => 100, 'lead_hours' => 6],
+                            'same_day' => ['enabled' => false, 'fee' => 200, 'lead_hours' => 3],
+                        ];
+                        
+                        $rushMeta = [
+                            'standard' => ['icon' => 'calendar', 'color' => 'blue', 'label' => 'Standard Pickup'],
+                            'express' => ['icon' => 'zap', 'color' => 'orange', 'label' => 'Express Pickup'],
+                            'rush' => ['icon' => 'flame', 'color' => 'red', 'label' => 'Rush Pickup', 'tag' => 'URGENT'],
+                            'same_day' => ['icon' => 'rocket', 'color' => 'purple', 'label' => 'Same Day Pickup', 'tag' => 'PREMIUM'],
+                        ];
+                    @endphp
 
-                    <!-- Express Pickup -->
-                    <label class="relative cursor-pointer block">
-                        <input type="radio" name="rush_option" value="express" class="sr-only peer" data-days="1" data-fee="50">
-                        <div class="border-2 border-gray-200 rounded-lg p-4 transition-all peer-checked:border-primary peer-checked:bg-primary/5 hover:border-gray-300">
-                            <div class="flex items-center justify-between">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
-                                        <i data-lucide="zap" class="h-5 w-5 text-orange-600"></i>
-                                    </div>
-                                    <div>
-                                        <h4 class="font-semibold text-gray-900">Express Pickup</h4>
-                                        <p class="text-sm text-gray-600">Ready in 1 business day</p>
-                                    </div>
-                                </div>
-                                <div class="text-right">
-                                    <span class="text-lg font-bold text-orange-600">+₱50</span>
-                                    <p class="text-xs text-gray-500">Per order</p>
-                                </div>
-                            </div>
-                            <div class="absolute top-4 right-4 w-5 h-5 border-2 border-gray-300 rounded-full peer-checked:border-primary peer-checked:bg-primary flex items-center justify-center">
-                                <div class="w-2 h-2 bg-white rounded-full opacity-0 peer-checked:opacity-100"></div>
-                            </div>
+                    @if(!$rushAllowed)
+                        <div class="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+                            Rush pickup options are not available because one or more services in your order do not support rush.
                         </div>
-                    </label>
+                    @endif
 
-                    <!-- Rush Pickup -->
-                    <label class="relative cursor-pointer block">
-                        <input type="radio" name="rush_option" value="rush" class="sr-only peer" data-days="0.5" data-fee="100">
-                        <div class="border-2 border-gray-200 rounded-lg p-4 transition-all peer-checked:border-primary peer-checked:bg-primary/5 hover:border-gray-300">
-                            <div class="flex items-center justify-between">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                                        <i data-lucide="flame" class="h-5 w-5 text-red-600"></i>
-                                    </div>
-                                    <div>
-                                        <h4 class="font-semibold text-gray-900 flex items-center gap-2">
-                                            Rush Pickup
-                                            <span class="bg-red-100 text-red-800 text-xs font-medium px-2 py-1 rounded-full">URGENT</span>
-                                        </h4>
-                                        <p class="text-sm text-gray-600">Ready in 4-6 hours</p>
-                                    </div>
-                                </div>
-                                <div class="text-right">
-                                    <span class="text-lg font-bold text-red-600">+₱100</span>
-                                    <p class="text-xs text-gray-500">Per order</p>
-                                </div>
-                            </div>
-                            <div class="absolute top-4 right-4 w-5 h-5 border-2 border-gray-300 rounded-full peer-checked:border-primary peer-checked:bg-primary flex items-center justify-center">
-                                <div class="w-2 h-2 bg-white rounded-full opacity-0 peer-checked:opacity-100"></div>
-                            </div>
-                        </div>
-                    </label>
+                    @foreach($rushMeta as $key => $meta)
+                        @php
+                            $opt = $rushOptions[$key] ?? ['enabled' => false, 'fee' => 0, 'lead_hours' => 0];
+                            $enabled = !empty($opt['enabled']) || $key === 'standard';
+                            if (!$rushAllowed && $key !== 'standard') $enabled = false;
+                            
+                            $fee = (float) ($opt['fee'] ?? 0);
+                            $leadHours = (int) ($opt['lead_hours'] ?? 0);
+                            
+                            // Human readable lead time
+                            if ($leadHours >= 24) {
+                                $days = round($leadHours / 24);
+                                $timeDesc = "Ready in " . ($days == 1 ? "1 business day" : "$days business days");
+                            } else {
+                                $timeDesc = "Ready in $leadHours hours";
+                            }
+                        @endphp
 
-                    <!-- Same Day Pickup -->
-                    <label class="relative cursor-pointer block">
-                        <input type="radio" name="rush_option" value="same_day" class="sr-only peer" data-days="0.25" data-fee="200">
-                        <div class="border-2 border-gray-200 rounded-lg p-4 transition-all peer-checked:border-primary peer-checked:bg-primary/5 hover:border-gray-300">
-                            <div class="flex items-center justify-between">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-                                        <i data-lucide="rocket" class="h-5 w-5 text-purple-600"></i>
+                        @if($enabled || $key === 'standard')
+                        <label class="relative cursor-pointer block">
+                            <input type="radio" name="rush_option" value="{{ $key }}" {{ $key === 'standard' ? 'checked' : '' }} 
+                                   class="sr-only peer" data-lead-hours="{{ $leadHours }}" data-fee="{{ $fee }}" {{ !$enabled ? 'disabled' : '' }}>
+                            <div class="border-2 border-gray-200 rounded-lg p-4 transition-all peer-checked:border-primary peer-checked:bg-primary/5 hover:border-gray-300 {{ !$enabled ? 'opacity-50 grayscale' : '' }}">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-10 h-10 bg-{{ $meta['color'] }}-100 rounded-full flex items-center justify-center">
+                                            <i data-lucide="{{ $meta['icon'] }}" class="h-5 w-5 text-{{ $meta['color'] }}-600"></i>
+                                        </div>
+                                        <div>
+                                            <h4 class="font-semibold text-gray-900 flex items-center gap-2">
+                                                {{ $meta['label'] }}
+                                                @if(isset($meta['tag']))
+                                                    <span class="bg-{{ $meta['color'] }}-100 text-{{ $meta['color'] }}-800 text-xs font-medium px-2 py-1 rounded-full">{{ $meta['tag'] }}</span>
+                                                @endif
+                                            </h4>
+                                            <p class="text-sm text-gray-600">{{ $timeDesc }}</p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <h4 class="font-semibold text-gray-900 flex items-center gap-2">
-                                            Same Day Pickup
-                                            <span class="bg-purple-100 text-purple-800 text-xs font-medium px-2 py-1 rounded-full">PREMIUM</span>
-                                        </h4>
-                                        <p class="text-sm text-gray-600">Ready in 2-3 hours</p>
+                                    <div class="text-right">
+                                        @if($fee > 0)
+                                            <span class="text-lg font-bold text-{{ $meta['color'] }}-600">+₱{{ number_format($fee, 2) }}</span>
+                                        @else
+                                            <span class="text-lg font-bold text-green-600">FREE</span>
+                                        @endif
+                                        <p class="text-xs text-gray-500">Per order</p>
                                     </div>
                                 </div>
-                                <div class="text-right">
-                                    <span class="text-lg font-bold text-purple-600">+₱200</span>
-                                    <p class="text-xs text-gray-500">Per order</p>
+                                <div class="absolute top-4 right-4 w-5 h-5 border-2 border-gray-300 rounded-full peer-checked:border-primary peer-checked:bg-primary flex items-center justify-center">
+                                    <div class="w-2 h-2 bg-white rounded-full opacity-0 peer-checked:opacity-100"></div>
                                 </div>
                             </div>
-                            <div class="absolute top-4 right-4 w-5 h-5 border-2 border-gray-300 rounded-full peer-checked:border-primary peer-checked:bg-primary flex items-center justify-center">
-                                <div class="w-2 h-2 bg-white rounded-full opacity-0 peer-checked:opacity-100"></div>
-                            </div>
-                        </div>
-                    </label>
+                        </label>
+                        @endif
+                    @endforeach
                 </div>
 
                 <!-- Estimated Completion Time -->
@@ -202,7 +174,7 @@
             </div>
 
             <!-- Pickup Information -->
-            <div class="bg-white rounded-lg shadow-sm p-6">
+            <div class="bg-card border border-border rounded-xl shadow-card p-6">
                 <div class="flex items-center gap-2 mb-6">
                     <i data-lucide="map-pin" class="h-5 w-5 text-primary"></i>
                     <h3 class="text-lg font-semibold text-gray-900">Pickup Information</h3>
@@ -219,7 +191,7 @@
             </div>
 
             <!-- Payment Method -->
-            <div class="bg-white rounded-lg shadow-sm p-6">
+            <div class="bg-card border border-border rounded-xl shadow-card p-6">
                 <div class="flex items-center gap-2 mb-6">
                     <i data-lucide="credit-card" class="h-5 w-5 text-primary"></i>
                     <h3 class="text-lg font-semibold text-gray-900">Payment Method</h3>
@@ -261,11 +233,36 @@
                         </div>
                     </label>
                     @endif
+
+                    @if(in_array('paypal', $pm))
+                    <label class="relative cursor-pointer">
+                        <input type="radio" name="payment_method" value="paypal" class="sr-only peer">
+                        <div class="border-2 border-gray-200 rounded-lg p-4 text-center transition-all peer-checked:border-primary peer-checked:bg-primary/5 hover:border-gray-300">
+                            <div class="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                <i data-lucide="wallet" class="h-6 w-6 text-yellow-700"></i>
+                            </div>
+                            <h4 class="font-semibold text-gray-900 mb-1">PayPal</h4>
+                            <p class="text-sm text-gray-600">Card / PayPal balance</p>
+                            <div class="absolute top-3 right-3 w-5 h-5 border-2 border-gray-300 rounded-full peer-checked:border-primary peer-checked:bg-primary flex items-center justify-center">
+                                <div class="w-2 h-2 bg-white rounded-full opacity-0 peer-checked:opacity-100"></div>
+                            </div>
+                        </div>
+                    </label>
+                    @endif
                 </div>
+
+                @if(in_array('paypal', $pm))
+                    <div id="paypal-buttons-wrapper" class="mt-4" style="display:none;">
+                        <div class="text-sm text-gray-600 mb-2">Complete PayPal payment first, then place your order.</div>
+                        <div id="paypal-buttons"></div>
+                        <input type="hidden" name="paypal_order_id" id="paypal_order_id" value="" />
+                        <div id="paypal-status" class="text-xs text-gray-500 mt-2"></div>
+                    </div>
+                @endif
             </div>
 
             <!-- Additional Notes -->
-            <div class="bg-white rounded-lg shadow-sm p-6">
+            <div class="bg-card border border-border rounded-xl shadow-card p-6">
                 <div class="flex items-center gap-2 mb-6">
                     <i data-lucide="message-square" class="h-5 w-5 text-primary"></i>
                     <h3 class="text-lg font-semibold text-gray-900">Additional Notes</h3>
@@ -280,7 +277,7 @@
 
         <!-- Order Summary -->
         <div class="lg:col-span-1">
-            <div class="bg-white rounded-lg shadow-sm p-6 sticky top-6">
+            <div class="bg-card border border-border rounded-xl shadow-card p-6 sticky top-6">
                 <div class="flex items-center gap-2 mb-6">
                     <i data-lucide="receipt" class="h-5 w-5 text-primary"></i>
                     <h3 class="text-lg font-semibold text-gray-900">Order Summary</h3>
@@ -289,7 +286,7 @@
                 <!-- Cart Items -->
                 <div class="space-y-4 mb-6">
                     @foreach($cartItems as $item)
-                    <div class="flex justify-between items-start pb-4 border-b border-gray-200 last:border-b-0">
+                    <div class="flex justify-between items-start pb-4 border-b border-border last:border-b-0">
                         <div class="flex-1">
                             @php
                                 $service = $item['service'] ?? ($item['product'] ?? null);
@@ -321,7 +318,7 @@
                         <span class="text-gray-600">Tax (12%):</span>
                         <span class="font-medium" id="tax">₱{{ number_format($tax, 2) }}</span>
                     </div>
-                    <div class="flex justify-between text-lg font-bold pt-3 border-t border-gray-200">
+                    <div class="flex justify-between text-lg font-bold pt-3 border-t border-border">
                         <span>Total:</span>
                         <span class="text-primary" id="total">₱{{ number_format($total, 2) }}</span>
                     </div>
@@ -346,73 +343,42 @@
 @endsection
 
 @push('scripts')
+@if(in_array('paypal', $availablePaymentMethods ?? []) && !empty(config('services.paypal.client_id')))
+    <script id="paypal-sdk" src="https://www.paypal.com/sdk/js?client-id={{ config('services.paypal.client_id') }}&currency={{ config('services.paypal.currency', 'PHP') }}&intent=capture"></script>
+@endif
 <script>
 const subtotal = {{ $subtotal }};
 const taxRate = 0.12;
 let currentRushFee = 0;
 
-// Rush pickup options configuration
-const rushOptions = {
-    'standard': {
-        days: 2,
-        fee: 0,
-        label: 'Standard Pickup',
-        description: 'Ready in 2-3 business days'
-    },
-    'express': {
-        days: 1,
-        fee: 50,
-        label: 'Express Pickup',
-        description: 'Ready in 1 business day'
-    },
-    'rush': {
-        days: 0.5,
-        fee: 100,
-        label: 'Rush Pickup',
-        description: 'Ready in 4-6 hours'
-    },
-    'same_day': {
-        days: 0.25,
-        fee: 200,
-        label: 'Same Day Pickup',
-        description: 'Ready in 2-3 hours'
-    }
-};
-
 // Calculate completion time based on rush option
 function calculateCompletionTime(rushType) {
     const now = new Date();
-    const option = rushOptions[rushType];
+    const radio = document.querySelector(`input[name="rush_option"][value="${rushType}"]`);
+    if (!radio) return now;
     
-    if (!option) return now;
-    
+    const leadHours = parseFloat(radio.dataset.leadHours || 0);
     let completionTime = new Date(now);
     
-    if (rushType === 'same_day') {
-        // Same day: add 2-3 hours
-        completionTime.setHours(now.getHours() + 3);
-    } else if (rushType === 'rush') {
-        // Rush: add 4-6 hours
-        completionTime.setHours(now.getHours() + 6);
-    } else if (rushType === 'express') {
-        // Express: next business day by 5 PM
-        completionTime.setDate(now.getDate() + 1);
-        completionTime.setHours(17, 0, 0, 0); // 5:00 PM
-        
-        // Skip weekends
-        while (completionTime.getDay() === 0 || completionTime.getDay() === 6) {
-            completionTime.setDate(completionTime.getDate() + 1);
-        }
+    if (leadHours <= 6) {
+        // Short lead times: just add hours
+        completionTime.setHours(now.getHours() + leadHours);
     } else {
-        // Standard: 2-3 business days by 5 PM
-        let businessDays = 0;
-        while (businessDays < 2) {
-            completionTime.setDate(completionTime.getDate() + 1);
-            if (completionTime.getDay() !== 0 && completionTime.getDay() !== 6) {
-                businessDays++;
+        // Longer lead times: respect business hours (approx 9 AM - 5 PM)
+        let hoursRemaining = leadHours;
+        while (hoursRemaining > 0) {
+            completionTime.setHours(completionTime.getHours() + 1);
+            
+            // Skip weekends (optional, but professional)
+            const day = completionTime.getDay();
+            if (day === 0 || day === 6) continue;
+            
+            // Only count "business hours" (9 AM to 5 PM)
+            const hour = completionTime.getHours();
+            if (hour >= 9 && hour < 17) {
+                hoursRemaining--;
             }
         }
-        completionTime.setHours(17, 0, 0, 0); // 5:00 PM
     }
     
     return completionTime;
@@ -435,11 +401,14 @@ function formatCompletionTime(date) {
 
 // Update pricing and completion time
 function updateOrderSummary(rushType) {
-    const option = rushOptions[rushType];
-    if (!option) return;
+    const radio = document.querySelector(`input[name="rush_option"][value="${rushType}"]`);
+    if (!radio) return;
+    
+    const fee = parseFloat(radio.dataset.fee || 0);
+    const leadHours = parseFloat(radio.dataset.leadHours || 0);
     
     // Update rush fee
-    currentRushFee = option.fee;
+    currentRushFee = fee;
     const rushFeeRow = document.getElementById('rush-fee-row');
     const rushFeeAmount = document.getElementById('rush-fee');
     
@@ -474,119 +443,146 @@ function updateOrderSummary(rushType) {
     const formattedTime = formatCompletionTime(completionTime);
     
     // Update estimated completion in pickup options
-    document.getElementById('estimated-completion').innerHTML = 
-        `Your order will be ready by <span class="font-semibold">${formattedTime}</span>`;
+    const estimatedCompletionEl = document.getElementById('estimated-completion');
+    if (estimatedCompletionEl) {
+        estimatedCompletionEl.innerHTML = `Your order will be ready by <span class="font-semibold">${formattedTime}</span>`;
+    }
     
     // Update order button completion time
-    document.getElementById('order-completion-time').textContent = 
-        `Ready by ${formattedTime}`;
+    const orderCompletionTimeEl = document.getElementById('order-completion-time');
+    if (orderCompletionTimeEl) {
+        orderCompletionTimeEl.textContent = `Ready by ${formattedTime}`;
+    }
     
     // Add visual feedback for urgent orders
     const orderBtn = document.getElementById('place-order-btn');
-    orderBtn.className = 'w-full text-white py-3 px-6 rounded-lg font-semibold transition-colors flex flex-col items-center justify-center gap-1';
-    
-    if (rushType === 'rush' || rushType === 'same_day') {
-        orderBtn.classList.add('bg-gradient-to-r', 'from-red-500', 'to-red-600', 'hover:from-red-600', 'hover:to-red-700', 'shadow-lg');
-        if (rushType === 'same_day') {
-            orderBtn.classList.remove('from-red-500', 'to-red-600', 'hover:from-red-600', 'hover:to-red-700');
-            orderBtn.classList.add('from-purple-500', 'to-purple-600', 'hover:from-purple-600', 'hover:to-purple-700');
+    if (orderBtn) {
+        orderBtn.className = 'w-full text-white py-3 px-6 rounded-lg font-semibold transition-colors flex flex-col items-center justify-center gap-1';
+        
+        if (rushType === 'rush' || rushType === 'same_day') {
+            orderBtn.classList.add('bg-gradient-to-r', 'from-red-500', 'to-red-600', 'hover:from-red-600', 'hover:to-red-700', 'shadow-lg');
+            if (rushType === 'same_day') {
+                orderBtn.classList.remove('from-red-500', 'to-red-600', 'hover:from-red-600', 'hover:to-red-700');
+                orderBtn.classList.add('from-purple-500', 'to-purple-600', 'hover:from-purple-600', 'hover:to-purple-700');
+            }
+        } else if (rushType === 'express') {
+            orderBtn.classList.add('bg-gradient-to-r', 'from-orange-500', 'to-orange-600', 'hover:from-orange-600', 'hover:to-orange-700');
+        } else {
+            orderBtn.classList.add('bg-primary', 'hover:bg-primary/90');
         }
-    } else if (rushType === 'express') {
-        orderBtn.classList.add('bg-gradient-to-r', 'from-orange-500', 'to-orange-600', 'hover:from-orange-600', 'hover:to-orange-700');
-    } else {
-        orderBtn.classList.add('bg-primary', 'hover:bg-primary/90');
     }
 }
 
-// Initialize rush option listeners
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
+    // Rush option listeners
     const rushRadios = document.querySelectorAll('input[name="rush_option"]');
-    
-    rushRadios.forEach(radio => {
-        radio.addEventListener('change', function() {
+    rushRadios.forEach((radio) => {
+        radio.addEventListener('change', function () {
             if (this.checked) {
                 updateOrderSummary(this.value);
             }
         });
     });
-    
+
     // Initialize with default selection
     const defaultOption = document.querySelector('input[name="rush_option"]:checked');
     if (defaultOption) {
         updateOrderSummary(defaultOption.value);
     }
-    
-    // Initialize Lucide icons
+
+    // Form Submission
+    const checkoutForm = document.getElementById('checkout-form');
+    if (checkoutForm) {
+        checkoutForm.addEventListener('submit', async function (e) {
+            e.preventDefault();
+            
+            const btn = document.getElementById('place-order-btn');
+            const originalText = btn ? btn.innerHTML : '';
+            
+            // Show global loader immediately
+            if (window.UniPrintUI && typeof window.UniPrintUI.loading === 'object' && window.UniPrintUI.loading.show) {
+                window.UniPrintUI.loading.show({
+                    title: 'Placing your order...',
+                    message: 'Processing checkout. Please wait.'
+                });
+            } else if (window.UniPrintUI && typeof window.UniPrintUI.showLoading === 'function') {
+                window.UniPrintUI.showLoading({
+                    title: 'Placing your order...',
+                    message: 'Processing checkout. Please wait.'
+                });
+            }
+            
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="up-inline-spinner" aria-hidden="true"></span><span>Processing...</span>';
+            }
+
+            try {
+                const formData = new FormData(this);
+                const response = await fetch('{{ route("checkout.process") }}', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                        'Accept': 'application/json'
+                    },
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Hide loader
+                    if (window.UniPrintUI && typeof window.UniPrintUI.loading === 'object' && window.UniPrintUI.loading.hide) {
+                        window.UniPrintUI.loading.hide();
+                    } else if (window.UniPrintUI && typeof window.UniPrintUI.hideLoading === 'function') {
+                        window.UniPrintUI.hideLoading();
+                    }
+
+                    let message = 'Order placed successfully! ';
+                    message += 'You will receive pickup instructions shortly.';
+
+                    if (window.UniPrintUI && typeof window.UniPrintUI.alert === 'function') {
+                        await window.UniPrintUI.alert(message, { title: 'Success', variant: 'success' });
+                    } else {
+                        alert(message);
+                    }
+                    
+                    window.location.href = '{{ route("customer.orders") }}';
+                    return;
+                }
+
+                throw new Error(result.message || 'Failed to place order');
+            } catch (error) {
+                console.error('Checkout error:', error);
+                
+                // Hide loader on error
+                if (window.UniPrintUI && typeof window.UniPrintUI.loading === 'object' && window.UniPrintUI.loading.hide) {
+                    window.UniPrintUI.loading.hide();
+                } else if (window.UniPrintUI && typeof window.UniPrintUI.hideLoading === 'function') {
+                    window.UniPrintUI.hideLoading();
+                }
+                
+                if (window.UniPrintUI && typeof window.UniPrintUI.alert === 'function') {
+                    window.UniPrintUI.alert(error.message || 'Checkout failed', { title: 'Error', variant: 'danger' });
+                } else {
+                    alert('Error: ' + (error.message || 'Checkout failed'));
+                }
+
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                }
+                
+                if (typeof lucide !== 'undefined') {
+                    lucide.createIcons();
+                }
+            }
+        });
+    }
+
+    // Icons
     if (typeof lucide !== 'undefined') {
         lucide.createIcons();
-    }
-});
-
-// Form submission
-document.getElementById('checkout-form').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    
-    const btn = document.getElementById('place-order-btn');
-    const originalText = btn.innerHTML;
-    
-    // Show loading state
-    btn.disabled = true;
-    btn.innerHTML = '<div class="flex items-center gap-2"><i data-lucide="loader-2" class="h-5 w-5 animate-spin"></i><span>Processing Order...</span></div>';
-
-    if (window.UniPrintUI && UniPrintUI.loading && typeof UniPrintUI.loading.show === 'function') {
-        UniPrintUI.loading.show({ title: 'Placing your order…', message: 'Processing checkout. Please wait.' });
-    }
-    
-    try {
-        const formData = new FormData(this);
-        
-        // Add rush fee to form data
-        formData.append('rush_fee', currentRushFee);
-        
-        const response = await fetch('{{ route("checkout.process") }}', {
-            method: 'POST',
-            headers: {
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-            },
-            body: formData
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            // Show success message with rush info
-            const selectedRush = document.querySelector('input[name="rush_option"]:checked');
-            const rushInfo = rushOptions[selectedRush.value];
-            
-            let message = 'Order placed successfully! ';
-            if (rushInfo.fee > 0) {
-                message += `Your ${rushInfo.label.toLowerCase()} order will be ${rushInfo.description.toLowerCase()}. `;
-            }
-            message += 'You will receive pickup instructions shortly.';
-            
-            alert(message);
-            
-            // Redirect to orders page
-            window.location.href = '{{ route("customer.orders") }}';
-        } else {
-            throw new Error(result.message || 'Failed to place order');
-        }
-    } catch (error) {
-        console.error('Checkout error:', error);
-        alert('Error: ' + error.message);
-
-        if (window.UniPrintUI && UniPrintUI.loading && typeof UniPrintUI.loading.hide === 'function') {
-            UniPrintUI.loading.hide();
-        }
-        
-        // Reset button
-        btn.disabled = false;
-        btn.innerHTML = originalText;
-        
-        // Re-initialize Lucide icons
-        if (typeof lucide !== 'undefined') {
-            lucide.createIcons();
-        }
     }
 });
 </script>

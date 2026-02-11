@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Artisan;
@@ -26,8 +27,41 @@ class SystemController extends Controller
                 $autoCompleteHours = (int) $raw;
             }
         }
+
+        $taxRatePercent = 12.0;
+        if (Schema::hasTable('system_settings')) {
+            $rawTax = DB::table('system_settings')->where('key', 'tax_rate')->value('value');
+            if (is_numeric($rawTax)) {
+                $rate = (float) $rawTax;
+                if ($rate > 1) {
+                    $taxRatePercent = $rate;
+                } else {
+                    $taxRatePercent = $rate * 100;
+                }
+            }
+        }
+        if ($taxRatePercent < 0) {
+            $taxRatePercent = 0.0;
+        }
+        if ($taxRatePercent > 100) {
+            $taxRatePercent = 100.0;
+        }
+
+        $overdueCancelDays = 14;
+        if (Schema::hasTable('system_settings')) {
+            $rawOverdue = DB::table('system_settings')->where('key', 'order_overdue_cancel_days')->value('value');
+            if (is_numeric($rawOverdue)) {
+                $overdueCancelDays = (int) $rawOverdue;
+            }
+        }
+        if ($overdueCancelDays < 1) {
+            $overdueCancelDays = 14;
+        }
+        if ($overdueCancelDays > 365) {
+            $overdueCancelDays = 365;
+        }
         
-        return view('admin.settings', compact('backups', 'autoCompleteHours'));
+        return view('admin.settings', compact('backups', 'autoCompleteHours', 'taxRatePercent', 'overdueCancelDays'));
     }
 
     public function updateOrderAutoComplete(Request $request)
@@ -50,6 +84,126 @@ class SystemController extends Controller
         );
 
         return redirect()->back()->with('success', 'Auto-complete timeout updated successfully.');
+    }
+
+    public function updateTaxRate(Request $request)
+    {
+        $request->validate([
+            'tax_rate' => 'required|numeric|min:0|max:100',
+        ]);
+
+        if (! Schema::hasTable('system_settings')) {
+            return redirect()->back()->with('error', 'System settings table is not available. Please run migrations.');
+        }
+
+        DB::table('system_settings')->updateOrInsert(
+            ['key' => 'tax_rate'],
+            [
+                'value' => (string) $request->input('tax_rate'),
+                'updated_at' => now(),
+                'created_at' => now(),
+            ]
+        );
+
+        Cache::forget('system_setting.tax_rate');
+
+        return redirect()->back()->with('success', 'Tax rate updated successfully.');
+    }
+
+    public function updateOrderOverdueCancelDays(Request $request)
+    {
+        $request->validate([
+            'order_overdue_cancel_days' => 'required|integer|min:1|max:365',
+        ]);
+
+        if (! Schema::hasTable('system_settings')) {
+            return redirect()->back()->with('error', 'System settings table is not available. Please run migrations.');
+        }
+
+        DB::table('system_settings')->updateOrInsert(
+            ['key' => 'order_overdue_cancel_days'],
+            [
+                'value' => (string) $request->integer('order_overdue_cancel_days'),
+                'updated_at' => now(),
+                'created_at' => now(),
+            ]
+        );
+
+        return redirect()->back()->with('success', 'Overdue auto-cancel setting updated successfully.');
+    }
+
+    public function updateBranding(Request $request)
+    {
+        $request->validate([
+            'brand_name' => 'required|string|max:80',
+            'brand_tagline' => 'nullable|string|max:120',
+            'brand_logo' => 'nullable|image|max:2048',
+        ]);
+
+        if (! Schema::hasTable('system_settings')) {
+            return redirect()->back()->with('error', 'System settings table is not available. Please run migrations.');
+        }
+
+        $brandName = trim((string) $request->input('brand_name'));
+        $brandTagline = trim((string) $request->input('brand_tagline', ''));
+
+        $brandLogoUrl = DB::table('system_settings')->where('key', 'brand_logo_url')->value('value');
+        $brandLogoUrl = is_string($brandLogoUrl) ? $brandLogoUrl : null;
+
+        if ($request->hasFile('brand_logo')) {
+            $disk = env('BRANDING_DISK');
+            if (!$disk) {
+                $disk = env('AWS_ENDPOINT') ? 's3' : 'public';
+            }
+
+            try {
+                $path = $request->file('brand_logo')->storePublicly('branding', [
+                    'disk' => $disk,
+                    'visibility' => 'public',
+                ]);
+
+                if ($path) {
+                    $brandLogoUrl = Storage::disk($disk)->url($path);
+                }
+            } catch (\Throwable $e) {
+                return redirect()->back()->with('error', 'Failed to upload logo. Please check storage configuration.');
+            }
+        }
+
+        DB::table('system_settings')->updateOrInsert(
+            ['key' => 'brand_name'],
+            [
+                'value' => $brandName,
+                'updated_at' => now(),
+                'created_at' => now(),
+            ]
+        );
+
+        DB::table('system_settings')->updateOrInsert(
+            ['key' => 'brand_tagline'],
+            [
+                'value' => $brandTagline,
+                'updated_at' => now(),
+                'created_at' => now(),
+            ]
+        );
+
+        if ($brandLogoUrl !== null) {
+            DB::table('system_settings')->updateOrInsert(
+                ['key' => 'brand_logo_url'],
+                [
+                    'value' => (string) $brandLogoUrl,
+                    'updated_at' => now(),
+                    'created_at' => now(),
+                ]
+            );
+        }
+
+        Cache::forget('system_setting.brand_name');
+        Cache::forget('system_setting.brand_tagline');
+        Cache::forget('system_setting.brand_logo_url');
+
+        return redirect()->back()->with('success', 'Branding updated successfully.');
     }
     
     /**

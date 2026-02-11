@@ -1,23 +1,6 @@
-@extends('layouts.app')
+@extends('layouts.public')
 
 @section('title', 'Order Details')
-
-@section('dashboard-route', route('customer.dashboard'))
-
-@section('sidebar')
-    <a href="{{ route('customer.dashboard') }}" class="nav-link">
-        <i class="bi bi-speedometer2"></i>Dashboard
-    </a>
-    <a href="{{ route('customer.enterprises') }}" class="nav-link">
-        <i class="bi bi-shop"></i>Browse Shops
-    </a>
-    <a href="{{ route('customer.orders') }}" class="nav-link active">
-        <i class="bi bi-bag"></i>My Orders
-    </a>
-    <a href="{{ route('customer.design-assets') }}" class="nav-link">
-        <i class="bi bi-images"></i>My Designs
-    </a>
-@endsection
 
 @section('content')
 <div class="page-header d-flex justify-content-between align-items-center">
@@ -27,7 +10,7 @@
     </div>
     <div class="d-flex gap-2">
         @if(!empty($order->enterprise_id))
-            <a href="{{ route('chat.enterprise', $order->enterprise_id) }}" class="btn btn-outline-primary">
+            <a href="{{ route('chat.enterprise', $order->enterprise_id) }}" class="btn btn-outline-primary js-open-enterprise-chat" data-enterprise-id="{{ $order->enterprise_id }}">
                 <i class="bi bi-chat-dots me-2"></i>Chat with Shop
             </a>
         @endif
@@ -55,6 +38,38 @@
 
 <div class="row g-4">
     <div class="col-lg-8">
+        @if(isset($pendingExtensionRequest) && $pendingExtensionRequest)
+            <div class="alert alert-warning mb-4">
+                <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+                    <div>
+                        <strong><i class="bi bi-clock-history me-1"></i>Extension requested</strong>
+                        <div class="small text-muted mt-1">
+                            The shop requested {{ (int) ($pendingExtensionRequest->requested_days ?? 0) }} day(s) extension.
+                            @if(!empty($pendingExtensionRequest->proposed_due_date))
+                                Proposed due date: {{ date('M d, Y', strtotime($pendingExtensionRequest->proposed_due_date)) }}.
+                            @endif
+                        </div>
+                        @if(!empty($pendingExtensionRequest->message))
+                            <div class="small mt-2">Message: {{ $pendingExtensionRequest->message }}</div>
+                        @endif
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <form action="{{ route('customer.orders.extension.respond', [$order->purchase_order_id, $pendingExtensionRequest->request_id]) }}" method="POST" data-up-global-loader>
+                            @csrf
+                            <input type="hidden" name="decision" value="accept">
+                            <button type="submit" class="btn btn-sm btn-success" data-up-button-loader>Accept</button>
+                        </form>
+                        <form action="{{ route('customer.orders.extension.respond', [$order->purchase_order_id, $pendingExtensionRequest->request_id]) }}" method="POST" data-up-global-loader>
+                            @csrf
+                            <input type="hidden" name="decision" value="decline">
+                            <button type="submit" class="btn btn-sm btn-outline-danger" data-up-button-loader>Decline</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        @endif
+
         <!-- Order Status -->
         <div class="card mb-4">
             <div class="card-body text-center">
@@ -94,6 +109,53 @@
                     <h3 class="mt-3">Order Complete</h3>
                     <p class="text-muted">Your order has been delivered</p>
                 @endif
+
+                @php
+                    $latestByStatus = collect($statusHistory ?? [])->groupBy('status_name')->map(function ($g) {
+                        return $g->first();
+                    });
+
+                    $hasDelivered = $latestByStatus->has('Delivered');
+                    $hasReady = $latestByStatus->has('Ready for Pickup');
+                    $fulfillmentStep = $hasDelivered ? 'Delivered' : ($hasReady ? 'Ready for Pickup' : 'Delivered');
+
+                    $steps = ['Pending', 'Confirmed', 'In Progress', $fulfillmentStep, 'Completed'];
+                    $currentIndex = array_search($status, $steps, true);
+                    $progressPct = ($currentIndex === false || count($steps) < 2)
+                        ? 0
+                        : ((int) $currentIndex / (count($steps) - 1)) * 100;
+                @endphp
+
+                @if($status !== 'Cancelled')
+                    <div class="mt-4">
+                        <div class="d-flex justify-content-between position-relative" style="gap: 6px;">
+                            <div class="position-absolute top-50 start-0 end-0 translate-middle-y" style="height: 4px; background: #e9ecef;"></div>
+                            <div class="position-absolute top-50 start-0 translate-middle-y" style="height: 4px; background: #0d6efd; width: {{ $progressPct }}%;"></div>
+
+                            @foreach($steps as $idx => $step)
+                                @php
+                                    $active = ($currentIndex !== false) && ($idx <= $currentIndex);
+                                    $t = optional($latestByStatus->get($step))->timestamp;
+                                @endphp
+                                <div class="text-center" style="flex: 1; min-width: 0;">
+                                    <div class="d-inline-flex align-items-center justify-content-center rounded-circle {{ $active ? 'bg-primary text-white' : 'bg-light text-muted border' }}" style="width: 32px; height: 32px; position: relative; z-index: 1;">
+                                        @if($active)
+                                            <i class="bi bi-check"></i>
+                                        @else
+                                            <span class="small">{{ $idx + 1 }}</span>
+                                        @endif
+                                    </div>
+                                    <div class="small mt-2 {{ $active ? 'fw-semibold' : 'text-muted' }}" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ $step }}</div>
+                                    <div class="text-muted" style="font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                        @if(!empty($t))
+                                            {{ is_string($t) ? date('M d, H:i', strtotime($t)) : $t->format('M d, H:i') }}
+                                        @endif
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
             </div>
         </div>
 
@@ -111,6 +173,13 @@
                             <span class="badge bg-secondary">Quantity: {{ $item->quantity }}</span>
                         </div>
                         <h5 class="text-primary mb-0">₱{{ number_format($item->total_cost ?? ($item->quantity * ($item->unit_price ?? 0)), 2) }}</h5>
+                    </div>
+
+                    <div class="mt-3">
+                        <small class="text-muted d-block mb-1"><strong>Service Description</strong></small>
+                        <div class="small text-muted whitespace-pre-line">
+                            {{ $item->service_description ?? 'No description available.' }}
+                        </div>
                     </div>
 
                     @if(isset($item->customizations) && $item->customizations->count() > 0)
@@ -148,6 +217,7 @@
                         <strong><i class="bi bi-chat-left-text me-1"></i>Your Notes:</strong> {{ $item->notes_to_enterprise ?? '' }}
                     </div>
                     @endif
+
                 </div>
                 @endforeach
 

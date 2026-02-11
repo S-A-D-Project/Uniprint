@@ -72,7 +72,7 @@
                                 </div>
                                 <div class="flex items-center gap-1 bg-primary/10 px-2 py-1 rounded">
                                     <i data-lucide="star" class="h-4 w-4 fill-primary text-primary"></i>
-                                    <span class="text-sm font-medium">4.8</span>
+                                    <span class="text-sm font-medium">{{ !empty($enterprise->review_count) ? number_format((float) ($enterprise->rating ?? 0), 1) : '—' }}</span>
                                 </div>
                             </div>
 

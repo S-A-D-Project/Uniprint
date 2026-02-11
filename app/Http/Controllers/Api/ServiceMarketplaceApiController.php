@@ -4,117 +4,156 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 
 class ServiceMarketplaceApiController extends Controller
 {
+    private function isPostgres(): bool
+    {
+        return DB::connection()->getDriverName() === 'pgsql';
+    }
+
+    private function applyEnterpriseVisibilityConstraints($query): void
+    {
+        if (Schema::hasColumn('enterprises', 'is_active')) {
+            $query->where('e.is_active', true);
+        }
+
+        if (Schema::hasColumn('enterprises', 'is_verified')) {
+            $query->where('e.is_verified', true);
+        }
+    }
+
     /**
      * Get marketplace services with filtering and pagination
      */
     public function getServices(Request $request)
     {
         try {
-            $userId = session('user_id');
+            $userId = Auth::user()?->user_id;
             
             if (!$userId) {
                 return response()->json(['error' => 'Unauthorized'], 401);
             }
 
-            $page = (int) $request->get('page', 1);
+            $page = max(1, (int) $request->get('page', 1));
             $limit = 12;
-            $offset = ($page - 1) * $limit;
 
-            // Check if reviews table exists
-            $reviewsTableExists = Schema::hasTable('reviews');
-            
-            // Build query for services
-            $query = DB::table('services as s')
-                ->join('enterprises as e', 's.enterprise_id', '=', 'e.enterprise_id');
-            
-            if ($reviewsTableExists) {
-                $query->leftJoin('reviews as r', 's.service_id', '=', 'r.service_id');
-            }
-            
-            $query->where('s.is_active', true);
-            
-            $selectFields = [
-                's.service_id',
-                's.service_name as title',
-                's.description',
-                's.base_price as price',
-                's.base_price as original_price', // Can be modified for discounts
-                'e.name as provider_name',
-                'e.address as location',
-                DB::raw("'printing' as service_type"),
-                DB::raw('false as is_featured'),
-                Schema::hasColumn('services', 'image_path')
-                    ? DB::raw("CASE WHEN s.image_path IS NULL OR s.image_path = '' THEN NULL ELSE '/storage/' || s.image_path END as image_url")
-                    : DB::raw('NULL as image_url')
-            ];
-            
-            if ($reviewsTableExists) {
-                $selectFields[] = DB::raw('COALESCE(AVG(r.rating), 0) as rating');
-                $selectFields[] = DB::raw('COUNT(r.review_id) as review_count');
-                $groupBy = ['s.service_id', 's.service_name', 's.description', 's.base_price', 'e.name', 'e.address'];
-                if (Schema::hasColumn('services', 'image_path')) {
-                    $groupBy[] = 's.image_path';
+            $cacheKey = 'marketplace.services.' . md5(json_encode([
+                'page' => $page,
+                'sort_by' => (string) $request->get('sort_by', 'relevance'),
+                'category' => (string) $request->get('category', ''),
+                'enterprise_id' => (string) $request->get('enterprise_id', ''),
+                'search' => (string) $request->get('search', ''),
+                'price_range' => (string) $request->get('price_range', ''),
+                'service_type' => (string) $request->get('service_type', ''),
+            ]));
+
+            $cached = Cache::remember($cacheKey, 60, function () use ($request, $limit, $page) {
+                $reviewsTableExists = Schema::hasTable('reviews');
+
+                $query = DB::table('services as s')
+                    ->join('enterprises as e', 's.enterprise_id', '=', 'e.enterprise_id')
+                    ->where('s.is_active', true);
+
+                $this->applyEnterpriseVisibilityConstraints($query);
+
+                if ($reviewsTableExists) {
+                    $reviewsAgg = DB::table('reviews')
+                        ->select('service_id', DB::raw('AVG(rating) as rating'), DB::raw('COUNT(*) as review_count'))
+                        ->groupBy('service_id');
+
+                    $query->leftJoinSub($reviewsAgg, 'ra', function ($join) {
+                        $join->on('s.service_id', '=', 'ra.service_id');
+                    });
                 }
-                $query->groupBy($groupBy);
-            } else {
-                $selectFields[] = DB::raw('0 as rating');
-                $selectFields[] = DB::raw('0 as review_count');
-            }
-            
-            $query->select($selectFields);
 
-            // Apply filters
-            $this->applyFilters($query, $request);
+                $selectFields = [
+                    's.service_id',
+                    's.service_name as title',
+                    's.description',
+                    's.base_price as price',
+                    's.base_price as original_price',
+                    'e.name as provider_name',
+                    'e.address as location',
+                    Schema::hasColumn('services', 'fulfillment_type')
+                        ? 's.fulfillment_type as service_type'
+                        : DB::raw("'pickup' as service_type"),
+                    Schema::hasColumn('services', 'image_path')
+                        ? 's.image_path'
+                        : DB::raw('NULL as image_path'),
+                ];
 
-            // Apply sorting
-            $this->applySorting($query, $request->get('sort_by', 'relevance'));
+                if ($reviewsTableExists) {
+                    $selectFields[] = DB::raw('COALESCE(ra.rating, 0) as rating');
+                    $selectFields[] = DB::raw('COALESCE(ra.review_count, 0) as review_count');
+                } else {
+                    $selectFields[] = DB::raw('0 as rating');
+                    $selectFields[] = DB::raw('0 as review_count');
+                }
 
-            // Get total count
-            $totalQuery = clone $query;
-            $total = $totalQuery->count();
+                $query->select($selectFields);
 
-            // Get paginated results
-            $services = $query->offset($offset)->limit($limit)->get();
+                $this->applyFilters($query, $request);
+                $this->applySorting($query, $request->get('sort_by', 'relevance'));
 
-            // Format services
-            $formattedServices = $services->map(function($service) {
+                $paginator = $query->paginate($limit, ['*'], 'page', $page);
+
+                $disk = config('filesystems.default', 'public');
+                $formattedServices = collect($paginator->items())->map(function ($service) use ($disk) {
+                    $imageUrl = null;
+                    $path = $service->image_path ?? null;
+                    if (!empty($path)) {
+                        try {
+                            $imageUrl = Storage::disk($disk)->url($path);
+                        } catch (\Throwable $e) {
+                            try {
+                                $imageUrl = Storage::disk('public')->url($path);
+                            } catch (\Throwable $e2) {
+                                $imageUrl = null;
+                            }
+                        }
+                    }
+                    return [
+                        'service_id' => $service->service_id,
+                        'title' => $service->title,
+                        'description' => $service->description ?? '',
+                        'price' => number_format($service->price, 2),
+                        'original_price' => null,
+                        'provider_name' => $service->provider_name,
+                        'location' => $service->location ?: 'Online',
+                        'rating' => round($service->rating, 1),
+                        'review_count' => $service->review_count,
+                        'service_type' => $service->service_type,
+                        'is_featured' => $service->review_count > 10,
+                        'image_url' => $imageUrl,
+                    ];
+                });
+
                 return [
-                    'service_id' => $service->service_id,
-                    'title' => $service->title,
-                    'description' => $service->description ?? '',
-                    'price' => number_format($service->price, 2),
-                    'original_price' => null,
-                    'provider_name' => $service->provider_name,
-                    'location' => $service->location ?: 'Online',
-                    'rating' => round($service->rating, 1),
-                    'review_count' => $service->review_count,
-                    'service_type' => $service->service_type,
-                    'is_featured' => $service->review_count > 10,
-                    'image_url' => $service->image_url
+                    'services' => $formattedServices,
+                    'total' => $paginator->total(),
+                    'has_more' => $paginator->hasMorePages(),
                 ];
             });
-
-            $hasMore = ($offset + $services->count()) < $total;
 
             Log::info('Marketplace services loaded', [
                 'user_id' => $userId,
                 'page' => $page,
-                'total' => $total,
+                'total' => $cached['total'] ?? null,
                 'filters' => $request->all()
             ]);
 
             return response()->json([
-                'services' => $formattedServices,
-                'total' => $total,
+                'services' => $cached['services'],
+                'total' => $cached['total'],
                 'page' => $page,
-                'has_more' => $hasMore
+                'has_more' => $cached['has_more']
             ]);
 
         } catch (\Exception $e) {
@@ -134,7 +173,7 @@ class ServiceMarketplaceApiController extends Controller
     public function getSearchSuggestions(Request $request)
     {
         try {
-            $userId = session('user_id');
+            $userId = Auth::user()?->user_id;
             
             if (!$userId) {
                 return response()->json(['error' => 'Unauthorized'], 401);
@@ -146,24 +185,35 @@ class ServiceMarketplaceApiController extends Controller
                 return response()->json([]);
             }
 
-            // Cache suggestions for performance
-            $cacheKey = "search_suggestions_" . md5($query);
-            $suggestions = Cache::remember($cacheKey, 300, function() use ($query) {
-                return DB::table('services as s')
+            $isPostgres = $this->isPostgres();
+            $cacheKey = 'search_suggestions_' . md5($query);
+            $suggestions = Cache::remember($cacheKey, 300, function () use ($query, $isPostgres) {
+                $q = DB::table('services as s')
                     ->join('enterprises as e', 's.enterprise_id', '=', 'e.enterprise_id')
-                    ->where('s.is_active', true)
-                    ->where('s.service_name', 'ILIKE', "%{$query}%")
-                    ->select(
-                        's.service_name as term',
-                        DB::raw("'Printing Services' as category"),
-                        DB::raw('(
-                            SELECT COUNT(*) FROM services 
-                            WHERE service_name ILIKE "%' . $query . '%"
-                        ) as count')
-                    )
-                    ->distinct()
+                    ->where('s.is_active', true);
+
+                $this->applyEnterpriseVisibilityConstraints($q);
+
+                if ($isPostgres) {
+                    $q->where('s.service_name', 'ILIKE', "%{$query}%");
+                } else {
+                    $q->whereRaw('LOWER(s.service_name) LIKE ?', ['%' . strtolower($query) . '%']);
+                }
+
+                $rows = $q
+                    ->select('s.service_name as term', DB::raw('COUNT(*) as count'))
+                    ->groupBy('s.service_name')
+                    ->orderByDesc(DB::raw('COUNT(*)'))
                     ->limit(5)
                     ->get();
+
+                return $rows->map(function ($row) {
+                    return [
+                        'term' => $row->term,
+                        'category' => 'Service',
+                        'count' => (int) ($row->count ?? 0),
+                    ];
+                });
             });
 
             Log::info('Search suggestions loaded', [
@@ -190,7 +240,7 @@ class ServiceMarketplaceApiController extends Controller
     public function getServiceDetails($serviceId)
     {
         try {
-            $userId = session('user_id');
+            $userId = Auth::user()?->user_id;
             
             if (!$userId) {
                 return response()->json(['error' => 'Unauthorized'], 401);
@@ -201,6 +251,8 @@ class ServiceMarketplaceApiController extends Controller
             
             $query = DB::table('services as s')
                 ->join('enterprises as e', 's.enterprise_id', '=', 'e.enterprise_id');
+
+            $this->applyEnterpriseVisibilityConstraints($query);
             
             if ($reviewsTableExists) {
                 $query->leftJoin('reviews as r', 's.service_id', '=', 'r.service_id');
@@ -222,8 +274,8 @@ class ServiceMarketplaceApiController extends Controller
                     ? 'e.email as email'
                     : DB::raw('NULL as email'),
                 Schema::hasColumn('services', 'image_path')
-                    ? DB::raw("CASE WHEN s.image_path IS NULL OR s.image_path = '' THEN NULL ELSE '/storage/' || s.image_path END as image_url")
-                    : DB::raw('NULL as image_url')
+                    ? 's.image_path'
+                    : DB::raw('NULL as image_path')
             ];
             
             if ($reviewsTableExists) {
@@ -253,6 +305,12 @@ class ServiceMarketplaceApiController extends Controller
             // Get related services
             $relatedServices = DB::table('services as s')
                 ->join('enterprises as e', 's.enterprise_id', '=', 'e.enterprise_id')
+                ->when(Schema::hasColumn('enterprises', 'is_active'), function ($q) {
+                    $q->where('e.is_active', true);
+                })
+                ->when(Schema::hasColumn('enterprises', 'is_verified'), function ($q) {
+                    $q->where('e.is_verified', true);
+                })
                 ->where('s.is_active', true)
                 ->where('s.service_id', '!=', $serviceId)
                 ->where('s.enterprise_id', '=', DB::raw("(SELECT enterprise_id FROM services WHERE service_id = '{$serviceId}')"))
@@ -263,12 +321,26 @@ class ServiceMarketplaceApiController extends Controller
                     's.base_price as price',
                     'e.name as provider_name',
                     Schema::hasColumn('services', 'image_path')
-                        ? DB::raw("CASE WHEN s.image_path IS NULL OR s.image_path = '' THEN NULL ELSE '/storage/' || s.image_path END as image_url")
-                        : DB::raw('NULL as image_url')
+                        ? 's.image_path'
+                        : DB::raw('NULL as image_path')
                 ])
                 ->get();
 
             // Format service
+            $disk = config('filesystems.default', 'public');
+            $imageUrl = null;
+            if (!empty($service->image_path ?? null)) {
+                try {
+                    $imageUrl = Storage::disk($disk)->url($service->image_path);
+                } catch (\Throwable $e) {
+                    try {
+                        $imageUrl = Storage::disk('public')->url($service->image_path);
+                    } catch (\Throwable $e2) {
+                        $imageUrl = null;
+                    }
+                }
+            }
+
             $formattedService = [
                 'service_id' => $service->service_id,
                 'title' => $service->title,
@@ -281,14 +353,26 @@ class ServiceMarketplaceApiController extends Controller
                 'email' => $service->email,
                 'rating' => round($service->rating, 1),
                 'review_count' => $service->review_count,
-                'image_url' => $service->image_url,
-                'related_services' => $relatedServices->map(function($related) {
+                'image_url' => $imageUrl,
+                'related_services' => $relatedServices->map(function($related) use ($disk) {
+                    $relatedImageUrl = null;
+                    if (!empty($related->image_path ?? null)) {
+                        try {
+                            $relatedImageUrl = Storage::disk($disk)->url($related->image_path);
+                        } catch (\Throwable $e) {
+                            try {
+                                $relatedImageUrl = Storage::disk('public')->url($related->image_path);
+                            } catch (\Throwable $e2) {
+                                $relatedImageUrl = null;
+                            }
+                        }
+                    }
                     return [
                         'service_id' => $related->service_id,
                         'title' => $related->title,
                         'price' => number_format($related->price, 2),
                         'provider_name' => $related->provider_name,
-                        'image_url' => $related->image_url
+                        'image_url' => $relatedImageUrl
                     ];
                 })
             ];
@@ -317,7 +401,7 @@ class ServiceMarketplaceApiController extends Controller
     public function toggleFavorite(Request $request)
     {
         try {
-            $userId = session('user_id');
+            $userId = Auth::user()?->user_id;
             
             if (!$userId) {
                 return response()->json(['error' => 'Unauthorized'], 401);
@@ -330,10 +414,14 @@ class ServiceMarketplaceApiController extends Controller
             }
 
             // Check if service exists
-            $service = DB::table('services')
-                ->where('service_id', $serviceId)
-                ->where('is_active', true)
-                ->first();
+            $serviceQuery = DB::table('services as s')
+                ->join('enterprises as e', 's.enterprise_id', '=', 'e.enterprise_id')
+                ->where('s.service_id', $serviceId)
+                ->where('s.is_active', true);
+
+            $this->applyEnterpriseVisibilityConstraints($serviceQuery);
+
+            $service = $serviceQuery->select('s.*')->first();
 
             if (!$service) {
                 return response()->json(['error' => 'Service not found'], 404);
@@ -402,34 +490,58 @@ class ServiceMarketplaceApiController extends Controller
     public function getCategories()
     {
         try {
-            $userId = session('user_id');
+            $userId = Auth::user()?->user_id;
             
             if (!$userId) {
                 return response()->json(['error' => 'Unauthorized'], 401);
             }
 
-            // Cache categories for performance
-            $categories = Cache::remember('marketplace_categories', 3600, function() {
-                return [
-                    ['id' => 'all', 'name' => 'All Services', 'icon' => 'grid', 'count' => 0],
-                    ['id' => 'business', 'name' => 'Business Services', 'icon' => 'briefcase', 'count' => 0],
-                    ['id' => 'design', 'name' => 'Design & Creative', 'icon' => 'palette', 'count' => 0],
-                    ['id' => 'marketing', 'name' => 'Marketing', 'icon' => 'megaphone', 'count' => 0],
-                    ['id' => 'printing', 'name' => 'Printing & Production', 'icon' => 'printer', 'count' => 0],
-                    ['id' => 'digital', 'name' => 'Digital Services', 'icon' => 'monitor', 'count' => 0],
-                    ['id' => 'consulting', 'name' => 'Consulting', 'icon' => 'users', 'count' => 0]
-                ];
-            });
+            $categories = Cache::remember('marketplace_categories_v2', 3600, function () {
+                $allCountQuery = DB::table('services as s')
+                    ->join('enterprises as e', 's.enterprise_id', '=', 'e.enterprise_id')
+                    ->where('s.is_active', true);
 
-            // Get actual counts
-            foreach ($categories as &$category) {
-                if ($category['id'] === 'all') {
-                    $category['count'] = DB::table('services')->where('is_active', true)->count();
-                } else {
-                    // For demo, assign some counts - in real implementation, this would be based on actual categorization
-                    $category['count'] = rand(5, 50);
+                if (Schema::hasColumn('enterprises', 'is_active')) {
+                    $allCountQuery->where('e.is_active', true);
                 }
-            }
+                if (Schema::hasColumn('enterprises', 'is_verified')) {
+                    $allCountQuery->where('e.is_verified', true);
+                }
+
+                $allCount = $allCountQuery->count();
+
+                if (!Schema::hasColumn('enterprises', 'category')) {
+                    return [
+                        ['id' => 'all', 'name' => 'All Services', 'icon' => 'grid', 'count' => (int) $allCount],
+                    ];
+                }
+
+                $byCategory = DB::table('enterprises as e')
+                    ->join('services as s', 'e.enterprise_id', '=', 's.enterprise_id')
+                    ->where('e.is_active', true)
+                    ->when(Schema::hasColumn('enterprises', 'is_verified'), function ($q) {
+                        $q->where('e.is_verified', true);
+                    })
+                    ->where('s.is_active', true)
+                    ->select('e.category', DB::raw('COUNT(DISTINCT s.service_id) as count'))
+                    ->groupBy('e.category')
+                    ->orderBy('e.category')
+                    ->get();
+
+                $mapped = $byCategory->map(function ($row) {
+                    $name = (string) ($row->category ?? 'General');
+                    return [
+                        'id' => $name,
+                        'name' => $name,
+                        'icon' => 'grid',
+                        'count' => (int) ($row->count ?? 0),
+                    ];
+                })->values()->all();
+
+                return array_merge([
+                    ['id' => 'all', 'name' => 'All Services', 'icon' => 'grid', 'count' => (int) $allCount],
+                ], $mapped);
+            });
 
             Log::info('Marketplace categories loaded', ['user_id' => $userId]);
 
@@ -450,43 +562,59 @@ class ServiceMarketplaceApiController extends Controller
      */
     private function applyFilters($query, Request $request)
     {
-        // Category filter
         $category = $request->get('category', 'all');
-        if ($category !== 'all') {
-            // In real implementation, this would filter by actual categories
-            // For demo, we'll apply some basic filtering
-            switch($category) {
-                case 'printing':
-                    $query->where('s.service_name', 'ILIKE', '%print%');
-                    break;
-                case 'design':
-                    $query->where('s.service_name', 'ILIKE', '%design%');
-                    break;
-                case 'business':
-                    $query->where('s.service_name', 'ILIKE', '%business%');
-                    break;
+        if (!empty($category) && $category !== 'all') {
+            if (Schema::hasColumn('enterprises', 'category')) {
+                $query->where('e.category', $category);
+            } elseif (Schema::hasColumn('services', 'category')) {
+                $query->where('s.category', $category);
             }
         }
 
-        // Search filter
-        $search = $request->get('search', '');
-        if (!empty($search)) {
-            $query->where(function($q) use ($search) {
-                $q->where('s.service_name', 'ILIKE', "%{$search}%")
-                  ->orWhere('s.description', 'ILIKE', "%{$search}%")
-                  ->orWhere('e.name', 'ILIKE', "%{$search}%");
+        $enterpriseId = $request->get('enterprise_id');
+        if (!empty($enterpriseId)) {
+            $query->where('s.enterprise_id', $enterpriseId);
+        }
+
+        $search = (string) $request->get('search', '');
+        if ($search !== '') {
+            $isPostgres = $this->isPostgres();
+
+            $query->where(function ($q) use ($search, $isPostgres) {
+                if ($isPostgres) {
+                    $q->where('s.service_name', 'ILIKE', "%{$search}%")
+                        ->orWhere('s.description', 'ILIKE', "%{$search}%")
+                        ->orWhere('e.name', 'ILIKE', "%{$search}%");
+                } else {
+                    $like = '%' . strtolower($search) . '%';
+                    $q->whereRaw('LOWER(s.service_name) LIKE ?', [$like])
+                        ->orWhereRaw('LOWER(COALESCE(s.description, \'\')) LIKE ?', [$like])
+                        ->orWhereRaw('LOWER(e.name) LIKE ?', [$like]);
+                }
             });
         }
 
-        // Location filter
-        $location = $request->get('location', '');
-        if (!empty($location)) {
-            $query->where('e.address', 'ILIKE', "%{$location}%");
+        $location = (string) $request->get('location', '');
+        if ($location !== '') {
+            if ($this->isPostgres()) {
+                $query->where('e.address', 'ILIKE', "%{$location}%");
+            } else {
+                $query->whereRaw('LOWER(COALESCE(e.address, \'\')) LIKE ?', ['%' . strtolower($location) . '%']);
+            }
         }
 
-        // Price range filter
+        $minPrice = $request->get('min_price');
+        if (is_numeric($minPrice)) {
+            $query->where('s.base_price', '>=', (float) $minPrice);
+        }
+
+        $maxPrice = $request->get('max_price');
+        if (is_numeric($maxPrice)) {
+            $query->where('s.base_price', '<=', (float) $maxPrice);
+        }
+
         $priceRange = $request->get('price_range', '');
-        if (!empty($priceRange)) {
+        if (!empty($priceRange) && !is_numeric($minPrice) && !is_numeric($maxPrice)) {
             switch($priceRange) {
                 case '0-500':
                     $query->where('s.base_price', '<', 500);
@@ -507,25 +635,148 @@ class ServiceMarketplaceApiController extends Controller
         $rating = $request->get('rating', '');
         if (!empty($rating) && Schema::hasTable('reviews')) {
             $minRating = (float) str_replace('+', '', $rating);
-            $query->havingRaw('COALESCE(AVG(r.rating), 0) >= ?', [$minRating]);
+            $query->whereRaw('COALESCE(ra.rating, 0) >= ?', [$minRating]);
         }
 
-        // Service type filter
-        $serviceType = $request->get('service_type', '');
-        if (!empty($serviceType)) {
-            // In real implementation, this would filter by actual service types
-            // For demo, we'll apply some basic logic
-            switch($serviceType) {
-                case 'online':
-                    $query->where('e.city', 'ILIKE', '%online%');
-                    break;
-                case 'onsite':
-                    $query->whereNotNull('e.address');
-                    break;
-                case 'delivery':
-                    $query->where('s.service_name', 'ILIKE', '%delivery%');
-                    break;
+        $fulfillmentType = (string) $request->get('fulfillment_type', '');
+        if ($fulfillmentType !== '' && Schema::hasColumn('services', 'fulfillment_type')) {
+            if ($fulfillmentType === 'pickup') {
+                $query->whereIn('s.fulfillment_type', ['pickup', 'both']);
+            } elseif ($fulfillmentType === 'delivery') {
+                $query->whereIn('s.fulfillment_type', ['delivery', 'both']);
+            } elseif ($fulfillmentType === 'both') {
+                $query->where('s.fulfillment_type', 'both');
             }
+        }
+    }
+
+    public function getEnterprises(Request $request)
+    {
+        try {
+            $userId = Auth::user()?->user_id;
+            if (!$userId) {
+                return response()->json(['error' => 'Unauthorized'], 401);
+            }
+
+            $term = (string) $request->get('q', '');
+            $limit = min(30, max(5, (int) $request->get('limit', 20)));
+
+            $q = DB::table('enterprises as e')
+                ->join('services as s', 'e.enterprise_id', '=', 's.enterprise_id')
+                ->where('s.is_active', true)
+                ->select(
+                    'e.enterprise_id',
+                    'e.name',
+                    DB::raw('COUNT(DISTINCT s.service_id) as services_count')
+                )
+                ->groupBy('e.enterprise_id', 'e.name');
+
+            if (Schema::hasColumn('enterprises', 'is_active')) {
+                $q->where('e.is_active', true);
+            }
+            if (Schema::hasColumn('enterprises', 'is_verified')) {
+                $q->where('e.is_verified', true);
+            }
+
+            if ($term !== '') {
+                if ($this->isPostgres()) {
+                    $q->where('e.name', 'ILIKE', "%{$term}%");
+                } else {
+                    $q->whereRaw('LOWER(e.name) LIKE ?', ['%' . strtolower($term) . '%']);
+                }
+            }
+
+            $rows = $q
+                ->orderBy('e.name')
+                ->limit($limit)
+                ->get();
+
+            return response()->json($rows->map(function ($row) {
+                return [
+                    'enterprise_id' => $row->enterprise_id,
+                    'name' => $row->name,
+                    'services_count' => (int) ($row->services_count ?? 0),
+                ];
+            }));
+        } catch (\Throwable $e) {
+            Log::error('Failed to load marketplace enterprises', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json(['error' => 'Failed to load enterprises'], 500);
+        }
+    }
+
+    public function getLocations(Request $request)
+    {
+        try {
+            $userId = Auth::user()?->user_id;
+            if (!$userId) {
+                return response()->json(['error' => 'Unauthorized'], 401);
+            }
+
+            $limit = min(50, max(5, (int) $request->get('limit', 30)));
+
+            $q = DB::table('enterprises as e')
+                ->join('services as s', 'e.enterprise_id', '=', 's.enterprise_id')
+                ->where('s.is_active', true)
+                ->whereNotNull('e.address')
+                ->where('e.address', '!=', '')
+                ->select('e.address')
+                ->distinct()
+                ->limit(500);
+
+            if (Schema::hasColumn('enterprises', 'is_active')) {
+                $q->where('e.is_active', true);
+            }
+            if (Schema::hasColumn('enterprises', 'is_verified')) {
+                $q->where('e.is_verified', true);
+            }
+
+            $rows = $q->get();
+
+            $seen = [];
+            $locations = [];
+
+            foreach ($rows as $row) {
+                $address = trim((string) ($row->address ?? ''));
+                if ($address === '') {
+                    continue;
+                }
+
+                $parts = array_values(array_filter(array_map('trim', explode(',', $address)), function ($v) {
+                    return $v !== '';
+                }));
+
+                $token = $parts ? end($parts) : $address;
+                $token = trim((string) $token);
+                if ($token === '') {
+                    continue;
+                }
+
+                $key = mb_strtolower($token);
+                if (isset($seen[$key])) {
+                    continue;
+                }
+
+                $seen[$key] = true;
+                $locations[] = [
+                    'id' => $token,
+                    'name' => $token,
+                ];
+
+                if (count($locations) >= $limit) {
+                    break;
+                }
+            }
+
+            return response()->json($locations);
+        } catch (\Throwable $e) {
+            Log::error('Failed to load marketplace locations', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json(['error' => 'Failed to load locations'], 500);
         }
     }
 
@@ -540,9 +791,8 @@ class ServiceMarketplaceApiController extends Controller
             case 'popular':
                 if ($reviewsTableExists) {
                     $query->orderBy('review_count', 'desc');
-                } else {
-                    $query->orderBy('s.created_at', 'desc');
                 }
+                $query->orderBy('s.created_at', 'desc');
                 break;
             case 'price-low':
                 $query->orderBy('s.base_price', 'asc');
@@ -552,17 +802,16 @@ class ServiceMarketplaceApiController extends Controller
                 break;
             case 'rating':
                 if ($reviewsTableExists) {
-                    $query->orderByRaw('COALESCE(AVG(r.rating), 0) DESC');
-                } else {
-                    $query->orderBy('s.created_at', 'desc');
+                    $query->orderBy('rating', 'desc');
                 }
+                $query->orderBy('s.created_at', 'desc');
                 break;
             case 'newest':
                 $query->orderBy('s.created_at', 'desc');
                 break;
             case 'relevance':
             default:
-                $query->orderBy('s.base_price', 'asc');
+                $query->orderBy('s.created_at', 'desc');
                 break;
         }
     }

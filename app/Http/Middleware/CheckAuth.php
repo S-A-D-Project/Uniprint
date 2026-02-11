@@ -17,6 +17,12 @@ class CheckAuth
             $userId = session('user_id');
 
             if (!$userId) {
+                if ($request->expectsJson() || $request->ajax() || $request->is('api') || $request->is('api/*')) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Unauthorized',
+                    ], 401);
+                }
                 if ($request->is('admin') || $request->is('admin/*')) {
                     return redirect()->route('admin.login')->with('error', 'Please login to continue');
                 }

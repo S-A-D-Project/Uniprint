@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     
-    <title>@yield('title', 'UniPrint') - Smart Printing Services for Baguio</title>
+    <title>@yield('title', system_brand_name()) - {{ system_brand_tagline() }}</title>
     
     <script>
         (function () {
@@ -95,6 +95,8 @@
     
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
+
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     
     @stack('styles')
 </head>
@@ -251,12 +253,96 @@
         lucide.createIcons();
     </script>
     
-    <!-- Alpine.js for interactions -->
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ asset('js/uniprint-ui.js') }}"></script>
     
     @stack('scripts')
+
+    @auth
+        @if(($layoutPublicRoleType ?? null) === 'customer')
+            <div class="modal fade" id="userReportModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <form method="POST" action="{{ route('reports.store') }}" data-up-global-loader>
+                            @csrf
+                            <div class="modal-header">
+                                <h5 class="modal-title">Report</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <input type="hidden" name="entity_type" id="userReportEntityType" value="">
+                                <input type="hidden" name="enterprise_id" id="userReportEnterpriseId" value="">
+                                <input type="hidden" name="service_id" id="userReportServiceId" value="">
+
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">Reason</label>
+                                    <select name="reason" class="form-select" required>
+                                        <option value="">Select a reason</option>
+                                        <option value="Scam / Fraud">Scam / Fraud</option>
+                                        <option value="Inappropriate content">Inappropriate content</option>
+                                        <option value="Misleading information">Misleading information</option>
+                                        <option value="Poor service">Poor service</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                </div>
+
+                                <div class="mb-0">
+                                    <label class="form-label fw-semibold">Details (optional)</label>
+                                    <textarea name="description" class="form-control" rows="3" maxlength="2000" placeholder="Provide more context..."></textarea>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-danger" data-up-button-loader>Submit Report</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        @endif
+    @endauth
+
+    <script>
+        document.addEventListener('click', async function (e) {
+            const link = e.target.closest('a.js-open-enterprise-chat');
+            if (!link) return;
+
+            const enterpriseId = link.getAttribute('data-enterprise-id');
+            if (!enterpriseId) return;
+
+            if (window.UniPrintChat && typeof window.UniPrintChat.openEnterpriseChat === 'function') {
+                e.preventDefault();
+                try {
+                    await window.UniPrintChat.openEnterpriseChat(enterpriseId);
+                } catch (err) {
+                    window.location.href = link.getAttribute('href');
+                }
+            }
+        });
+    </script>
+
+    <script>
+        document.addEventListener('click', function (e) {
+            const btn = e.target.closest('[data-up-report]');
+            if (!btn) return;
+
+            const modalEl = document.getElementById('userReportModal');
+            if (!modalEl || typeof bootstrap === 'undefined') return;
+
+            const entityType = btn.getAttribute('data-entity-type') || '';
+            const enterpriseId = btn.getAttribute('data-enterprise-id') || '';
+            const serviceId = btn.getAttribute('data-service-id') || '';
+
+            const et = document.getElementById('userReportEntityType');
+            const eid = document.getElementById('userReportEnterpriseId');
+            const sid = document.getElementById('userReportServiceId');
+            if (et) et.value = entityType;
+            if (eid) eid.value = enterpriseId;
+            if (sid) sid.value = serviceId;
+
+            const inst = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+            inst.show();
+        });
+    </script>
 </body>
 </html>

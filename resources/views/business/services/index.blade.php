@@ -20,12 +20,12 @@
     @endphp
 
     <!-- Services Grid -->
-    <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
         @forelse($services as $service)
             <div class="bg-card border border-border rounded-xl shadow-card hover:shadow-card-hover transition-smooth overflow-hidden">
                 @if(!empty($service->image_path))
                     <div class="h-48 bg-secondary overflow-hidden">
-                        <img src="{{ asset('storage/' . $service->image_path) }}" alt="{{ $service->service_name }}" class="w-full h-full object-cover" />
+                        <img src="{{ \Illuminate\Support\Facades\Storage::url($service->image_path) }}" alt="{{ $service->service_name }}" class="w-full h-full object-cover" />
                     </div>
                 @else
                     <div class="h-48 gradient-accent flex items-center justify-center">
@@ -64,42 +64,46 @@
                         </div>
                     </div>
                     
-                    <div class="flex gap-2">
-                        <a href="{{ route('business.customizations.index', $service->service_id) }}" 
-                           class="flex-1 px-3 py-2 text-sm text-center border border-input rounded-md hover:bg-secondary transition-smooth">
+                    <div class="grid grid-cols-3 gap-2">
+                        <a href="{{ route('business.customizations.index', $service->service_id) }}"
+                           class="px-3 py-2 text-xs sm:text-sm text-center border border-input rounded-md hover:bg-secondary transition-smooth whitespace-nowrap">
                             Customizations
                         </a>
-                        <a href="{{ route('business.services.edit', $service->service_id) }}" 
-                           class="flex-1 px-3 py-2 text-sm text-center bg-primary text-primary-foreground rounded-md hover:shadow-glow transition-smooth js-business-service-edit">
+                        <a href="{{ route('business.services.edit', $service->service_id) }}"
+                           class="px-3 py-2 text-xs sm:text-sm text-center bg-primary text-primary-foreground rounded-md hover:shadow-glow transition-smooth js-business-service-edit whitespace-nowrap">
                             Edit
                         </a>
 
                         @if($hasRequiresFileUpload)
                             <button type="button"
-                                    class="px-3 py-2 text-sm border border-input rounded-md hover:bg-secondary transition-smooth"
+                                    class="px-3 py-2 text-xs sm:text-sm border border-input rounded-md hover:bg-secondary transition-smooth whitespace-nowrap"
                                     onclick="openServiceUploadSettings('{{ $service->service_id }}', @json($service->service_name), {{ !empty($service->file_upload_enabled ?? false) ? 'true' : 'false' }}, {{ !empty($service->requires_file_upload) ? 'true' : 'false' }})">
                                 Files
                             </button>
+                        @else
+                            <form id="delete-service-{{ $service->service_id }}" action="{{ route('business.services.delete', $service->service_id) }}" method="POST">
+                                @csrf
+                                @method('DELETE')
+                                <button type="button" class="w-full px-3 py-2 text-xs sm:text-sm bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90"
+                                        onclick="confirmServiceDelete('{{ $service->service_id }}', @json($service->service_name))">
+                                    <i data-lucide="trash-2" class="h-4 w-4 inline"></i>
+                                </button>
+                            </form>
                         @endif
-
-                        <form id="toggle-service-{{ $service->service_id }}" action="{{ route('business.services.toggle-status', $service->service_id) }}" method="POST">
-                            @csrf
-                            <button type="button"
-                                    class="px-3 py-2 text-sm {{ $service->is_active ? 'bg-secondary text-secondary-foreground' : 'bg-success text-white' }} rounded-md hover:opacity-90"
-                                    onclick="confirmServiceToggleStatus('{{ $service->service_id }}', @json($service->service_name), {{ $service->is_active ? 'true' : 'false' }})">
-                                {{ $service->is_active ? 'Deactivate' : 'Activate' }}
-                            </button>
-                        </form>
-
-                        <form id="delete-service-{{ $service->service_id }}" action="{{ route('business.services.delete', $service->service_id) }}" method="POST">
-                            @csrf
-                            @method('DELETE')
-                            <button type="button" class="px-3 py-2 text-sm bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90"
-                                    onclick="confirmServiceDelete('{{ $service->service_id }}', @json($service->service_name))">
-                                <i data-lucide="trash-2" class="h-4 w-4"></i>
-                            </button>
-                        </form>
                     </div>
+
+                    @if($hasRequiresFileUpload)
+                        <div class="flex justify-end mt-2">
+                            <form id="delete-service-{{ $service->service_id }}" action="{{ route('business.services.delete', $service->service_id) }}" method="POST">
+                                @csrf
+                                @method('DELETE')
+                                <button type="button" class="px-3 py-2 text-xs sm:text-sm bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90"
+                                        onclick="confirmServiceDelete('{{ $service->service_id }}', @json($service->service_name))">
+                                    <i data-lucide="trash-2" class="h-4 w-4 inline"></i>
+                                </button>
+                            </form>
+                        </div>
+                    @endif
                 </div>
             </div>
         @empty
@@ -121,7 +125,7 @@
             {{ $services->links() }}
         </div>
     @endif
-</div>
+
 
     <x-ui.modal id="businessServiceFormModal" title="Service" size="xl" scrollable>
         <div id="businessServiceFormModalBody" class="min-h-[200px]"></div>
@@ -141,6 +145,9 @@ function openBusinessServiceFormModal(url) {
         return;
     }
 
+    const __upModalCache = (window.__upModalCache = window.__upModalCache || {});
+    const cacheKey = `GET:${url}`;
+
     bodyEl.innerHTML = '<div class="py-5 text-center text-muted">Loading…</div>';
 
     let bsModal = window.modal_businessServiceFormModal;
@@ -153,17 +160,27 @@ function openBusinessServiceFormModal(url) {
         bsModal.show();
     }
 
+    if (__upModalCache[cacheKey]) {
+        bodyEl.innerHTML = __upModalCache[cacheKey];
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+        return;
+    }
+
     fetch(url, {
         headers: {
             'X-Requested-With': 'XMLHttpRequest',
             'Accept': 'text/html'
-        }
+        },
+        credentials: 'same-origin'
     })
         .then((res) => {
             if (!res.ok) throw new Error('Failed to load service form');
             return res.text();
         })
         .then((html) => {
+            __upModalCache[cacheKey] = html;
             bodyEl.innerHTML = html;
             if (typeof lucide !== 'undefined') {
                 lucide.createIcons();

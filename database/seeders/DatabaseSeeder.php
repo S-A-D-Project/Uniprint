@@ -16,7 +16,6 @@ class DatabaseSeeder extends Seeder
             StatusesSeeder::class,
             NewUsersSeeder::class,
             BaguioPrintshopsSeeder::class,
-            ProductsSeeder::class,
             SampleOrdersSeeder::class,
         ]);
     }

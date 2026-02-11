@@ -4,13 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', 'UniPrint') - Printing Services Platform</title>
+    <title>@yield('title', system_brand_name()) - {{ system_brand_tagline() }}</title>
     
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <link rel="stylesheet" href="{{ asset('css/uniprint-ui.css') }}">
+
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     @auth
         @php
             $layoutRoleType = Auth::user()->getUserRoleType();
@@ -137,125 +139,41 @@
     @stack('styles')
 </head>
 <body>
-    <div class="container-fluid">
-        <div class="row">
-            <!-- Sidebar -->
-            <div class="col-md-3 col-lg-2 px-0 sidebar">
-                <div class="p-3">
-                    <a href="@yield('dashboard-route', '/')" class="navbar-brand d-flex align-items-center">
-                        <i class="bi bi-printer-fill me-2"></i>
-                        UniPrint
-                    </a>
-                </div>
-                
-                <nav class="nav flex-column mt-4">
-                    @yield('sidebar')
-                </nav>
+    @include('partials.header')
+
+    <main class="container-fluid py-4">
+        @if(session('success'))
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="bi bi-check-circle-fill me-2"></i>
+                {{ session('success') }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
+        @endif
 
-            <!-- Main content -->
-            <div class="col-md-9 col-lg-10">
-                <!-- Top navigation -->
-                <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom">
-                    <div class="container-fluid">
-                        <div class="ms-auto d-flex align-items-center">
-                            @auth
-                            @php
-                                $unreadChatCount = 0;
-                                try {
-                                    if (\Illuminate\Support\Facades\Schema::hasTable('conversations') && \Illuminate\Support\Facades\Schema::hasTable('chat_messages')) {
-                                        $uid = Auth::user()->user_id;
-                                        $conversationIds = \Illuminate\Support\Facades\DB::table('conversations')
-                                            ->where('customer_id', $uid)
-                                            ->orWhere('business_id', $uid)
-                                            ->pluck('conversation_id');
-
-                                        if ($conversationIds->isNotEmpty()) {
-                                            $unreadChatCount = (int) \Illuminate\Support\Facades\DB::table('chat_messages')
-                                                ->whereIn('conversation_id', $conversationIds)
-                                                ->where('sender_id', '!=', $uid)
-                                                ->where('is_read', false)
-                                                ->count();
-                                        }
-                                    }
-                                } catch (\Exception $e) {
-                                    $unreadChatCount = 0;
-                                }
-                            @endphp
-
-                            <a href="{{ route('chat.index') }}" class="btn btn-outline-primary btn-sm me-3 position-relative">
-                                <i class="bi bi-chat-dots me-1"></i>
-                                Chat
-                                @if($unreadChatCount > 0)
-                                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
-                                        {{ $unreadChatCount > 99 ? '99+' : $unreadChatCount }}
-                                    </span>
-                                @endif
-                            </a>
-
-                            <span class="me-3 text-muted">
-                                <i class="bi bi-person-circle me-2"></i>
-                                {{ Auth::user()->username ?? Auth::user()->name ?? 'Account' }}
-                                @php
-                                    $roleType = Auth::user()->getUserRoleType();
-                                @endphp
-                                @if(!empty($roleType))
-                                    <span class="badge bg-primary ms-2">{{ ucfirst($roleType) }}</span>
-                                @endif
-                            </span>
-                            <form action="{{ route('logout') }}" method="POST" class="d-inline">
-                                @csrf
-                                <button type="submit" class="btn btn-outline-danger btn-sm">
-                                    <i class="bi bi-box-arrow-right me-1"></i>
-                                    Logout
-                                </button>
-                            </form>
-                            @else
-                            <a href="{{ route('login') }}" class="btn btn-outline-primary btn-sm">
-                                <i class="bi bi-box-arrow-in-right me-1"></i>
-                                Login
-                            </a>
-                            @endauth
-                        </div>
-                    </div>
-                </nav>
-
-                <!-- Page content -->
-                <div class="p-4">
-                    <!-- Alerts -->
-                    @if(session('success'))
-                        <div class="alert alert-success alert-dismissible fade show" role="alert">
-                            <i class="bi bi-check-circle-fill me-2"></i>
-                            {{ session('success') }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                        </div>
-                    @endif
-
-                    @if(session('error'))
-                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                            <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                            {{ session('error') }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                        </div>
-                    @endif
-
-                    @if($errors->any())
-                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                            <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                            <ul class="mb-0">
-                                @foreach($errors->all() as $error)
-                                    <li>{{ $error }}</li>
-                                @endforeach
-                            </ul>
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                        </div>
-                    @endif
-
-                    @yield('content')
-                </div>
+        @if(session('error'))
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                {{ session('error') }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
-        </div>
-    </div>
+        @endif
+
+        @if($errors->any())
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                <ul class="mb-0">
+                    @foreach($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        @endif
+
+        @yield('content')
+    </main>
+
+    @include('partials.footer')
 
     @auth
         @php

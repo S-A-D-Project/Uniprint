@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     
-    <title>@yield('title', 'Admin Dashboard') - UniPrint</title>
+    <title>@yield('title', 'Admin Dashboard') - {{ system_brand_name() }}</title>
     
     <!-- Preload Critical Assets -->
     <link rel="preload" href="https://cdn.tailwindcss.com" as="script">
@@ -16,7 +16,8 @@
 
     <!-- Custom TailwindCSS Configuration -->
     <script>
-        tailwind.config = {
+        window.tailwind = window.tailwind || {};
+        window.tailwind.config = {
             theme: {
                 extend: {
                     colors: {
@@ -280,6 +281,8 @@
     
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
+
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     
     @stack('styles')
 </head>
@@ -291,11 +294,18 @@
                 <!-- Logo -->
                 <div class="p-6 border-b border-sidebar-hover">
                     <a href="{{ route('home') }}" class="flex items-center gap-3">
-                        <div class="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
-                            <i data-lucide="shield-check" class="h-6 w-6 text-primary"></i>
-                        </div>
+                        @php
+                            $systemBrandLogoUrl = system_brand_logo_url();
+                        @endphp
+                        @if($systemBrandLogoUrl)
+                            <img src="{{ $systemBrandLogoUrl }}" alt="{{ system_brand_name() }}" class="w-10 h-10 rounded-xl object-cover border border-border" />
+                        @else
+                            <div class="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
+                                <i data-lucide="shield-check" class="h-6 w-6 text-primary"></i>
+                            </div>
+                        @endif
                         <div>
-                            <h1 class="text-xl font-bold text-gray-900">UniPrint</h1>
+                            <h1 class="text-xl font-bold text-gray-900">{{ system_brand_name() }}</h1>
                             <p class="text-xs text-gray-500">Admin Panel</p>
                         </div>
                     </a>
@@ -332,7 +342,7 @@
                     </a>
                     
                     <a href="{{ route('admin.services') }}" 
-                       class="nav-link {{ request()->routeIs('admin.services') || request()->routeIs('admin.products') ? 'active' : '' }}"
+                       class="nav-link {{ request()->routeIs('admin.services') ? 'active' : '' }}"
                        aria-label="Services Management">
                         <i data-lucide="package" class="h-5 w-5"></i>
                         <span>Services</span>
@@ -343,6 +353,13 @@
                        aria-label="Reports">
                         <i data-lucide="bar-chart-3" class="h-5 w-5"></i>
                         <span>Reports</span>
+                    </a>
+
+                    <a href="{{ route('admin.user-reports') }}" 
+                       class="nav-link {{ request()->routeIs('admin.user-reports') ? 'active' : '' }}"
+                       aria-label="User Reports">
+                        <i data-lucide="flag" class="h-5 w-5"></i>
+                        <span>User Reports</span>
                     </a>
 
                     @if (\Illuminate\Support\Facades\Route::has('admin.audit-logs'))
@@ -497,17 +514,7 @@
                 @yield('content')
             </main>
             
-            <!-- Footer -->
-            <footer class="bg-card border-t border-border px-4 lg:px-6 py-4 no-print" role="contentinfo">
-                <div class="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
-                    <p>&copy; {{ date('Y') }} UniPrint. All rights reserved.</p>
-                    <div class="flex items-center gap-4">
-                        <a href="#" class="hover:text-foreground transition-smooth">Documentation</a>
-                        <a href="#" class="hover:text-foreground transition-smooth">Support</a>
-                        <a href="#" class="hover:text-foreground transition-smooth">Privacy</a>
-                    </div>
-                </div>
-            </footer>
+            @include('partials.footer')
         </div>
     </div>
     

@@ -74,6 +74,9 @@
     </style>
     
     <script src="https://unpkg.com/lucide@latest"></script>
+    @if(!empty(config('services.turnstile.site_key')))
+        <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
+    @endif
 </head>
 <body class="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4">
     <div class="w-full max-w-md space-y-6">
@@ -98,10 +101,10 @@
         <div class="bg-card border border-border rounded-xl shadow-card-hover" x-data="{ activeTab: '{{ request('tab') === 'signup' ? 'signup' : 'login' }}' }">
             <!-- Tabs -->
             <div class="grid grid-cols-2 gap-0 border-b border-border p-4">
-                <button @click="activeTab = 'login'" :class="activeTab === 'login' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'" class="px-4 py-2 text-sm font-medium rounded-md transition-smooth">
+                <button @click="activeTab = 'login'; setTimeout(() => window.renderTurnstiles && window.renderTurnstiles(), 50)" :class="activeTab === 'login' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'" class="px-4 py-2 text-sm font-medium rounded-md transition-smooth">
                     Sign In
                 </button>
-                <button @click="activeTab = 'signup'" :class="activeTab === 'signup' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'" class="px-4 py-2 text-sm font-medium rounded-md transition-smooth">
+                <button @click="activeTab = 'signup'; setTimeout(() => window.renderTurnstiles && window.renderTurnstiles(), 50)" :class="activeTab === 'signup' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'" class="px-4 py-2 text-sm font-medium rounded-md transition-smooth">
                     Sign Up
                 </button>
             </div>
@@ -119,18 +122,28 @@
                     <div class="space-y-4">
                         <div class="space-y-2">
                             <label for="login-username" class="text-sm font-medium">Username or Email</label>
-                            <input id="login-username" name="username" type="text" placeholder="Enter your username" value="{{ old('username') }}" required autofocus class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring @error('username') border-destructive @enderror">
+                            <input id="login-username" name="username" type="text" placeholder="Username or email" value="{{ old('username') }}" required autofocus class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring @error('username') border-destructive @enderror">
                             @error('username')
                                 <p class="text-sm text-destructive">{{ $message }}</p>
                             @enderror
                         </div>
                         <div class="space-y-2">
                             <label for="login-password" class="text-sm font-medium">Password</label>
-                            <input id="login-password" name="password" type="password" placeholder="••••••••" required class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring @error('password') border-destructive @enderror">
+                            <input id="login-password" name="password" type="password" placeholder="Password" required class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring @error('password') border-destructive @enderror">
                             @error('password')
                                 <p class="text-sm text-destructive">{{ $message }}</p>
                             @enderror
                         </div>
+                        @if(!empty(config('services.turnstile.site_key')))
+                            <div class="space-y-2">
+                                <div class="flex justify-center">
+                                    <div class="cf-turnstile" data-sitekey="{{ config('services.turnstile.site_key') }}"></div>
+                                </div>
+                                @error('cf-turnstile-response')
+                                    <p class="text-sm text-destructive">{{ $message }}</p>
+                                @enderror
+                            </div>
+                        @endif
                         <button type="submit" data-up-loading-text="Signing in..." class="w-full px-4 py-2 bg-primary text-primary-foreground font-medium rounded-md hover:shadow-glow transition-smooth">
                             Sign In
                         </button>
@@ -187,23 +200,23 @@
                         </div>
                         <div class="space-y-2">
                             <label for="signup-name" class="text-sm font-medium">Full Name</label>
-                            <input id="signup-name" name="name" type="text" placeholder="John Doe" required class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
+                            <input id="signup-name" name="name" type="text" placeholder="Full name" required class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
                         </div>
                         <div class="space-y-2">
                             <label for="signup-email" class="text-sm font-medium">Email</label>
-                            <input id="signup-email" name="email" type="email" placeholder="you@example.com" required class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
+                            <input id="signup-email" name="email" type="email" placeholder="Email address" required class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
                         </div>
                         <div class="space-y-2">
                             <label for="signup-username" class="text-sm font-medium">Username</label>
-                            <input id="signup-username" name="username" type="text" placeholder="johndoe" required class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
+                            <input id="signup-username" name="username" type="text" placeholder="Username" required class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
                         </div>
                         <div class="space-y-2">
                             <label for="signup-password" class="text-sm font-medium">Password</label>
-                            <input id="signup-password" name="password" type="password" placeholder="••••••••" required class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
+                            <input id="signup-password" name="password" type="password" placeholder="Password" required class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
                         </div>
                         <div class="space-y-2">
                             <label for="signup-password-confirm" class="text-sm font-medium">Confirm Password</label>
-                            <input id="signup-password-confirm" name="password_confirmation" type="password" placeholder="••••••••" required class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
+                            <input id="signup-password-confirm" name="password_confirmation" type="password" placeholder="Confirm password" required class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
                         </div>
                         <div class="space-y-2">
                             <label class="flex items-start gap-3 text-sm">
@@ -225,6 +238,16 @@
                                 <p class="text-sm text-destructive">{{ $message }}</p>
                             @enderror
                         </div>
+                        @if(!empty(config('services.turnstile.site_key')))
+                            <div class="space-y-2">
+                                <div class="flex justify-center">
+                                    <div class="cf-turnstile" data-sitekey="{{ config('services.turnstile.site_key') }}"></div>
+                                </div>
+                                @error('cf-turnstile-response')
+                                    <p class="text-sm text-destructive">{{ $message }}</p>
+                                @enderror
+                            </div>
+                        @endif
                         <button type="submit" data-up-loading-text="Creating account..." class="w-full px-4 py-2 bg-primary text-primary-foreground font-medium rounded-md hover:shadow-glow transition-smooth">
                             Sign Up
                         </button>
@@ -279,12 +302,38 @@
             return value === 'business' ? 'business' : 'customer';
         }
 
-        document.querySelectorAll('a.oauth-link').forEach((a) => {
-            a.addEventListener('click', (e) => {
-                const base = a.getAttribute('data-oauth-base') || a.getAttribute('href');
-                const roleType = getSelectedRoleType();
-                a.setAttribute('href', `${base}?role_type=${encodeURIComponent(roleType)}`);
+        window.renderTurnstiles = function () {
+            if (!window.turnstile || typeof window.turnstile.render !== 'function') return;
+
+            document.querySelectorAll('.cf-turnstile').forEach((el) => {
+                if (el.dataset.rendered === '1') return;
+                const sitekey = el.getAttribute('data-sitekey');
+                if (!sitekey) return;
+                try {
+                    window.turnstile.render(el, { sitekey });
+                    el.dataset.rendered = '1';
+                } catch (e) {
+                    // no-op
+                }
             });
+        };
+
+        document.querySelectorAll('.oauth-link').forEach(function (link) {
+            link.addEventListener('click', function (e) {
+                e.preventDefault();
+                const base = link.getAttribute('data-oauth-base') || link.getAttribute('href');
+                const roleType = getSelectedRoleType();
+                const url = `${base}?role_type=${encodeURIComponent(roleType)}`;
+                window.location.assign(url);
+            });
+        });
+
+        document.addEventListener('DOMContentLoaded', function () {
+            window.renderTurnstiles();
+            setTimeout(() => window.renderTurnstiles(), 500);
+        });
+        window.addEventListener('load', function () {
+            window.renderTurnstiles();
         });
     </script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>

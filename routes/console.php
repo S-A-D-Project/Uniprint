@@ -198,4 +198,300 @@ Artisan::command('orders:deadline-warnings', function () {
 
     $this->info("Created {$count} deadline warning notification(s). Run daily via cron.");
     return 0;
-})->purpose('Create deadline warning notifications for business users');
+})->purpose('Create deadline warning notifications for business owners');
+
+Artisan::command('orders:auto-cancel-overdue', function () {
+    if (! Schema::hasTable('order_status_history') || ! Schema::hasTable('customer_orders')) {
+        $this->warn('Required order tables not found. Run migrations first.');
+        return 0;
+    }
+
+    if (! Schema::hasTable('statuses')) {
+        $this->warn('statuses table not found. Run migrations first.');
+        return 0;
+    }
+
+    if (! Schema::hasTable('system_settings')) {
+        $this->warn('system_settings table not found. Run migrations first.');
+        return 0;
+    }
+
+    $rawDays = DB::table('system_settings')->where('key', 'order_overdue_cancel_days')->value('value');
+    $days = is_numeric($rawDays) ? (int) $rawDays : 14;
+    if ($days < 1) {
+        $days = 14;
+    }
+
+    $cancelledStatusId = DB::table('statuses')->where('status_name', 'Cancelled')->value('status_id');
+    if (! $cancelledStatusId) {
+        $this->error('Cancelled status is missing.');
+        return 1;
+    }
+
+    $today = Carbon::today();
+    $cutoff = $today->copy()->subDays($days);
+
+    $dueExpr = 'customer_orders.date_requested';
+    if (Schema::hasColumn('customer_orders', 'pickup_date')) {
+        $dueExpr = 'customer_orders.pickup_date';
+    } elseif (Schema::hasColumn('customer_orders', 'requested_fulfillment_date')) {
+        $dueExpr = 'customer_orders.requested_fulfillment_date';
+    } elseif (Schema::hasColumn('customer_orders', 'delivery_date')) {
+        $dueExpr = 'customer_orders.delivery_date';
+    }
+
+    // Latest status per order
+    $latest = DB::table('order_status_history')
+        ->select('purchase_order_id', DB::raw('MAX(timestamp) as last_ts'))
+        ->groupBy('purchase_order_id');
+
+    $latestStatus = DB::table('order_status_history as osh')
+        ->joinSub($latest, 'latest', function ($join) {
+            $join->on('osh.purchase_order_id', '=', 'latest.purchase_order_id')
+                ->on('osh.timestamp', '=', 'latest.last_ts');
+        })
+        ->join('statuses', 'osh.status_id', '=', 'statuses.status_id')
+        ->select('osh.purchase_order_id', 'statuses.status_name');
+
+    $candidates = DB::table('customer_orders')
+        ->joinSub($latestStatus, 'ls', function ($join) {
+            $join->on('customer_orders.purchase_order_id', '=', 'ls.purchase_order_id');
+        })
+        ->whereNotNull($dueExpr)
+        ->whereRaw("DATE({$dueExpr}) <= ?", [$cutoff->toDateString()])
+        ->whereNotIn('ls.status_name', ['Cancelled', 'Completed'])
+        ->select('customer_orders.purchase_order_id', 'customer_orders.customer_id', 'customer_orders.enterprise_id', 'customer_orders.order_no', 'customer_orders.total')
+        ->get();
+
+    $count = 0;
+    foreach ($candidates as $row) {
+        DB::transaction(function () use ($row, $cancelledStatusId, &$count) {
+            // Idempotency: skip if already cancelled
+            $alreadyCancelled = DB::table('order_status_history')
+                ->where('purchase_order_id', $row->purchase_order_id)
+                ->where('status_id', $cancelledStatusId)
+                ->exists();
+            if ($alreadyCancelled) {
+                return;
+            }
+
+            DB::table('order_status_history')->insert([
+                'approval_id' => (string) Str::uuid(),
+                'purchase_order_id' => $row->purchase_order_id,
+                'user_id' => null,
+                'status_id' => $cancelledStatusId,
+                'remarks' => 'Order auto-cancelled by system due to being overdue for too long',
+                'timestamp' => now(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            if (Schema::hasColumn('customer_orders', 'status_id')) {
+                DB::table('customer_orders')
+                    ->where('purchase_order_id', $row->purchase_order_id)
+                    ->update([
+                        'status_id' => $cancelledStatusId,
+                        'updated_at' => now(),
+                    ]);
+            }
+
+            if (Schema::hasColumn('customer_orders', 'payment_status')) {
+                DB::table('customer_orders')
+                    ->where('purchase_order_id', $row->purchase_order_id)
+                    ->update([
+                        'payment_status' => 'failed',
+                        'updated_at' => now(),
+                    ]);
+            }
+
+            // Record refund (best-effort)
+            if (Schema::hasTable('order_refunds')) {
+                $existsRefund = DB::table('order_refunds')->where('purchase_order_id', $row->purchase_order_id)->exists();
+                if (! $existsRefund) {
+                    $refundAmount = 0.0;
+                    if (Schema::hasTable('payments')) {
+                        $p = DB::table('payments')->where('purchase_order_id', $row->purchase_order_id)->first();
+                        if ($p && !empty($p->is_verified)) {
+                            $refundAmount = (float) ($p->amount_paid ?? 0);
+                        }
+                    }
+
+                    DB::table('order_refunds')->insert([
+                        'refund_id' => (string) Str::uuid(),
+                        'purchase_order_id' => $row->purchase_order_id,
+                        'status' => 'refunded',
+                        'amount' => $refundAmount,
+                        'reason' => 'Auto-cancelled overdue order',
+                        'refunded_at' => now(),
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
+            }
+
+            // Notify customer
+            if (Schema::hasTable('order_notifications')) {
+                DB::table('order_notifications')->insert([
+                    'notification_id' => (string) Str::uuid(),
+                    'purchase_order_id' => $row->purchase_order_id,
+                    'recipient_id' => $row->customer_id,
+                    'notification_type' => 'status_change',
+                    'title' => 'Order Cancelled (Overdue)',
+                    'message' => "Order #{$row->order_no} was cancelled and refunded because it was overdue for too long.",
+                    'is_read' => false,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+
+            // Notify business owner (best-effort)
+            if (Schema::hasTable('order_notifications')) {
+                $recipientId = null;
+                if (Schema::hasColumn('enterprises', 'owner_user_id')) {
+                    $recipientId = DB::table('enterprises')->where('enterprise_id', $row->enterprise_id)->value('owner_user_id');
+                }
+                if (! $recipientId && Schema::hasTable('staff')) {
+                    $recipientId = DB::table('staff')->where('enterprise_id', $row->enterprise_id)->whereNotNull('user_id')->value('user_id');
+                }
+                if ($recipientId) {
+                    DB::table('order_notifications')->insert([
+                        'notification_id' => (string) Str::uuid(),
+                        'purchase_order_id' => $row->purchase_order_id,
+                        'recipient_id' => $recipientId,
+                        'notification_type' => 'status_change',
+                        'title' => 'Order Auto-Cancelled (Overdue)',
+                        'message' => "Order #{$row->order_no} was auto-cancelled by the system due to being overdue for too long.",
+                        'is_read' => false,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
+            }
+
+            $count++;
+        });
+    }
+
+    $this->info("Auto-cancelled {$count} overdue order(s).");
+    return 0;
+})->purpose('Auto-cancel orders overdue beyond configured days and record refunds');
+
+Artisan::command('orders:auto-cancel-downpayments', function () {
+    if (! Schema::hasTable('customer_orders') || ! Schema::hasTable('order_status_history')) {
+        $this->warn('Required order tables not found. Run migrations first.');
+        return 0;
+    }
+
+    if (! Schema::hasTable('order_notifications')) {
+        $this->warn('order_notifications table not found. Run migrations first.');
+        return 0;
+    }
+
+    if (! Schema::hasColumn('customer_orders', 'downpayment_required_percent') || ! Schema::hasColumn('customer_orders', 'downpayment_due_at')) {
+        $this->warn('Downpayment deadline columns not found on customer_orders. Run migrations first.');
+        return 0;
+    }
+
+    $cancelledStatusId = DB::table('statuses')->where('status_name', 'Cancelled')->value('status_id');
+    if (! $cancelledStatusId) {
+        $this->error('Status "Cancelled" is not configured.');
+        return 1;
+    }
+
+    $now = Carbon::now();
+
+    $latest = DB::table('order_status_history')
+        ->select('purchase_order_id', DB::raw('MAX(timestamp) as last_ts'))
+        ->groupBy('purchase_order_id');
+
+    $latestWithStatus = DB::table('order_status_history as osh')
+        ->joinSub($latest, 'latest', function ($join) {
+            $join->on('osh.purchase_order_id', '=', 'latest.purchase_order_id')
+                ->on('osh.timestamp', '=', 'latest.last_ts');
+        })
+        ->leftJoin('statuses', 'osh.status_id', '=', 'statuses.status_id')
+        ->select('osh.purchase_order_id', 'osh.status_id', 'statuses.status_name', 'osh.timestamp as last_status_time');
+
+    $candidatesQuery = DB::table('customer_orders')
+        ->leftJoinSub($latestWithStatus, 'last_status', function ($join) {
+            $join->on('customer_orders.purchase_order_id', '=', 'last_status.purchase_order_id');
+        })
+        ->where('customer_orders.downpayment_required_percent', '>', 0)
+        ->whereNotNull('customer_orders.downpayment_due_at')
+        ->where('customer_orders.downpayment_due_at', '<=', $now)
+        ->where(function ($q) {
+            // Default: cancel only orders that are still early in the flow
+            $q->whereIn('last_status.status_name', ['Pending', 'Confirmed'])
+              ->orWhereNull('last_status.status_name');
+        })
+        ->select(
+            'customer_orders.purchase_order_id',
+            'customer_orders.customer_id',
+            'customer_orders.order_no',
+            'customer_orders.downpayment_required_amount',
+            'customer_orders.downpayment_due_at',
+            'last_status.status_name'
+        );
+
+    if (Schema::hasTable('payments') && Schema::hasColumn('payments', 'purchase_order_id')) {
+        $candidatesQuery->leftJoin('payments', 'customer_orders.purchase_order_id', '=', 'payments.purchase_order_id');
+        $candidatesQuery->where(function ($q) {
+            $q->whereNull('payments.payment_id')
+              ->orWhere('payments.is_verified', false)
+              ->orWhereRaw('COALESCE(payments.amount_paid, 0) + 0.00001 < COALESCE(customer_orders.downpayment_required_amount, 0)');
+        });
+    }
+
+    $candidates = $candidatesQuery->get();
+    $count = 0;
+
+    foreach ($candidates as $row) {
+        DB::transaction(function () use ($row, $cancelledStatusId, &$count) {
+            DB::table('order_status_history')->insert([
+                'approval_id' => (string) Str::uuid(),
+                'purchase_order_id' => $row->purchase_order_id,
+                'user_id' => null,
+                'status_id' => $cancelledStatusId,
+                'remarks' => 'Order auto-cancelled due to overdue downpayment',
+                'timestamp' => now(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $updates = [
+                'status_id' => $cancelledStatusId,
+                'updated_at' => now(),
+            ];
+
+            if (Schema::hasColumn('customer_orders', 'payment_status')) {
+                $updates['payment_status'] = 'failed';
+            }
+
+            DB::table('customer_orders')
+                ->where('purchase_order_id', $row->purchase_order_id)
+                ->update($updates);
+
+            $dueAt = $row->downpayment_due_at ? Carbon::parse($row->downpayment_due_at)->format('M d, Y g:i A') : null;
+            $message = $dueAt
+                ? "Order #{$row->order_no} was cancelled because the downpayment was not received by {$dueAt}."
+                : "Order #{$row->order_no} was cancelled because the downpayment was not received on time.";
+
+            DB::table('order_notifications')->insert([
+                'notification_id' => (string) Str::uuid(),
+                'purchase_order_id' => $row->purchase_order_id,
+                'recipient_id' => $row->customer_id,
+                'notification_type' => 'status_change',
+                'title' => 'Order Cancelled',
+                'message' => $message,
+                'is_read' => false,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $count++;
+        });
+    }
+
+    $this->info("Auto-cancelled {$count} overdue downpayment order(s). ");
+    return 0;
+})->purpose('Auto-cancel overdue downpayment-required orders');

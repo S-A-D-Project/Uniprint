@@ -37,7 +37,15 @@
                     <div class="space-y-6">
                         @foreach($grouped as $type => $options)
                             <div>
-                                <h3 class="font-semibold mb-3 text-lg">{{ $type }}</h3>
+                                <div class="flex items-center justify-between mb-3">
+                                    <h3 class="font-semibold text-lg">{{ $type }}</h3>
+                                    <button type="button"
+                                            class="inline-flex items-center gap-2 px-3 py-1.5 text-sm border border-input rounded-md hover:bg-secondary transition-smooth"
+                                            onclick="openAddCustomizationForType(@json($type))">
+                                        <i data-lucide="plus" class="h-4 w-4"></i>
+                                        Add option
+                                    </button>
+                                </div>
                                 <div class="space-y-2">
                                     @foreach($options as $option)
                                         <div class="flex items-center justify-between p-3 border border-border rounded-lg hover:bg-secondary/30">
@@ -125,6 +133,113 @@
 
         <!-- Quick Stats -->
         <div>
+            @if(\Illuminate\Support\Facades\Schema::hasColumn('services', 'supports_custom_size'))
+                <div class="bg-card border border-border rounded-xl shadow-card p-6 mb-6">
+                    <h2 class="text-xl font-bold mb-4">Custom Size Settings</h2>
+
+                    <form method="POST" action="{{ route('business.customizations.custom-size.update', $service->service_id) }}" class="space-y-4" data-up-global-loader>
+                        @csrf
+                        @method('PUT')
+
+                        <x-ui.form.switch
+                            name="supports_custom_size"
+                            id="supports_custom_size"
+                            :checked="old('supports_custom_size', !empty($service->supports_custom_size))"
+                            label="Enable Custom Size"
+                        />
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            @if(\Illuminate\Support\Facades\Schema::hasColumn('services', 'custom_size_unit'))
+                                <div>
+                                    <label class="block text-sm font-medium mb-2" for="custom_size_unit">Unit</label>
+                                    <select id="custom_size_unit"
+                                            name="custom_size_unit"
+                                            class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring @error('custom_size_unit') border-destructive @enderror">
+                                        @php
+                                            $unitValue = old('custom_size_unit', $service->custom_size_unit ?? 'in');
+                                            $unitValue = is_string($unitValue) && $unitValue !== '' ? strtolower($unitValue) : 'in';
+                                        @endphp
+                                        <option value="in" {{ $unitValue === 'in' ? 'selected' : '' }}>in</option>
+                                        <option value="cm" {{ $unitValue === 'cm' ? 'selected' : '' }}>cm</option>
+                                        <option value="mm" {{ $unitValue === 'mm' ? 'selected' : '' }}>mm</option>
+                                    </select>
+                                    @error('custom_size_unit')
+                                        <p class="text-sm text-destructive mt-1">{{ $message }}</p>
+                                    @enderror
+                                </div>
+                            @endif
+
+                            <div class="hidden sm:block"></div>
+
+                            @if(\Illuminate\Support\Facades\Schema::hasColumn('services', 'custom_size_min_width'))
+                                <div>
+                                    <label class="block text-sm font-medium mb-2" for="custom_size_min_width">Min Width</label>
+                                    <input type="number"
+                                           id="custom_size_min_width"
+                                           name="custom_size_min_width"
+                                           value="{{ old('custom_size_min_width', $service->custom_size_min_width ?? '') }}"
+                                           step="0.01"
+                                           min="0"
+                                           class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring @error('custom_size_min_width') border-destructive @enderror" />
+                                    @error('custom_size_min_width')
+                                        <p class="text-sm text-destructive mt-1">{{ $message }}</p>
+                                    @enderror
+                                </div>
+                            @endif
+                            @if(\Illuminate\Support\Facades\Schema::hasColumn('services', 'custom_size_max_width'))
+                                <div>
+                                    <label class="block text-sm font-medium mb-2" for="custom_size_max_width">Max Width</label>
+                                    <input type="number"
+                                           id="custom_size_max_width"
+                                           name="custom_size_max_width"
+                                           value="{{ old('custom_size_max_width', $service->custom_size_max_width ?? '') }}"
+                                           step="0.01"
+                                           min="0"
+                                           class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring @error('custom_size_max_width') border-destructive @enderror" />
+                                    @error('custom_size_max_width')
+                                        <p class="text-sm text-destructive mt-1">{{ $message }}</p>
+                                    @enderror
+                                </div>
+                            @endif
+                            @if(\Illuminate\Support\Facades\Schema::hasColumn('services', 'custom_size_min_height'))
+                                <div>
+                                    <label class="block text-sm font-medium mb-2" for="custom_size_min_height">Min Height</label>
+                                    <input type="number"
+                                           id="custom_size_min_height"
+                                           name="custom_size_min_height"
+                                           value="{{ old('custom_size_min_height', $service->custom_size_min_height ?? '') }}"
+                                           step="0.01"
+                                           min="0"
+                                           class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring @error('custom_size_min_height') border-destructive @enderror" />
+                                    @error('custom_size_min_height')
+                                        <p class="text-sm text-destructive mt-1">{{ $message }}</p>
+                                    @enderror
+                                </div>
+                            @endif
+                            @if(\Illuminate\Support\Facades\Schema::hasColumn('services', 'custom_size_max_height'))
+                                <div>
+                                    <label class="block text-sm font-medium mb-2" for="custom_size_max_height">Max Height</label>
+                                    <input type="number"
+                                           id="custom_size_max_height"
+                                           name="custom_size_max_height"
+                                           value="{{ old('custom_size_max_height', $service->custom_size_max_height ?? '') }}"
+                                           step="0.01"
+                                           min="0"
+                                           class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring @error('custom_size_max_height') border-destructive @enderror" />
+                                    @error('custom_size_max_height')
+                                        <p class="text-sm text-destructive mt-1">{{ $message }}</p>
+                                    @enderror
+                                </div>
+                            @endif
+                        </div>
+
+                        <button type="submit" class="w-full px-4 py-2 bg-primary text-primary-foreground font-medium rounded-md hover:shadow-glow transition-smooth" data-up-button-loader>
+                            Save Custom Size Settings
+                        </button>
+                    </form>
+                </div>
+            @endif
+
             <x-ui.collapsible title="Customization Statistics" icon="bi bi-bar-chart" :expanded="true">
                 <div class="grid grid-cols-2 gap-4">
                     <div class="text-center p-3 bg-primary/5 rounded-lg">
@@ -158,8 +273,35 @@
         <div class="space-y-4">
             <div>
                 <label class="block text-sm font-medium mb-2">Option Type *</label>
-                <input type="text" name="option_type" placeholder="e.g., Size, Color, Paper" required
-                       class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
+                @php
+                    $existingTypes = $customizations
+                        ->pluck('option_type')
+                        ->filter()
+                        ->map(fn($t) => trim((string) $t))
+                        ->filter(fn($t) => $t !== '')
+                        ->unique()
+                        ->sort()
+                        ->values();
+                @endphp
+
+                @if($existingTypes->count() > 1)
+                    <select name="option_type_select" id="add_option_type_select"
+                            class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
+                        <option value="" disabled selected>Select a type</option>
+                        @foreach($existingTypes as $t)
+                            <option value="{{ $t }}">{{ $t }}</option>
+                        @endforeach
+                        <option value="__new__">New type...</option>
+                    </select>
+
+                    <input type="text" name="option_type_new" id="add_option_type_new" placeholder="e.g., Size, Color, Paper" disabled
+                           class="w-full mt-2 px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
+
+                    <input type="hidden" name="option_type" id="add_option_type" value="" required>
+                @else
+                    <input type="text" name="option_type" id="add_option_type" placeholder="e.g., Size, Color, Paper" required
+                           class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
+                @endif
                 <small class="text-muted-foreground">Group similar options together (e.g., all sizes under "Size")</small>
             </div>
 
@@ -296,6 +438,59 @@
 
 @push('scripts')
 <script>
+function syncAddOptionTypeHidden() {
+    const select = document.getElementById('add_option_type_select');
+    const hidden = document.getElementById('add_option_type');
+    const inputNew = document.getElementById('add_option_type_new');
+    if (!hidden) return;
+
+    if (!select || !inputNew) {
+        return;
+    }
+
+    const selected = select.value;
+    if (selected === '__new__') {
+        inputNew.disabled = false;
+        inputNew.required = true;
+        hidden.value = inputNew.value || '';
+    } else {
+        inputNew.disabled = true;
+        inputNew.required = false;
+        inputNew.value = '';
+        hidden.value = selected || '';
+    }
+}
+
+function openAddCustomizationForType(optionType) {
+    const select = document.getElementById('add_option_type_select');
+    const hidden = document.getElementById('add_option_type');
+    const inputNew = document.getElementById('add_option_type_new');
+    const raw = optionType || '';
+
+    if (select && hidden && inputNew) {
+        const hasMatching = Array.from(select.options).some(o => o.value === raw);
+        if (hasMatching) {
+            select.value = raw;
+        } else {
+            select.value = '__new__';
+            inputNew.value = raw;
+        }
+        syncAddOptionTypeHidden();
+    } else if (hidden) {
+        hidden.value = raw;
+    }
+
+    const modalEl = document.getElementById('addCustomizationModal');
+    if (!modalEl || typeof bootstrap === 'undefined') return;
+    const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+    modal.show();
+
+    setTimeout(() => {
+        const nameInput = modalEl.querySelector('input[name="option_name"]');
+        if (nameInput) nameInput.focus();
+    }, 150);
+}
+
 function editCustomization(optionId, optionType, optionName, priceModifier) {
     // Populate form fields
     document.getElementById('edit_option_type').value = optionType;
@@ -421,6 +616,23 @@ function showToast(message, type = 'info') {
 document.addEventListener('DOMContentLoaded', function() {
     if (typeof lucide !== 'undefined') {
         lucide.createIcons();
+    }
+});
+
+document.addEventListener('DOMContentLoaded', function () {
+    const select = document.getElementById('add_option_type_select');
+    const inputNew = document.getElementById('add_option_type_new');
+    const form = document.getElementById('addCustomizationForm');
+    if (select) {
+        select.addEventListener('change', syncAddOptionTypeHidden);
+    }
+    if (inputNew) {
+        inputNew.addEventListener('input', syncAddOptionTypeHidden);
+    }
+    if (form) {
+        form.addEventListener('submit', function () {
+            syncAddOptionTypeHidden();
+        });
     }
 });
 </script>

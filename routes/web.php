@@ -14,8 +14,14 @@ use App\Http\Controllers\AIDesignController;
 use App\Http\Controllers\SavedServiceController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\TwoFactorController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\BusinessOnboardingController;
+use App\Http\Controllers\BusinessVerificationController;
+use App\Http\Controllers\UserReportController;
+use App\Http\Middleware\EnsureBusinessVerified;
+use App\Http\Middleware\EnsureAiGenerationLimit;
+use App\Http\Middleware\TwoFactorVerify;
 use Illuminate\Http\Request;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Support\Facades\RateLimiter;
@@ -83,7 +89,25 @@ Route::get('/admin', function () {
 
 
 // Saved Services routes
-Route::middleware([\App\Http\Middleware\CheckAuth::class])->group(function () {
+Route::middleware([\App\Http\Middleware\CheckAuth::class, TwoFactorVerify::class])->group(function () {
+    // Security settings (Email 2FA toggle)
+    Route::get('/security', [TwoFactorController::class, 'securitySettings'])->name('security.settings');
+    Route::post('/security/two-factor/enable', [TwoFactorController::class, 'startEnableEmail2fa'])->name('security.two-factor.enable');
+    Route::post('/security/two-factor/confirm', [TwoFactorController::class, 'confirmEnableEmail2fa'])->name('security.two-factor.confirm');
+    Route::post('/security/two-factor/resend', [TwoFactorController::class, 'resendEnableEmail2fa'])->name('security.two-factor.resend');
+    Route::post('/security/two-factor/disable', [TwoFactorController::class, 'disableEmail2fa'])->name('security.two-factor.disable');
+
+    // Email 2FA verification
+    Route::get('/verify', [TwoFactorController::class, 'showVerify'])->name('two-factor.verify');
+    Route::post('/verify', [TwoFactorController::class, 'submitVerify'])->name('two-factor.verify.submit');
+    Route::post('/verify/resend', [TwoFactorController::class, 'resendVerifyCode'])->name('two-factor.verify.resend');
+
+    // Two-factor challenge (must be reachable for logged-in users who haven't completed 2FA yet)
+    Route::get('/two-factor/challenge', [TwoFactorController::class, 'challenge'])->name('two-factor.challenge');
+    Route::post('/two-factor/verify', [TwoFactorController::class, 'verify'])->name('two-factor.totp.verify');
+    Route::post('/two-factor/send-email-code', [TwoFactorController::class, 'sendEmailCode'])->name('two-factor.email.send');
+    Route::post('/two-factor/verify-email-code', [TwoFactorController::class, 'verifyEmailCode'])->name('two-factor.email.verify');
+
     Route::get('/saved-services', [\App\Http\Controllers\SavedServiceController::class, 'index'])->name('saved-services.index');
     Route::post('/saved-services/save', [\App\Http\Controllers\SavedServiceController::class, 'save'])->name('saved-services.save');
     Route::post('/checkout/from-service', [\App\Http\Controllers\CheckoutController::class, 'fromService'])->name('checkout.from-service');
@@ -103,10 +127,24 @@ Route::middleware([\App\Http\Middleware\CheckAuth::class])->group(function () {
     Route::post('/profile/delete', [ProfileController::class, 'deleteAccount'])->name('profile.delete');
     Route::get('/profile/notifications', [ProfileController::class, 'getNotifications'])->name('profile.notifications');
     Route::post('/profile/notifications/{id}/read', [ProfileController::class, 'markNotificationRead'])->name('profile.notifications.read');
+
+    // Two-factor settings
+    Route::get('/profile/two-factor', [TwoFactorController::class, 'setup'])->name('two-factor.setup');
+    Route::post('/profile/two-factor/enable', [TwoFactorController::class, 'enable'])->name('two-factor.enable');
+    Route::post('/profile/two-factor/disable', [TwoFactorController::class, 'disable'])->name('two-factor.disable');
+    Route::post('/profile/two-factor/methods', [TwoFactorController::class, 'updateMethods'])->name('two-factor.methods.update');
+
+    // Payment account settings
+    Route::get('/profile/paypal/connect', [ProfileController::class, 'redirectToPayPalConnect'])->name('profile.paypal.connect');
+    Route::get('/profile/paypal/callback', [ProfileController::class, 'handlePayPalConnectCallback'])->name('profile.paypal.callback');
+    Route::post('/profile/paypal/disconnect', [ProfileController::class, 'disconnectPayPal'])->name('profile.paypal.disconnect');
     
     // AI Design routes
     Route::get('/ai-design', [AIDesignController::class, 'index'])->name('ai-design.index');
-    Route::post('/ai-design/generate', [AIDesignController::class, 'generate'])->name('ai-design.generate');
+    Route::get('/ai-design/usage', [AIDesignController::class, 'usage'])->name('ai-design.usage');
+    Route::post('/ai-design/generate', [AIDesignController::class, 'generate'])
+        ->middleware([EnsureAiGenerationLimit::class])
+        ->name('ai-design.generate');
     Route::post('/ai-design/save', [AIDesignController::class, 'save'])->name('ai-design.save');
     Route::get('/ai-design/my-designs', [AIDesignController::class, 'myDesigns'])->name('ai-design.my-designs');
     Route::delete('/ai-design/{designId}', [AIDesignController::class, 'delete'])->name('ai-design.delete');
@@ -114,6 +152,8 @@ Route::middleware([\App\Http\Middleware\CheckAuth::class])->group(function () {
     // Checkout routes
     Route::get('/checkout', [\App\Http\Controllers\CheckoutController::class, 'index'])->name('checkout.index');
     Route::post('/checkout/process', [\App\Http\Controllers\CheckoutController::class, 'process'])->name('checkout.process');
+    Route::post('/checkout/paypal/create-order', [\App\Http\Controllers\CheckoutController::class, 'paypalCreateOrder'])->name('checkout.paypal.create-order');
+    Route::post('/checkout/paypal/capture-order', [\App\Http\Controllers\CheckoutController::class, 'paypalCaptureOrder'])->name('checkout.paypal.capture-order');
     Route::post('/checkout/apply-discount', [\App\Http\Controllers\CheckoutController::class, 'applyDiscountCode'])->name('checkout.apply-discount');
 });
 
@@ -121,16 +161,24 @@ Route::middleware([\App\Http\Middleware\CheckAuth::class])->group(function () {
 Route::prefix('business')->middleware([\App\Http\Middleware\CheckAuth::class, \App\Http\Middleware\CheckRole::class.':business_user'])->name('business.')->group(function () {
     Route::get('/onboarding', [BusinessOnboardingController::class, 'show'])->name('onboarding');
     Route::post('/onboarding', [BusinessOnboardingController::class, 'store'])->name('onboarding.store');
+
+    Route::get('/verification', [BusinessVerificationController::class, 'show'])->name('verification');
+    Route::post('/verification', [BusinessVerificationController::class, 'store'])->name('verification.store');
 });
 
 // Admin routes
 Route::prefix('admin')->middleware([\App\Http\Middleware\CheckAuth::class, \App\Http\Middleware\CheckRole::class.':admin'])->name('admin.')->group(function () {
     Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('dashboard');
     Route::get('/users', [AdminController::class, 'users'])->name('users');
+    Route::get('/users/create', [AdminController::class, 'createUser'])->name('users.create');
+    Route::post('/users', [AdminController::class, 'storeUser'])->name('users.store');
     Route::get('/users/{id}', [AdminController::class, 'userDetails'])->whereUuid('id')->name('users.details');
     Route::post('/users/{id}/toggle-active', [AdminController::class, 'toggleUserActive'])->whereUuid('id')->name('users.toggle-active');
+    Route::post('/users/{id}/disable-email-2fa', [AdminController::class, 'disableUserEmail2fa'])->whereUuid('id')->name('users.disable-email-2fa');
+    Route::post('/users/{id}/delete', [AdminController::class, 'deleteUser'])->whereUuid('id')->name('users.delete');
     Route::get('/enterprises', [AdminController::class, 'enterprises'])->name('enterprises');
     Route::get('/enterprises/{id}', [AdminController::class, 'enterpriseDetails'])->whereUuid('id')->name('enterprises.details');
+    Route::post('/enterprises/{id}/verify', [AdminController::class, 'verifyEnterprise'])->whereUuid('id')->name('enterprises.verify');
     Route::post('/enterprises/{id}/toggle-active', [AdminController::class, 'toggleEnterpriseActive'])->whereUuid('id')->name('enterprises.toggle-active');
     Route::get('/orders', [AdminController::class, 'orders'])->name('orders');
     Route::get('/orders/{id}', [AdminController::class, 'orderDetails'])->whereUuid('id')->name('orders.details');
@@ -138,10 +186,9 @@ Route::prefix('admin')->middleware([\App\Http\Middleware\CheckAuth::class, \App\
     Route::get('/services', [AdminController::class, 'services'])->name('services');
     Route::get('/services/{id}', [AdminController::class, 'serviceDetails'])->whereUuid('id')->name('services.details');
     Route::post('/services/{id}/toggle-active', [AdminController::class, 'toggleServiceActive'])->whereUuid('id')->name('services.toggle-active');
-    Route::get('/products', function () {
-        return redirect()->route('admin.services');
-    })->name('products');
     Route::get('/reports', [AdminController::class, 'reports'])->name('reports');
+    Route::get('/user-reports', [AdminController::class, 'userReports'])->name('user-reports');
+    Route::post('/user-reports/{id}/resolve', [AdminController::class, 'resolveUserReport'])->whereUuid('id')->name('user-reports.resolve');
     Route::get('/audit-logs', [AdminController::class, 'auditLogs'])->name('audit-logs');
     
     // Real-time API endpoints
@@ -150,7 +197,10 @@ Route::prefix('admin')->middleware([\App\Http\Middleware\CheckAuth::class, \App\
     
     // System Management
     Route::get('/settings', [\App\Http\Controllers\Admin\SystemController::class, 'settings'])->name('settings');
+    Route::post('/settings/branding', [\App\Http\Controllers\Admin\SystemController::class, 'updateBranding'])->name('settings.branding');
     Route::post('/settings/order-auto-complete', [\App\Http\Controllers\Admin\SystemController::class, 'updateOrderAutoComplete'])->name('settings.order-auto-complete');
+    Route::post('/settings/order-overdue-cancel-days', [\App\Http\Controllers\Admin\SystemController::class, 'updateOrderOverdueCancelDays'])->name('settings.order-overdue-cancel-days');
+    Route::post('/settings/tax-rate', [\App\Http\Controllers\Admin\SystemController::class, 'updateTaxRate'])->name('settings.tax-rate');
     Route::post('/backup/create', [\App\Http\Controllers\Admin\SystemController::class, 'createBackup'])->name('backup.create');
     Route::get('/backup/download/{filename}', [\App\Http\Controllers\Admin\SystemController::class, 'downloadBackup'])->name('backup.download');
     Route::delete('/backup/delete/{filename}', [\App\Http\Controllers\Admin\SystemController::class, 'deleteBackup'])->name('backup.delete');
@@ -160,12 +210,17 @@ Route::prefix('admin')->middleware([\App\Http\Middleware\CheckAuth::class, \App\
 });
 
 // Business routes
-Route::prefix('business')->middleware([\App\Http\Middleware\CheckAuth::class])->name('business.')->group(function () {
+Route::prefix('business')->middleware([\App\Http\Middleware\CheckAuth::class, TwoFactorVerify::class, EnsureBusinessVerified::class])->name('business.')->group(function () {
     Route::middleware([\App\Http\Middleware\CheckRole::class.':business_user|admin'])->group(function () {
         Route::get('/services/create', [BusinessController::class, 'createService'])->name('services.create');
         Route::post('/services', [BusinessController::class, 'storeService'])->name('services.store');
         Route::get('/services/{id}/edit', [BusinessController::class, 'editService'])->whereUuid('id')->name('services.edit');
         Route::put('/services/{id}', [BusinessController::class, 'updateService'])->whereUuid('id')->name('services.update');
+
+        Route::post('/services/{serviceId}/images/{imageId}/primary', [BusinessController::class, 'setServicePrimaryImage'])
+            ->whereUuid('serviceId')
+            ->whereUuid('imageId')
+            ->name('services.images.primary');
     });
 
     Route::middleware([\App\Http\Middleware\CheckRole::class.':business_user'])->group(function () {
@@ -185,6 +240,8 @@ Route::prefix('business')->middleware([\App\Http\Middleware\CheckAuth::class])->
         Route::post('/orders/{id}/confirm', [BusinessController::class, 'confirmOrder'])->whereUuid('id')->name('orders.confirm');
         Route::post('/orders/{id}/status', [BusinessController::class, 'updateOrderStatus'])->whereUuid('id')->name('orders.update-status');
         Route::post('/orders/{id}/downpayment-received', [BusinessController::class, 'markDownpaymentReceived'])->whereUuid('id')->name('orders.downpayment-received');
+        Route::post('/orders/{id}/payment-confirm', [BusinessController::class, 'confirmPayment'])->whereUuid('id')->name('orders.payment.confirm');
+        Route::post('/orders/{id}/extension-request', [BusinessController::class, 'requestOrderExtension'])->whereUuid('id')->name('orders.extension.request');
 
         // Notifications
         Route::get('/notifications', [BusinessController::class, 'notifications'])->name('notifications');
@@ -199,6 +256,7 @@ Route::prefix('business')->middleware([\App\Http\Middleware\CheckAuth::class])->
         // Customization Management
         Route::get('/services/{serviceId}/customizations', [BusinessController::class, 'customizations'])->whereUuid('serviceId')->name('customizations.index');
         Route::post('/services/{serviceId}/customizations', [BusinessController::class, 'storeCustomization'])->whereUuid('serviceId')->name('customizations.store');
+        Route::put('/services/{serviceId}/customizations/custom-size', [BusinessController::class, 'updateCustomSizeSettings'])->whereUuid('serviceId')->name('customizations.custom-size.update');
         Route::put('/services/{serviceId}/customizations/{optionId}', [BusinessController::class, 'updateCustomization'])->whereUuid('serviceId')->whereUuid('optionId')->name('customizations.update');
         Route::delete('/services/{serviceId}/customizations/{optionId}', [BusinessController::class, 'deleteCustomization'])->whereUuid('serviceId')->whereUuid('optionId')->name('customizations.delete');
 
@@ -222,29 +280,32 @@ Route::prefix('business')->middleware([\App\Http\Middleware\CheckAuth::class])->
         // Chat Management
         Route::get('/chat', [BusinessController::class, 'chat'])->name('chat');
     });
-});
 
-// Service Marketplace API routes
-Route::prefix('api/marketplace')->middleware([\App\Http\Middleware\CheckAuth::class, \App\Http\Middleware\CheckRole::class.':customer'])->name('api.marketplace.')->group(function () {
-    Route::get('/services', [\App\Http\Controllers\Api\ServiceMarketplaceApiController::class, 'getServices']);
-    Route::get('/search-suggestions', [\App\Http\Controllers\Api\ServiceMarketplaceApiController::class, 'getSearchSuggestions']);
-    Route::get('/service/{serviceId}', [\App\Http\Controllers\Api\ServiceMarketplaceApiController::class, 'getServiceDetails']);
-    Route::post('/toggle-favorite', [\App\Http\Controllers\Api\ServiceMarketplaceApiController::class, 'toggleFavorite']);
-    Route::get('/categories', [\App\Http\Controllers\Api\ServiceMarketplaceApiController::class, 'getCategories']);
-});
+    Route::middleware([\App\Http\Middleware\CheckRole::class.':business_user'])->group(function () {
+        Route::get('/pending', function () {
+            $userId = session('user_id');
 
-// Customer API routes
-Route::prefix('api/customer')->middleware([\App\Http\Middleware\CheckAuth::class, \App\Http\Middleware\CheckRole::class.':customer'])->name('api.customer.')->group(function () {
-    Route::get('/services', [\App\Http\Controllers\Api\CustomerDashboardApiController::class, 'getServices']);
-    Route::get('/orders', [\App\Http\Controllers\Api\CustomerDashboardApiController::class, 'getOrders']);
-    Route::get('/payments', [\App\Http\Controllers\Api\CustomerDashboardApiController::class, 'getPaymentHistory']);
-    Route::post('/profile', [\App\Http\Controllers\Api\CustomerDashboardApiController::class, 'updateProfile']);
-    Route::get('/stats', [\App\Http\Controllers\Api\CustomerDashboardApiController::class, 'getDashboardStats']);
-    Route::get('/saved-services', [\App\Http\Controllers\Api\CustomerDashboardApiController::class, 'getSavedServices']);
+            $enterprise = null;
+            if ($userId && \Illuminate\Support\Facades\Schema::hasTable('enterprises') && \Illuminate\Support\Facades\Schema::hasColumn('enterprises', 'owner_user_id')) {
+                $enterprise = \Illuminate\Support\Facades\DB::table('enterprises')
+                    ->where('owner_user_id', $userId)
+                    ->first();
+            }
+
+            if (!$enterprise && $userId && \Illuminate\Support\Facades\Schema::hasTable('staff')) {
+                $enterpriseId = \Illuminate\Support\Facades\DB::table('staff')->where('user_id', $userId)->value('enterprise_id');
+                if ($enterpriseId) {
+                    $enterprise = \Illuminate\Support\Facades\DB::table('enterprises')->where('enterprise_id', $enterpriseId)->first();
+                }
+            }
+
+            return view('business.pending', compact('enterprise'));
+        })->name('pending');
+    });
 });
 
 // Customer routes
-Route::prefix('customer')->middleware([\App\Http\Middleware\CheckAuth::class, \App\Http\Middleware\CheckRole::class.':customer'])->name('customer.')->group(function () {
+Route::prefix('customer')->middleware([\App\Http\Middleware\CheckAuth::class, TwoFactorVerify::class, \App\Http\Middleware\CheckRole::class.':customer'])->name('customer.')->group(function () {
     // Dashboard
     Route::get('/dashboard', [CustomerDashboardController::class, 'index'])->name('dashboard');
     Route::get('/dashboard-modern', [ModernCustomerDashboardController::class, 'index'])->name('dashboard.modern');
@@ -254,7 +315,9 @@ Route::prefix('customer')->middleware([\App\Http\Middleware\CheckAuth::class, \A
     // Service Marketplace
     Route::get('/marketplace', [ServiceMarketplaceController::class, 'index'])->name('marketplace');
     
-    Route::get('/enterprises', [CustomerController::class, 'enterprises'])->name('enterprises');
+    Route::get('/enterprises', function () {
+        return redirect()->route('customer.marketplace');
+    })->name('enterprises');
     Route::get('/enterprises/{id}/services', [CustomerController::class, 'enterpriseServices'])->whereUuid('id')->name('enterprise.services');
     Route::get('/services/{id}', [CustomerController::class, 'serviceDetails'])->whereUuid('id')->name('service.details');
     
@@ -262,7 +325,10 @@ Route::prefix('customer')->middleware([\App\Http\Middleware\CheckAuth::class, \A
     Route::get('/orders', [CustomerController::class, 'orders'])->name('orders');
     Route::get('/orders/{id}', [CustomerController::class, 'orderDetails'])->whereUuid('id')->name('order.details');
     Route::post('/orders/{id}/confirm-completion', [CustomerController::class, 'confirmCompletion'])->whereUuid('id')->name('orders.confirm-completion');
+    Route::post('/orders/{id}/reviews', [CustomerController::class, 'storeReview'])->whereUuid('id')->name('orders.reviews.store');
+    Route::get('/orders/{id}/reviews-fragment', [CustomerController::class, 'orderReviewsFragment'])->whereUuid('id')->name('orders.reviews.fragment');
     Route::post('/orders/{id}/cancel', [CustomerController::class, 'cancelOrder'])->whereUuid('id')->name('orders.cancel');
+    Route::post('/orders/{orderId}/extension-requests/{requestId}/respond', [CustomerController::class, 'respondOrderExtension'])->whereUuid('orderId')->whereUuid('requestId')->name('orders.extension.respond');
     
     // Design File Upload
     Route::post('/orders/{orderId}/upload-design', [CustomerController::class, 'uploadDesignFile'])->whereUuid('orderId')->name('orders.upload-design');
@@ -275,22 +341,23 @@ Route::prefix('customer')->middleware([\App\Http\Middleware\CheckAuth::class, \A
     Route::get('/design-assets', [CustomerController::class, 'designAssets'])->name('design-assets');
 });
 
-// Debug routes (remove in production)
-Route::get('/debug/enterprises', function() {
-    $enterprises = \App\Models\Enterprise::with('services')->get();
-    return response()->json([
-        'count' => $enterprises->count(),
-        'enterprises' => $enterprises->toArray()
-    ]);
-});
+if (app()->environment('local')) {
+    Route::get('/debug/enterprises', function() {
+        $enterprises = \App\Models\Enterprise::with('services')->get();
+        return response()->json([
+            'count' => $enterprises->count(),
+            'enterprises' => $enterprises->toArray()
+        ]);
+    });
 
-Route::get('/debug/services', function() {
-    $services = \App\Models\Service::with(['enterprise', 'customizationOptions'])->get();
-    return response()->json([
-        'count' => $services->count(),
-        'services' => $services->toArray()
-    ]);
-});
+    Route::get('/debug/services', function() {
+        $services = \App\Models\Service::with(['enterprise', 'customizationOptions'])->get();
+        return response()->json([
+            'count' => $services->count(),
+            'services' => $services->toArray()
+        ]);
+    });
+}
 
 
 // Chat routes (authenticated users)
@@ -301,33 +368,7 @@ Route::middleware([\App\Http\Middleware\CheckAuth::class])->group(function () {
         ->name('chat.enterprise');
 });
 
-Route::prefix('api/chat')
-    ->middleware([\App\Http\Middleware\CheckAuth::class])
-    ->group(function () {
-        Route::post('/enterprise-owner', [ChatController::class, 'resolveEnterpriseOwner']);
-    });
-
-// Chat API routes (session-authenticated users)
-Route::prefix('api/chat')
-    ->middleware([\App\Http\Middleware\CheckAuth::class, \App\Http\Middleware\CheckChatAccess::class])
-    ->group(function () {
-        Route::get('/conversations', [ChatController::class, 'getConversations']);
-        Route::post('/conversations', [ChatController::class, 'getOrCreateConversation']);
-        Route::get('/conversations/{conversationId}', [ChatController::class, 'getConversation']);
-        Route::get('/conversations/{conversationId}/messages', [ChatController::class, 'getMessages']);
-        Route::post('/messages', [ChatController::class, 'sendMessage']);
-        Route::post('/messages/read', [ChatController::class, 'markAsRead']);
-        Route::post('/typing', [ChatController::class, 'typing']);
-        Route::post('/online-status', [ChatController::class, 'updateOnlineStatus']);
-        Route::post('/online-status/check', [ChatController::class, 'getOnlineStatus']);
-        Route::get('/available-businesses', [ChatController::class, 'getAvailableBusinesses']);
-        Route::post('/pusher/auth', [ChatController::class, 'pusherAuth']);
-        Route::post('/cleanup', [ChatController::class, 'cleanup']);
-        Route::get('/health', [ChatController::class, 'healthCheck']);
-    });
-
-// Pricing API routes (AJAX)
-Route::prefix('api')->name('api.')->group(function () {
-    Route::post('/pricing/calculate', [\App\Http\Controllers\PricingController::class, 'calculatePrice'])->name('pricing.calculate');
+Route::middleware([\App\Http\Middleware\CheckAuth::class, \App\Http\Middleware\CheckRole::class.':customer'])->group(function () {
+    Route::post('/reports', [UserReportController::class, 'store'])->name('reports.store');
 });
 

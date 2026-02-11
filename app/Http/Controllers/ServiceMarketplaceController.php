@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class ServiceMarketplaceController extends Controller
 {
@@ -34,13 +35,29 @@ class ServiceMarketplaceController extends Controller
             Log::info('Loading service marketplace', ['user_id' => $userId]);
             
             // Get marketplace statistics
-            $totalServices = DB::table('services')->where('is_active', true)->count();
-            $totalProviders = DB::table('enterprises')->where('is_active', true)->count();
+            $totalServicesQuery = DB::table('services as s')
+                ->join('enterprises as e', 's.enterprise_id', '=', 'e.enterprise_id')
+                ->where('s.is_active', true)
+                ->where('e.is_active', true);
+            if (Schema::hasColumn('enterprises', 'is_verified')) {
+                $totalServicesQuery->where('e.is_verified', true);
+            }
+            $totalServices = $totalServicesQuery->count();
+
+            $totalProvidersQuery = DB::table('enterprises')->where('is_active', true);
+            if (Schema::hasColumn('enterprises', 'is_verified')) {
+                $totalProvidersQuery->where('is_verified', true);
+            }
+            $totalProviders = $totalProvidersQuery->count();
             
             // Get featured services (high review count or recent)
             $featuredServices = DB::table('services as s')
                 ->join('enterprises as e', 's.enterprise_id', '=', 'e.enterprise_id')
                 ->where('s.is_active', true)
+                ->where('e.is_active', true)
+                ->when(Schema::hasColumn('enterprises', 'is_verified'), function ($q) {
+                    $q->where('e.is_verified', true);
+                })
                 ->select([
                     's.service_id as product_id',
                     's.service_name as product_name',

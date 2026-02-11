@@ -1,5 +1,5 @@
 <x-ui.modal id="orderStatusActionModal" title="Update Order Status" size="md" centered>
-    <form id="orderStatusActionForm" method="POST" data-up-global-loader>
+    <form id="orderStatusActionForm" method="POST">
         @csrf
         <input type="hidden" name="status_id" id="orderStatusActionStatusId" value="">
         <div class="space-y-4">

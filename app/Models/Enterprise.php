@@ -22,12 +22,18 @@ class Enterprise extends Model
         'contact_person',
         'contact_number',
         'tin_no',
+        'checkout_payment_methods',
+        'checkout_fulfillment_methods',
+        'checkout_rush_options',
     ];
 
     protected function casts(): array
     {
         return [
             'enterprise_id' => 'string',
+            'checkout_payment_methods' => 'array',
+            'checkout_fulfillment_methods' => 'array',
+            'checkout_rush_options' => 'array',
         ];
     }
 

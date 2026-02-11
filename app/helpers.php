@@ -111,3 +111,46 @@ if (!function_exists('order_status')) {
         return SafePropertyHelper::getOrderStatus($order);
     }
 }
+
+if (!function_exists('system_setting')) {
+    function system_setting(string $key, $default = null)
+    {
+        try {
+            if (!\Illuminate\Support\Facades\Schema::hasTable('system_settings')) {
+                return $default;
+            }
+
+            $cacheKey = 'system_setting.' . $key;
+
+            return \Illuminate\Support\Facades\Cache::remember($cacheKey, 300, function () use ($key, $default) {
+                $value = \Illuminate\Support\Facades\DB::table('system_settings')->where('key', $key)->value('value');
+                return $value !== null ? $value : $default;
+            });
+        } catch (\Throwable $e) {
+            return $default;
+        }
+    }
+}
+
+if (!function_exists('system_brand_name')) {
+    function system_brand_name(): string
+    {
+        return (string) system_setting('brand_name', config('app.name', 'UniPrint'));
+    }
+}
+
+if (!function_exists('system_brand_tagline')) {
+    function system_brand_tagline(): string
+    {
+        return (string) system_setting('brand_tagline', 'Smart Printing Services');
+    }
+}
+
+if (!function_exists('system_brand_logo_url')) {
+    function system_brand_logo_url(): ?string
+    {
+        $url = system_setting('brand_logo_url', null);
+        $url = is_string($url) ? trim($url) : null;
+        return $url !== '' ? $url : null;
+    }
+}

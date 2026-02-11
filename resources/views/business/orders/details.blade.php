@@ -90,6 +90,52 @@
                 </div>
             </div>
 
+            @php
+                $canRequestExtension = false;
+                try {
+                    if (!empty($order->due_date)) {
+                        $canRequestExtension = \Carbon\Carbon::parse($order->due_date)->lt(\Carbon\Carbon::today());
+                    }
+                } catch (\Exception $e) {
+                    $canRequestExtension = false;
+                }
+            @endphp
+
+            @if(\Illuminate\Support\Facades\Schema::hasTable('order_extension_requests') && $canRequestExtension)
+                <div class="bg-card border border-border rounded-xl shadow-card p-6">
+                    <h3 class="font-bold mb-3">Extension Request</h3>
+
+                    @if(!empty($latestExtensionRequest))
+                        <div class="text-sm text-muted-foreground mb-3">
+                            Latest: <span class="font-medium text-foreground">{{ ucfirst($latestExtensionRequest->status ?? 'pending') }}</span>
+                            @if(!empty($latestExtensionRequest->requested_days))
+                                • {{ (int) $latestExtensionRequest->requested_days }} day(s)
+                            @endif
+                            @if(!empty($latestExtensionRequest->proposed_due_date))
+                                • Proposed due: {{ date('M d, Y', strtotime($latestExtensionRequest->proposed_due_date)) }}
+                            @endif
+                        </div>
+                    @endif
+
+                    <form action="{{ route('business.orders.extension.request', $order->purchase_order_id) }}" method="POST" class="space-y-3" data-up-global-loader>
+                        @csrf
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Request extension (days)</label>
+                            <input type="number" name="requested_days" min="1" max="60" value="3"
+                                   class="w-full px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Message (optional)</label>
+                            <textarea name="message" rows="2" maxlength="500"
+                                      class="w-full px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"></textarea>
+                        </div>
+                        <button type="submit" class="w-full px-4 py-2 bg-primary text-primary-foreground font-medium rounded-md hover:shadow-glow transition-smooth" data-up-button-loader>
+                            Request Extension From Customer
+                        </button>
+                    </form>
+                </div>
+            @endif
+
             <!-- Design Files -->
             <div class="bg-card border border-border rounded-xl shadow-card p-6">
                 <h2 class="text-xl font-bold mb-4">Design Files</h2>
@@ -214,6 +260,49 @@
                         <p class="font-medium">{{ date('M d, Y', strtotime($order->delivery_date)) }}</p>
                     </div>
                 </div>
+            </div>
+
+            <div class="bg-card border border-border rounded-xl shadow-card p-6">
+                <h3 class="font-bold mb-4">Payment</h3>
+
+                <div class="space-y-3">
+                    <div>
+                        <p class="text-sm text-muted-foreground">Method</p>
+                        <p class="font-medium">{{ $order->payment_method ?? '—' }}</p>
+                    </div>
+
+                    <div>
+                        <p class="text-sm text-muted-foreground">Status</p>
+                        @if(!empty($isPaid))
+                            <span class="inline-block px-2 py-1 text-xs font-medium rounded-md bg-success/10 text-success">Paid</span>
+                        @else
+                            <span class="inline-block px-2 py-1 text-xs font-medium rounded-md bg-warning/10 text-warning">Unpaid</span>
+                        @endif
+                    </div>
+
+                    @if(isset($payment) && $payment)
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <p class="text-sm text-muted-foreground">Paid</p>
+                                <p class="font-medium">₱{{ number_format((float) ($payment->amount_paid ?? 0), 2) }}</p>
+                            </div>
+                            <div>
+                                <p class="text-sm text-muted-foreground">Due</p>
+                                <p class="font-medium">₱{{ number_format((float) ($payment->amount_due ?? 0), 2) }}</p>
+                            </div>
+                        </div>
+                    @endif
+                </div>
+
+                @if(!empty($canConfirmPayment))
+                    <form action="{{ route('business.orders.payment.confirm', $order->purchase_order_id) }}" method="POST" class="mt-4" data-up-global-loader>
+                        @csrf
+                        <button type="submit" class="w-full px-4 py-2 bg-primary text-primary-foreground font-medium rounded-md hover:shadow-glow transition-smooth" data-up-button-loader
+                                onclick="return confirm('Confirm that payment has been received for this order?');">
+                            Confirm Payment
+                        </button>
+                    </form>
+                @endif
             </div>
 
             <!-- Linear Status Actions -->

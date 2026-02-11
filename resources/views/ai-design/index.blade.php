@@ -38,6 +38,24 @@
         <div class="tab-content">
             <!-- AI Generate Tab -->
             <div class="tab-panel active" id="ai-generate-panel">
+                <div class="mb-6">
+                    <div class="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
+                        <div class="p-4 flex items-center justify-between gap-4">
+                            <div class="flex items-center gap-3">
+                                <div class="w-9 h-9 bg-primary/10 rounded-lg flex items-center justify-center">
+                                    <i data-lucide="sparkles" class="h-5 w-5 text-primary"></i>
+                                </div>
+                                <div>
+                                    <div class="text-sm font-semibold text-foreground">Daily AI generations</div>
+                                    <div class="text-xs text-muted-foreground">
+                                        <span id="ai-usage-text">Loading usage...</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="button" id="ai-usage-refresh" class="text-xs text-muted-foreground hover:text-foreground transition-smooth">Refresh</button>
+                        </div>
+                    </div>
+                </div>
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     <!-- Input Section -->
                     <div class="lg:col-span-1 space-y-6">
@@ -146,22 +164,6 @@
                             </div>
                         </div>
 
-                        <!-- Get Design Help from Experts -->
-                        <div class="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
-                            <div class="p-6 text-center">
-                                <div class="w-12 h-12 bg-accent/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                                    <i data-lucide="message-circle" class="h-6 w-6 text-accent"></i>
-                                </div>
-                                <h3 class="text-lg font-semibold text-foreground mb-2">Need Professional Help?</h3>
-                                <p class="text-muted-foreground mb-4">Chat with our design experts for personalized guidance</p>
-                                <button 
-                                    onclick="openDesignChat()" 
-                                    class="bg-accent text-white px-6 py-3 rounded-lg font-medium hover:bg-accent/90 transition-all duration-200 flex items-center justify-center gap-2 mx-auto">
-                                    <i data-lucide="message-circle" class="h-4 w-4"></i>
-                                    Get Design Help from Experts
-                                </button>
-                            </div>
-                        </div>
                     </div>
 
                     <!-- Output Section -->
@@ -245,84 +247,6 @@
     </div>
 </div>
 
-<!-- Design Consultation Chat Modal -->
-<div id="designChatModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-    <div class="bg-card rounded-2xl shadow-2xl border border-border max-w-4xl w-full max-h-[90vh] overflow-hidden">
-        <div class="bg-gradient-to-r from-primary to-primary-glow px-6 py-4 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <div class="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
-                    <i data-lucide="message-circle" class="h-4 w-4 text-white"></i>
-                </div>
-                <div>
-                    <h3 class="text-lg font-semibold text-white">Design Consultation</h3>
-                    <p class="text-sm text-white/80">Chat with our design experts</p>
-                </div>
-            </div>
-            <button onclick="closeDesignChatModal()" class="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center hover:bg-white/30 transition-colors">
-                <i data-lucide="x" class="h-4 w-4 text-white"></i>
-            </button>
-        </div>
-        <div class="p-6">
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div class="lg:col-span-1">
-                    <div class="bg-muted/20 rounded-xl p-4">
-                        <h4 class="font-semibold text-foreground mb-3">Current Project</h4>
-                        <div class="space-y-2 text-sm">
-                            <div class="flex justify-between">
-                                <span class="text-muted-foreground">Type:</span>
-                                <span class="font-medium text-foreground" id="chat-design-type">Business Card</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-muted-foreground">Style:</span>
-                                <span class="font-medium text-foreground" id="chat-design-style">Modern</span>
-                            </div>
-                            <div class="mt-3">
-                                <span class="text-muted-foreground text-xs">Context:</span>
-                                <p class="text-foreground text-sm mt-1" id="chat-design-context">Modern business card with purple gradient...</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="lg:col-span-2">
-                    <div class="border border-border rounded-xl p-4 h-80 overflow-y-auto mb-4 bg-muted/10" id="design-chat-messages">
-                        <div class="text-center text-muted-foreground py-8">
-                            <div class="w-12 h-12 bg-muted/50 rounded-full flex items-center justify-center mx-auto mb-3">
-                                <i data-lucide="message-circle" class="h-6 w-6"></i>
-                            </div>
-                            <p>Start a conversation with our design experts</p>
-                        </div>
-                    </div>
-                    <div class="mb-4">
-                        <div class="flex flex-wrap gap-2">
-                            <button class="px-3 py-1 text-xs bg-muted text-muted-foreground rounded-full hover:bg-primary hover:text-white transition-colors quick-question" data-question="What colors work best for business cards?">
-                                Business card colors?
-                            </button>
-                            <button class="px-3 py-1 text-xs bg-muted text-muted-foreground rounded-full hover:bg-primary hover:text-white transition-colors quick-question" data-question="How do I choose the right font?">
-                                Font selection?
-                            </button>
-                            <button class="px-3 py-1 text-xs bg-muted text-muted-foreground rounded-full hover:bg-primary hover:text-white transition-colors quick-question" data-question="What file formats do you recommend?">
-                                File formats?
-                            </button>
-                        </div>
-                    </div>
-                    <div class="flex gap-2">
-                        <input 
-                            type="text" 
-                            class="flex-1 px-4 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-200" 
-                            id="design-chat-input" 
-                            placeholder="Ask about design styles, colors, layouts...">
-                        <button 
-                            class="bg-gradient-to-r from-primary to-primary-glow text-white px-4 py-3 rounded-lg hover:shadow-lg hover:shadow-primary/25 transition-all duration-200" 
-                            type="button" 
-                            id="send-design-message">
-                            <i data-lucide="send" class="h-4 w-4"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 @endsection
 
 @push('styles')
@@ -344,45 +268,14 @@
     @apply block;
 }
 
-/* Custom scrollbar for chat */
-#design-chat-messages::-webkit-scrollbar {
-    width: 6px;
-}
-
-#design-chat-messages::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-#design-chat-messages::-webkit-scrollbar-thumb {
-    background: hsl(240 4.8% 85%);
-    border-radius: 3px;
-}
-
-#design-chat-messages::-webkit-scrollbar-thumb:hover {
-    background: hsl(240 4.8% 75%);
-}
 </style>
 @endpush
 
 @push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 // Initialize Lucide icons
 if (typeof lucide !== 'undefined') {
     lucide.createIcons();
-}
-
-window.UniPrintSupabase = {
-    url: '{{ env('SUPABASE_URL') }}',
-    anonKey: '{{ env('SUPABASE_ANON_KEY') }}',
-    bucket: '{{ env('SUPABASE_STORAGE_BUCKET', 'Uniprint') }}'
-};
-
-function getSupabaseClient() {
-    if (!window.UniPrintSupabase?.url || !window.UniPrintSupabase?.anonKey) {
-        throw new Error('Supabase is not configured. Please set SUPABASE_URL and SUPABASE_ANON_KEY.');
-    }
-    return supabase.createClient(window.UniPrintSupabase.url, window.UniPrintSupabase.anonKey);
 }
 
 function base64ToUint8Array(base64) {
@@ -395,28 +288,6 @@ function base64ToUint8Array(base64) {
     return bytes;
 }
 
-async function uploadGeneratedDesignToSupabase(base64Png, filename) {
-    const client = getSupabaseClient();
-    const bucket = window.UniPrintSupabase.bucket || 'Uniprint';
-
-    const bytes = base64ToUint8Array(base64Png);
-    const path = `ai-design/temp/${filename}`;
-
-    const { error: uploadError } = await client.storage
-        .from(bucket)
-        .upload(path, bytes, { contentType: 'image/png', upsert: true });
-
-    if (uploadError) {
-        throw new Error(uploadError.message || 'Failed to upload to Supabase storage');
-    }
-
-    const { data } = client.storage.from(bucket).getPublicUrl(path);
-    if (!data?.publicUrl) {
-        throw new Error('Failed to get public URL from Supabase');
-    }
-
-    return { publicUrl: data.publicUrl, path };
-}
 
 // Tab Management
 function switchTab(tabName) {
@@ -593,7 +464,9 @@ function closeEnhancementModal() {
 }
 
 function openGeneratedDesignPreview() {
-    const imageUrl = window.currentDesign?.image_url;
+    const base64 = window.currentDesign?.image_base64;
+    const mt = window.currentDesign?.mime_type || 'image/png';
+    const imageUrl = base64 ? `data:${mt};base64,${base64}` : window.currentDesign?.image_url;
     if (!imageUrl) return;
 
     const modal = document.createElement('div');
@@ -667,6 +540,33 @@ document.getElementById('enhance-prompt-btn').addEventListener('click', function
     enhancePrompt();
 });
 
+async function refreshAiUsage() {
+    const el = document.getElementById('ai-usage-text');
+    if (!el) return;
+
+    try {
+        const res = await fetch('{{ route("ai-design.usage") }}', {
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            credentials: 'same-origin'
+        });
+        const data = await res.json();
+        if (data && data.success) {
+            el.textContent = `${data.remaining_today} remaining today (limit ${data.daily_limit})`;
+        } else {
+            el.textContent = 'Unable to load usage.';
+        }
+    } catch (e) {
+        el.textContent = 'Unable to load usage.';
+    }
+}
+
+document.getElementById('ai-usage-refresh')?.addEventListener('click', function() {
+    refreshAiUsage();
+});
+
 // AI Design Form Handler
 document.getElementById('ai-design-form').addEventListener('submit', async function(e) {
     e.preventDefault();
@@ -693,8 +593,10 @@ document.getElementById('ai-design-form').addEventListener('submit', async funct
             headers: {
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
                 'Content-Type': 'application/json',
-                'Accept': 'application/json'
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
             },
+            credentials: 'same-origin',
             body: JSON.stringify({
                 prompt: prompt,
                 style: style,
@@ -707,16 +609,29 @@ document.getElementById('ai-design-form').addEventListener('submit', async funct
         console.log('Response status:', response.status);
         
         if (!response.ok) {
-            const errorText = await response.text();
-            console.error('HTTP Error:', response.status, errorText);
-            throw new Error(`HTTP Error: ${response.status} - ${errorText}`);
+            let errorPayload = null;
+            const raw = await response.text();
+            try { errorPayload = raw ? JSON.parse(raw) : null; } catch (e) { errorPayload = null; }
+            console.error('HTTP Error:', response.status, raw);
+
+            if (response.status === 429) {
+                throw new Error(errorPayload?.message || 'Daily AI generation limit reached. Please try again tomorrow.');
+            }
+
+            throw new Error(errorPayload?.message || `HTTP Error: ${response.status} - ${raw}`);
         }
         
         const result = await response.json();
         console.log('API Response:', result);
         
         if (result.success && result.image_base64 && result.filename) {
-            const upload = await uploadGeneratedDesignToSupabase(result.image_base64, result.filename);
+            if (window.currentDesign?.image_url && String(window.currentDesign.image_url).startsWith('blob:')) {
+                try { URL.revokeObjectURL(window.currentDesign.image_url); } catch (e) {}
+            }
+
+            const bytes = base64ToUint8Array(result.image_base64);
+            const blob = new Blob([bytes], { type: result.mime_type || 'image/png' });
+            const objectUrl = URL.createObjectURL(blob);
 
             // Display generated design
             const outputDiv = document.getElementById('design-output');
@@ -744,14 +659,16 @@ document.getElementById('ai-design-form').addEventListener('submit', async funct
             // Store design data for saving
             window.currentDesign = {
                 ...result,
-                image_url: upload.publicUrl,
-                storage_path: upload.path
+                image_url: objectUrl,
+                image_base64: result.image_base64
             };
 
             // Re-initialize icons
             if (typeof lucide !== 'undefined') {
                 lucide.createIcons();
             }
+
+            refreshAiUsage();
             
         } else {
             const errorMsg = result.message || 'Failed to generate design. Please check your API key and try again.';
@@ -765,7 +682,9 @@ document.getElementById('ai-design-form').addEventListener('submit', async funct
         let errorMessage = error.message;
         
         // Provide helpful error messages
-        if (errorMessage.includes('API key')) {
+        if (errorMessage.includes('Daily AI generation limit')) {
+            errorMessage = 'Daily AI generation limit reached. Please try again tomorrow.';
+        } else if (errorMessage.includes('API key')) {
             errorMessage = 'API key not configured. Please add your Gemini API key to the environment.';
         } else if (errorMessage.includes('HTTP')) {
             errorMessage = 'Server error. Please check the logs and try again.';
@@ -810,6 +729,8 @@ document.getElementById('ai-design-form').addEventListener('submit', async funct
     }
 });
 
+refreshAiUsage();
+
 // Reset Form
 document.getElementById('reset-btn').addEventListener('click', function() {
     document.getElementById('ai-design-form').reset();
@@ -853,9 +774,8 @@ document.getElementById('save-design-btn').addEventListener('click', async funct
                 'Accept': 'application/json'
             },
             body: JSON.stringify({
-                image_url: window.currentDesign.image_url,
+                image_base64: window.currentDesign.image_base64,
                 filename: window.currentDesign.filename,
-                storage_path: window.currentDesign.storage_path || null,
                 title: title,
                 description: window.currentDesign.prompt || null
             })
@@ -878,66 +798,6 @@ document.getElementById('regenerate-btn').addEventListener('click', function() {
     document.getElementById('ai-design-form').dispatchEvent(new Event('submit'));
 });
 
-// Design Chat Functionality
-function openDesignChat() {
-    // Update chat context with current form values
-    const designType = document.getElementById('design-type').value;
-    const style = document.getElementById('style').value;
-    const prompt = document.getElementById('prompt').value;
-    
-    document.getElementById('chat-design-type').textContent = designType.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase());
-    document.getElementById('chat-design-style').textContent = style.charAt(0).toUpperCase() + style.slice(1);
-    document.getElementById('chat-design-context').textContent = prompt.substring(0, 50) + (prompt.length > 50 ? '...' : '');
-    
-    // Show modal
-    document.getElementById('designChatModal').classList.remove('hidden');
-    
-    // Re-initialize icons
-    if (typeof lucide !== 'undefined') {
-        lucide.createIcons();
-    }
-}
-
-// Close design chat modal
-function closeDesignChatModal() {
-    document.getElementById('designChatModal').classList.add('hidden');
-}
-
-// Send design message
-function sendDesignMessage() {
-    const input = document.getElementById('design-chat-input');
-    const message = input.value.trim();
-    
-    if (message) {
-        const messagesDiv = document.getElementById('design-chat-messages');
-        
-        // Add user message
-        messagesDiv.innerHTML += `
-            <div class="flex justify-end mb-3">
-                <div class="bg-primary text-white rounded-lg px-4 py-2 max-w-xs text-sm">
-                    ${message}
-                </div>
-            </div>
-        `;
-        
-        // Add expert response (simulated)
-        setTimeout(() => {
-            messagesDiv.innerHTML += `
-                <div class="flex justify-start mb-3">
-                    <div class="bg-muted rounded-lg px-4 py-2 max-w-xs text-sm">
-                        <div class="font-medium text-accent mb-1">Design Expert</div>
-                        <div class="text-foreground">Thank you for your question about "${message}". Our design experts will provide detailed guidance based on your specific needs.</div>
-                    </div>
-                </div>
-            `;
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
-        }, 1000);
-        
-        input.value = '';
-        messagesDiv.scrollTop = messagesDiv.scrollHeight;
-    }
-}
-
 // Initialize page
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize Lucide icons
@@ -953,24 +813,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-    // Set up chat functionality
-    document.getElementById('send-design-message').addEventListener('click', sendDesignMessage);
-    
-    // Set up quick question buttons
-    document.querySelectorAll('.quick-question').forEach(button => {
-        button.addEventListener('click', function() {
-            const question = this.dataset.question;
-            document.getElementById('design-chat-input').value = question;
-            sendDesignMessage();
-        });
-    });
-    
-    // Set up enter key for chat
-    document.getElementById('design-chat-input').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            sendDesignMessage();
-        }
-    });
 });
 </script>
 @endpush

@@ -1,26 +1,6 @@
-@extends('layouts.app')
+@extends('layouts.public')
 
 @section('title', 'My Designs')
-
-@section('dashboard-route', route('customer.dashboard'))
-
-@section('sidebar')
-    <a href="{{ route('customer.dashboard') }}" class="nav-link">
-        <i class="bi bi-speedometer2"></i>Dashboard
-    </a>
-    <a href="{{ route('customer.enterprises') }}" class="nav-link">
-        <i class="bi bi-shop"></i>Browse Shops
-    </a>
-    <a href="{{ route('customer.orders') }}" class="nav-link">
-        <i class="bi bi-bag"></i>My Orders
-    </a>
-    <a href="{{ route('ai-design.index') }}" class="nav-link">
-        <i class="bi bi-magic"></i>AI Design Tool
-    </a>
-    <a href="{{ route('ai-design.my-designs') }}" class="nav-link active">
-        <i class="bi bi-images"></i>My Designs
-    </a>
-@endsection
 
 @section('content')
 <div class="page-header d-flex justify-content-between align-items-center">

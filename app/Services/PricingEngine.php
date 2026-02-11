@@ -4,9 +4,103 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Schema;
 
 class PricingEngine
 {
+    public function getTaxRate(): float
+    {
+        $fallback = 0.12;
+
+        try {
+            if (!Schema::hasTable('system_settings')) {
+                return $fallback;
+            }
+
+            return Cache::remember('system_setting.tax_rate', 3600, function () use ($fallback) {
+                $raw = DB::table('system_settings')->where('key', 'tax_rate')->value('value');
+                if ($raw === null) {
+                    return $fallback;
+                }
+
+                $value = trim((string) $raw);
+                if ($value === '') {
+                    return $fallback;
+                }
+
+                $rate = (float) $value;
+
+                if ($rate > 1) {
+                    $rate = $rate / 100;
+                }
+
+                if ($rate < 0) {
+                    $rate = 0.0;
+                }
+                if ($rate > 1) {
+                    $rate = 1.0;
+                }
+
+                return $rate;
+            });
+        } catch (\Throwable) {
+            return $fallback;
+        }
+    }
+
+    public function calculateRushFee(string $rushOption, ?string $enterpriseId = null): float
+    {
+        if (!$enterpriseId) {
+            return match ($rushOption) {
+                'express' => 50.0,
+                'rush' => 100.0,
+                'same_day' => 200.0,
+                default => 0.0,
+            };
+        }
+
+        try {
+            $enterprise = DB::table('enterprises')->where('enterprise_id', $enterpriseId)->first();
+            if (!$enterprise || empty($enterprise->checkout_rush_options)) {
+                return match ($rushOption) {
+                    'express' => 50.0,
+                    'rush' => 100.0,
+                    'same_day' => 200.0,
+                    default => 0.0,
+                };
+            }
+
+            $options = is_array($enterprise->checkout_rush_options) 
+                ? $enterprise->checkout_rush_options 
+                : json_decode($enterprise->checkout_rush_options, true);
+
+            if (!is_array($options) || !isset($options[$rushOption])) {
+                return 0.0;
+            }
+
+            return (float) ($options[$rushOption]['fee'] ?? 0.0);
+        } catch (\Throwable) {
+            return 0.0;
+        }
+    }
+
+    public function calculateTax(float $amount, ?float $rate = null): float
+    {
+        if ($amount <= 0) {
+            return 0.0;
+        }
+
+        if ($rate === null) {
+            $rate = $this->getTaxRate();
+        }
+
+        if ($rate < 0) {
+            $rate = 0.0;
+        }
+
+        return $amount * $rate;
+    }
+
     /**
      * Calculate price for a service with customizations
      * 
@@ -50,7 +144,7 @@ class PricingEngine
 
         // Get and apply pricing rules
         $enterpriseId = $enterpriseId ?? $service->enterprise_id;
-        $rules = $this->getActivePricingRules($enterpriseId);
+        $rules = $this->getActivePricingRules($enterpriseId, $service->service_id ?? null);
         
         $rulesApplied = [];
         $discount = 0;
@@ -106,17 +200,30 @@ class PricingEngine
     /**
      * Get active pricing rules for an enterprise (cached)
      */
-    private function getActivePricingRules($enterpriseId)
+    private function getActivePricingRules($enterpriseId, $serviceId = null)
     {
         $cacheKey = "pricing_rules_{$enterpriseId}";
-        
-        return Cache::remember($cacheKey, 3600, function () use ($enterpriseId) {
+
+        $allRules = Cache::remember($cacheKey, 3600, function () use ($enterpriseId) {
             return DB::table('pricing_rules')
                 ->where('enterprise_id', $enterpriseId)
                 ->where('is_active', true)
                 ->orderBy('priority')
                 ->get();
         });
+
+        if (!Schema::hasColumn('pricing_rules', 'service_id')) {
+            return $allRules;
+        }
+
+        // If no service provided (rare in this app), only apply global rules.
+        if (empty($serviceId)) {
+            return $allRules->filter(fn ($r) => empty($r->service_id))->values();
+        }
+
+        return $allRules
+            ->filter(fn ($r) => empty($r->service_id) || (string) $r->service_id === (string) $serviceId)
+            ->values();
     }
 
     /**

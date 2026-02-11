@@ -12,6 +12,7 @@ $breadcrumbs = [
 ];
 
 $isActive = isset($enterprise->is_active) ? (bool) $enterprise->is_active : true;
+$isVerified = isset($enterprise->is_verified) ? (bool) $enterprise->is_verified : true;
 @endphp
 
 @section('content')
@@ -34,6 +35,16 @@ $isActive = isset($enterprise->is_active) ? (bool) $enterprise->is_active : true
                     </div>
                 </div>
                 <div>
+                    <div class="text-sm text-muted-foreground">Verification</div>
+                    <div class="mt-1">
+                        @if($isVerified)
+                            <x-admin.badge variant="success" icon="check-circle">Verified</x-admin.badge>
+                        @else
+                            <x-admin.badge variant="secondary" icon="clock">Pending</x-admin.badge>
+                        @endif
+                    </div>
+                </div>
+                <div>
                     <div class="text-sm text-muted-foreground">Name</div>
                     <div class="font-semibold">{{ $enterprise->name ?? 'Unknown Enterprise' }}</div>
                 </div>
@@ -50,6 +61,40 @@ $isActive = isset($enterprise->is_active) ? (bool) $enterprise->is_active : true
                     <div class="font-semibold">{{ $enterprise->contact_number ?? '—' }}</div>
                 </div>
             </div>
+
+            @if(\Illuminate\Support\Facades\Schema::hasColumn('enterprises', 'verification_document_path'))
+                <div class="mt-6 border-t border-border pt-5">
+                    <div class="text-sm font-semibold mb-3">Verification Proof</div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <div class="text-sm text-muted-foreground">Submitted</div>
+                            <div class="font-semibold">
+                                @if(!empty($enterprise->verification_submitted_at))
+                                    {{ is_string($enterprise->verification_submitted_at) ? date('M d, Y H:i', strtotime($enterprise->verification_submitted_at)) : \Carbon\Carbon::parse($enterprise->verification_submitted_at)->format('M d, Y H:i') }}
+                                @else
+                                    —
+                                @endif
+                            </div>
+                        </div>
+                        <div>
+                            <div class="text-sm text-muted-foreground">Document</div>
+                            <div class="font-semibold">
+                                @if(!empty($enterprise->verification_document_path))
+                                    <a class="text-primary hover:text-primary/80" href="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($enterprise->verification_document_path) }}" target="_blank" rel="noopener">View document</a>
+                                @else
+                                    —
+                                @endif
+                            </div>
+                        </div>
+                        @if(\Illuminate\Support\Facades\Schema::hasColumn('enterprises', 'verification_notes'))
+                            <div class="md:col-span-2">
+                                <div class="text-sm text-muted-foreground">Notes</div>
+                                <div class="font-semibold whitespace-pre-line">{{ $enterprise->verification_notes ?? '—' }}</div>
+                            </div>
+                        @endif
+                    </div>
+                </div>
+            @endif
         </x-admin.card>
 
         <x-admin.card title="Performance" icon="bar-chart-3">
@@ -190,6 +235,7 @@ $isActive = isset($enterprise->is_active) ? (bool) $enterprise->is_active : true
     <div class="space-y-6">
         <x-admin.card title="Actions" icon="settings">
             <div class="space-y-2">
+                @include('admin.partials.enterprise-verification-actions', ['enterprise' => $enterprise])
                 <x-admin.button variant="outline" icon="shopping-cart" href="{{ route('admin.orders', ['enterprise_id' => $enterprise->enterprise_id]) }}" class="w-full">View All Enterprise Orders</x-admin.button>
                 <x-admin.button variant="outline" icon="package" href="{{ route('admin.services', ['enterprise_id' => $enterprise->enterprise_id]) }}" class="w-full">View All Enterprise Services</x-admin.button>
 

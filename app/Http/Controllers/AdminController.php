@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use App\Traits\SafePropertyAccess;
 
@@ -54,31 +56,33 @@ class AdminController extends Controller
                 })
                 ->leftJoin('statuses', 'osh.status_id', '=', 'statuses.status_id');
 
-            $totalOrderValue = DB::table('customer_orders')->sum('total') ?? 0;
-            
-            $stats = [
-                'total_users' => DB::table('users')->count() ?? 0,
-                'total_customers' => DB::table('roles')
-                    ->join('role_types', 'roles.role_type_id', '=', 'role_types.role_type_id')
-                    ->where('role_types.user_role_type', 'customer')
-                    ->distinct()
-                    ->count('roles.user_id') ?? 0,
-                'total_business_users' => DB::table('roles')
-                    ->join('role_types', 'roles.role_type_id', '=', 'role_types.role_type_id')
-                    ->where('role_types.user_role_type', 'business_user')
-                    ->distinct()
-                    ->count('roles.user_id') ?? 0,
-                'total_enterprises' => DB::table('enterprises')->count() ?? 0,
-                'total_services' => DB::table('services')->count() ?? 0,
-                'total_orders' => DB::table('customer_orders')->count() ?? 0,
-                'pending_orders' => (clone $ordersWithLatestStatus)
-                    ->where('statuses.status_name', 'Pending')
-                    ->distinct()
-                    ->count('customer_orders.purchase_order_id') ?? 0,
-                'total_order_value' => $totalOrderValue,
-                'admin_commission' => $totalOrderValue * $commissionRate,
-                'commission_rate' => $commissionRate * 100, // Store as percentage for display
-            ];
+            $stats = Cache::remember('admin.dashboard.stats', 60, function () use ($commissionRate, $ordersWithLatestStatus) {
+                $totalOrderValue = DB::table('customer_orders')->sum('total') ?? 0;
+
+                return [
+                    'total_users' => DB::table('users')->count() ?? 0,
+                    'total_customers' => DB::table('roles')
+                        ->join('role_types', 'roles.role_type_id', '=', 'role_types.role_type_id')
+                        ->where('role_types.user_role_type', 'customer')
+                        ->distinct()
+                        ->count('roles.user_id') ?? 0,
+                    'total_business_users' => DB::table('roles')
+                        ->join('role_types', 'roles.role_type_id', '=', 'role_types.role_type_id')
+                        ->where('role_types.user_role_type', 'business_user')
+                        ->distinct()
+                        ->count('roles.user_id') ?? 0,
+                    'total_enterprises' => DB::table('enterprises')->count() ?? 0,
+                    'total_services' => DB::table('services')->count() ?? 0,
+                    'total_orders' => DB::table('customer_orders')->count() ?? 0,
+                    'pending_orders' => (clone $ordersWithLatestStatus)
+                        ->where('statuses.status_name', 'Pending')
+                        ->distinct()
+                        ->count('customer_orders.purchase_order_id') ?? 0,
+                    'total_order_value' => $totalOrderValue,
+                    'admin_commission' => $totalOrderValue * $commissionRate,
+                    'commission_rate' => $commissionRate * 100,
+                ];
+            });
         } catch (\Exception $e) {
             Log::error('Admin Dashboard Stats Error: ' . $e->getMessage());
             $stats = [
@@ -222,9 +226,115 @@ class AdminController extends Controller
         return view('admin.users', compact('users'));
     }
 
+    public function createUser(Request $request)
+    {
+        if ($request->ajax()) {
+            return view('admin.users.create-form')->render();
+        }
+        return view('admin.users.create');
+    }
+
+    public function storeUser(Request $request)
+    {
+        $request->validate([
+            'name' => 'required|string|max:200',
+            'email' => 'required|email|max:255|unique:users,email',
+            'username' => 'required|string|max:100|unique:login,username',
+            'password' => 'required|string|min:8|confirmed',
+            'role_type' => 'required|string',
+        ]);
+
+        $desiredRoleType = $request->input('role_type');
+        if (!in_array($desiredRoleType, ['customer', 'business_user', 'admin'], true)) {
+            $desiredRoleType = 'customer';
+        }
+
+        DB::beginTransaction();
+        try {
+            $userId = (string) Str::uuid();
+
+            $position = $desiredRoleType === 'business_user' ? 'Owner' : ($desiredRoleType === 'admin' ? 'Administrator' : 'Customer');
+            $department = $desiredRoleType === 'business_user' ? 'Management' : ($desiredRoleType === 'admin' ? 'Admin' : 'External');
+
+            $userData = [
+                'user_id' => $userId,
+                'name' => $request->input('name'),
+                'email' => $request->input('email'),
+                'position' => $position,
+                'department' => $department,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+
+            if (Schema::hasColumn('users', 'is_active')) {
+                $userData['is_active'] = true;
+            }
+
+            DB::table('users')->insert($userData);
+
+            DB::table('login')->insert([
+                'login_id' => (string) Str::uuid(),
+                'user_id' => $userId,
+                'username' => $request->input('username'),
+                'password' => Hash::make($request->input('password')),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $roleTypeId = DB::table('role_types')->where('user_role_type', $desiredRoleType)->value('role_type_id');
+            if (!$roleTypeId) {
+                $roleTypeId = (string) Str::uuid();
+                DB::table('role_types')->insert([
+                    'role_type_id' => $roleTypeId,
+                    'user_role_type' => $desiredRoleType,
+                ]);
+            }
+
+            DB::table('roles')->insert([
+                'role_id' => (string) Str::uuid(),
+                'user_id' => $userId,
+                'role_type_id' => $roleTypeId,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $this->logAudit('create', 'user', $userId, 'Created user', null, [
+                'user_id' => $userId,
+                'role_type' => $desiredRoleType,
+            ]);
+
+            DB::commit();
+            return redirect()->route('admin.users')->with('success', 'User created successfully.');
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            Log::error('Admin create user failed', ['exception' => $e]);
+            return redirect()->back()->withInput()->with('error', 'Failed to create user.');
+        }
+    }
+
     public function userDetails(Request $request, $id)
     {
         $hasUserIsActive = Schema::hasColumn('users', 'is_active');
+
+        $select = [
+            'users.*',
+            'role_types.user_role_type as role_type',
+            DB::raw('COALESCE(owned_enterprises.enterprise_id, staff_enterprises.enterprise_id) as enterprise_id'),
+            DB::raw('COALESCE(owned_enterprises.name, staff_enterprises.name) as enterprise_name'),
+            DB::raw(($hasUserIsActive ? 'COALESCE(users.is_active, true)' : 'true') . ' as is_active'),
+            DB::raw('COALESCE(users.email, \'\') as email'),
+            DB::raw('COALESCE(login.username, users.name) as username'),
+        ];
+
+        if (Schema::hasColumn('enterprises', 'is_verified')) {
+            $select[] = DB::raw('COALESCE(owned_enterprises.is_verified, staff_enterprises.is_verified) as enterprise_is_verified');
+        }
+        if (Schema::hasColumn('enterprises', 'verification_document_path')) {
+            $select[] = DB::raw('COALESCE(owned_enterprises.verification_document_path, staff_enterprises.verification_document_path) as enterprise_verification_document_path');
+        }
+        if (Schema::hasColumn('enterprises', 'verification_submitted_at')) {
+            $select[] = DB::raw('COALESCE(owned_enterprises.verification_submitted_at, staff_enterprises.verification_submitted_at) as enterprise_verification_submitted_at');
+        }
 
         $user = DB::table('users')
             ->leftJoin('login', 'users.user_id', '=', 'login.user_id')
@@ -234,15 +344,7 @@ class AdminController extends Controller
             ->leftJoin('staff', 'users.user_id', '=', 'staff.user_id')
             ->leftJoin('enterprises as staff_enterprises', 'staff.enterprise_id', '=', 'staff_enterprises.enterprise_id')
             ->where('users.user_id', $id)
-            ->select(
-                'users.*',
-                'role_types.user_role_type as role_type',
-                DB::raw('COALESCE(owned_enterprises.enterprise_id, staff_enterprises.enterprise_id) as enterprise_id'),
-                DB::raw('COALESCE(owned_enterprises.name, staff_enterprises.name) as enterprise_name'),
-                DB::raw(($hasUserIsActive ? 'COALESCE(users.is_active, true)' : 'true') . ' as is_active'),
-                DB::raw('COALESCE(users.email, \'\') as email'),
-                DB::raw('COALESCE(login.username, users.name) as username')
-            )
+            ->select($select)
             ->first();
 
         if (!$user) {
@@ -265,6 +367,57 @@ class AdminController extends Controller
         }
 
         return $view;
+    }
+
+    public function verifyEnterprise(Request $request, $id)
+    {
+        $enterprise = DB::table('enterprises')->where('enterprise_id', $id)->first();
+        if (! $enterprise) {
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Enterprise not found.',
+                ], 404);
+            }
+
+            abort(404);
+        }
+
+        if (! Schema::hasColumn('enterprises', 'is_verified')) {
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Enterprise verification is not available. Please run migrations.',
+                ], 400);
+            }
+
+            return redirect()->back()->with('error', 'Enterprise verification is not available. Please run migrations.');
+        }
+
+        $update = [
+            'is_verified' => true,
+            'updated_at' => now(),
+        ];
+
+        if (Schema::hasColumn('enterprises', 'verified_at')) {
+            $update['verified_at'] = now();
+        }
+        if (Schema::hasColumn('enterprises', 'verified_by_user_id')) {
+            $update['verified_by_user_id'] = session('user_id');
+        }
+
+        DB::table('enterprises')->where('enterprise_id', $id)->update($update);
+
+        $this->logAudit('update', 'enterprise', $id, 'Verified enterprise', null, $update);
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Enterprise verified successfully.',
+            ]);
+        }
+
+        return redirect()->back()->with('success', 'Enterprise verified successfully.');
     }
 
     public function toggleUserActive($id)
@@ -310,6 +463,248 @@ class AdminController extends Controller
         }
 
         return redirect()->back()->with('success', $newValue ? 'User activated.' : 'User deactivated.');
+    }
+
+    public function disableUserEmail2fa(Request $request, $id)
+    {
+        if (!Schema::hasColumn('users', 'two_factor_enabled')) {
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Email 2FA is not supported by the current schema. Please run migrations.',
+                ], 400);
+            }
+
+            return redirect()->back()->with('error', 'Email 2FA is not supported by the current schema. Please run migrations.');
+        }
+
+        $user = DB::table('users')->where('user_id', $id)->first();
+        if (!$user) {
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not found.',
+                ], 404);
+            }
+
+            return redirect()->back()->with('error', 'User not found.');
+        }
+
+        $roleType = (string) (DB::table('roles')
+            ->join('role_types', 'roles.role_type_id', '=', 'role_types.role_type_id')
+            ->where('roles.user_id', $id)
+            ->value('role_types.user_role_type') ?? '');
+        if ($roleType === 'admin') {
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cannot disable 2FA for admin users.',
+                ], 400);
+            }
+
+            return redirect()->back()->with('error', 'Cannot disable 2FA for admin users.');
+        }
+
+        $currentlyEnabled = (bool) ($user->two_factor_enabled ?? false);
+        if (!$currentlyEnabled) {
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Email 2FA is already disabled for this user.',
+                    'two_factor_enabled' => false,
+                    'updated_rows' => 0,
+                ]);
+            }
+
+            return redirect()->back()->with('success', 'Email 2FA is already disabled for this user.');
+        }
+
+        $oldValues = [
+            'two_factor_enabled' => (bool) ($user->two_factor_enabled ?? false),
+            'two_factor_code' => (string) ($user->two_factor_code ?? ''),
+            'two_factor_expires_at' => $user->two_factor_expires_at ?? null,
+        ];
+
+        $update = [
+            'two_factor_enabled' => false,
+            'two_factor_code' => null,
+            'two_factor_expires_at' => null,
+            'updated_at' => now(),
+        ];
+
+        if (Schema::hasColumn('users', 'two_factor_email_enabled')) {
+            $update['two_factor_email_enabled'] = false;
+        }
+        if (Schema::hasColumn('users', 'two_factor_sms_enabled')) {
+            $update['two_factor_sms_enabled'] = false;
+        }
+        if (Schema::hasColumn('users', 'two_factor_totp_enabled')) {
+            $update['two_factor_totp_enabled'] = false;
+        }
+        if (Schema::hasColumn('users', 'two_factor_enabled_at')) {
+            $update['two_factor_enabled_at'] = null;
+        }
+        if (Schema::hasColumn('users', 'two_factor_secret')) {
+            $update['two_factor_secret'] = null;
+        }
+
+        try {
+            $updatedRows = DB::table('users')->where('user_id', $id)->update($update);
+        } catch (\Throwable $e) {
+            Log::error('Admin disable email 2FA failed', ['error' => $e->getMessage(), 'user_id' => $id]);
+
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to disable Email 2FA for this user.',
+                ], 500);
+            }
+
+            return redirect()->back()->with('error', 'Failed to disable Email 2FA for this user.');
+        }
+
+        $this->logAudit('update', 'user', $id, 'Admin disabled user Email 2FA', $oldValues, array_merge($update, [
+            'updated_rows' => $updatedRows ?? null,
+        ]));
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Email 2FA disabled for this user.',
+                'two_factor_enabled' => false,
+                'updated_rows' => $updatedRows ?? null,
+            ]);
+        }
+
+        return redirect()->back()->with('success', 'Email 2FA disabled for this user.');
+    }
+
+    public function deleteUser(Request $request, string $id)
+    {
+        $adminId = (string) session('user_id');
+        if ($adminId !== '' && hash_equals($adminId, $id)) {
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'You cannot delete your own account.',
+                ], 400);
+            }
+
+            return redirect()->back()->with('error', 'You cannot delete your own account.');
+        }
+
+        $roleType = (string) (DB::table('roles')
+            ->join('role_types', 'roles.role_type_id', '=', 'role_types.role_type_id')
+            ->where('roles.user_id', $id)
+            ->value('role_types.user_role_type') ?? '');
+        if ($roleType === 'admin') {
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cannot delete admin users.',
+                ], 400);
+            }
+
+            return redirect()->back()->with('error', 'Cannot delete admin users.');
+        }
+
+        $user = DB::table('users')->where('user_id', $id)->first();
+        if (!$user) {
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not found.',
+                ], 404);
+            }
+
+            return redirect()->back()->with('error', 'User not found.');
+        }
+
+        $oldValues = [
+            'user_id' => (string) ($user->user_id ?? ''),
+            'email' => (string) ($user->email ?? ''),
+            'name' => (string) ($user->name ?? ''),
+            'role_type' => $roleType,
+        ];
+
+        try {
+            DB::beginTransaction();
+
+            if (Schema::hasTable('roles')) {
+                DB::table('roles')->where('user_id', $id)->delete();
+            }
+            if (Schema::hasTable('login')) {
+                DB::table('login')->where('user_id', $id)->delete();
+            }
+            if (Schema::hasTable('social_logins')) {
+                DB::table('social_logins')->where('user_id', $id)->delete();
+            }
+            if (Schema::hasTable('staff')) {
+                DB::table('staff')->where('user_id', $id)->delete();
+            }
+            if (Schema::hasTable('customer_orders')) {
+                if (Schema::hasColumn('customer_orders', 'customer_id')) {
+                    DB::table('customer_orders')->where('customer_id', $id)->delete();
+                }
+                if (Schema::hasColumn('customer_orders', 'customer_account_id')) {
+                    DB::table('customer_orders')->where('customer_account_id', $id)->delete();
+                }
+                if (Schema::hasColumn('customer_orders', 'user_id')) {
+                    DB::table('customer_orders')->where('user_id', $id)->delete();
+                }
+            }
+            if (Schema::hasTable('saved_services')) {
+                DB::table('saved_services')->where('user_id', $id)->delete();
+            }
+            if (Schema::hasTable('design_assets')) {
+                DB::table('design_assets')->where('user_id', $id)->delete();
+            }
+            if (Schema::hasTable('ai_image_generations')) {
+                DB::table('ai_image_generations')->where('user_id', $id)->delete();
+            }
+
+            $deleted = DB::table('users')->where('user_id', $id)->delete();
+            if (!$deleted) {
+                DB::rollBack();
+
+                if ($request->expectsJson() || $request->ajax()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Failed to delete user.',
+                    ], 500);
+                }
+
+                return redirect()->back()->with('error', 'Failed to delete user.');
+            }
+
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            Log::error('Admin delete user failed', [
+                'error' => $e->getMessage(),
+                'user_id' => $id,
+            ]);
+
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to delete user.',
+                ], 500);
+            }
+
+            return redirect()->back()->with('error', 'Failed to delete user.');
+        }
+
+        $this->logAudit('delete', 'user', $id, 'Admin deleted user', $oldValues, null);
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'User deleted successfully.',
+            ]);
+        }
+
+        return redirect()->route('admin.users')->with('success', 'User deleted successfully.');
     }
 
     public function enterprises()
@@ -450,14 +845,13 @@ class AdminController extends Controller
             'staff_count' => DB::table('staff')->where('enterprise_id', $id)->count(),
         ];
 
-        $view = view('admin.enterprises.details', compact('enterprise', 'stats', 'services', 'orders', 'staff'));
+        $view = view('admin.enterprises.details-partial', compact('enterprise', 'stats', 'services', 'orders', 'staff'));
 
         if ($request->expectsJson() || $request->ajax()) {
-            $sections = $view->renderSections();
-            return response($sections['content'] ?? '');
+            return $view->render();
         }
 
-        return $view;
+        return view('admin.enterprises.details', compact('enterprise', 'stats', 'services', 'orders', 'staff'));
     }
 
     public function orders(Request $request)
@@ -502,7 +896,7 @@ class AdminController extends Controller
         return view('admin.orders', compact('orders'));
     }
 
-    public function orderDetails($id)
+    public function orderDetails(Request $request, $id)
     {
         $latestStatusTimes = DB::table('order_status_history')
             ->select('purchase_order_id', DB::raw('MAX(timestamp) as latest_time'))
@@ -541,12 +935,8 @@ class AdminController extends Controller
             ->select('order_items.*', 'services.service_name')
             ->get();
 
-        foreach ($orderItems as $item) {
-            $item->customizations = DB::table('order_item_customizations')
-                ->join('customization_options', 'order_item_customizations.option_id', '=', 'customization_options.option_id')
-                ->where('order_item_customizations.order_item_id', $item->item_id)
-                ->select('customization_options.*', 'order_item_customizations.price_snapshot')
-                ->get();
+        if ($request->ajax() || $request->wantsJson()) {
+            return view('admin.orders.details-partial', compact('order', 'orderItems'))->render();
         }
 
         $statusHistory = DB::table('order_status_history')
@@ -717,7 +1107,7 @@ class AdminController extends Controller
         return view('admin.services', compact('services'));
     }
 
-    public function serviceDetails($id)
+    public function serviceDetails(Request $request, $id)
     {
         $service = DB::table('services')
             ->join('enterprises', 'services.enterprise_id', '=', 'enterprises.enterprise_id')
@@ -725,7 +1115,6 @@ class AdminController extends Controller
             ->select(
                 'services.*',
                 'enterprises.name as enterprise_name',
-                'enterprises.enterprise_id as enterprise_id',
                 DB::raw('COALESCE(services.base_price, 0) as base_price'),
                 DB::raw('COALESCE(services.is_active, true) as is_available'),
                 DB::raw('COALESCE(services.description, \'\') as description_text')
@@ -736,14 +1125,12 @@ class AdminController extends Controller
             abort(404);
         }
 
-        try {
-            $orderCount = DB::table('order_items')
-                ->join('customer_orders', 'order_items.purchase_order_id', '=', 'customer_orders.purchase_order_id')
-                ->where('order_items.service_id', $id)
-                ->distinct()
-                ->count('customer_orders.purchase_order_id');
-        } catch (\Exception $e) {
-            $orderCount = 0;
+        $orderCount = DB::table('order_items')
+            ->where('service_id', $id)
+            ->count();
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return view('admin.services.details-partial', compact('service', 'orderCount'))->render();
         }
 
         return view('admin.services.details', compact('service', 'orderCount'));
@@ -817,12 +1204,6 @@ class AdminController extends Controller
         return redirect()->back()->with('success', $newValue ? 'Enterprise activated.' : 'Enterprise deactivated.');
     }
 
-    // Backward compatibility
-    public function products()
-    {
-        return $this->services();
-    }
-
     public function reports()
     {
         try {
@@ -871,6 +1252,58 @@ class AdminController extends Controller
         }
 
         return view('admin.reports', compact('revenue_by_month', 'orders_by_status', 'top_enterprises'));
+    }
+
+    public function userReports(Request $request)
+    {
+        if (! Schema::hasTable('user_reports')) {
+            $reports = new \Illuminate\Pagination\LengthAwarePaginator([], 0, 25);
+            return view('admin.user-reports', compact('reports'));
+        }
+
+        $query = DB::table('user_reports as ur')
+            ->leftJoin('users as u', 'ur.reporter_id', '=', 'u.user_id')
+            ->leftJoin('enterprises as e', 'ur.enterprise_id', '=', 'e.enterprise_id')
+            ->leftJoin('services as s', 'ur.service_id', '=', 's.service_id')
+            ->select(
+                'ur.*',
+                'u.name as reporter_name',
+                'e.name as enterprise_name',
+                's.service_name as service_name'
+            )
+            ->orderBy('ur.created_at', 'desc');
+
+        if ($request->filled('status')) {
+            $query->where('ur.status', $request->string('status')->toString());
+        }
+
+        $reports = $query->paginate(25)->withQueryString();
+
+        return view('admin.user-reports', compact('reports'));
+    }
+
+    public function resolveUserReport(Request $request, string $id)
+    {
+        if (! Schema::hasTable('user_reports')) {
+            return redirect()->back()->with('error', 'Reports table is not available.');
+        }
+
+        $updated = DB::table('user_reports')
+            ->where('report_id', $id)
+            ->update([
+                'status' => 'resolved',
+                'resolved_by' => session('user_id'),
+                'resolved_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+        if (! $updated) {
+            return redirect()->back()->with('error', 'Unable to resolve report.');
+        }
+
+        $this->logAudit('update', 'user_report', $id, 'Resolved user report');
+
+        return redirect()->back()->with('success', 'Report resolved.');
     }
 
     /**
