@@ -29,7 +29,7 @@ class NewUsersSeeder extends Seeder
             // Business Users (Printing Shops)
             [
                 'user_id' => $userIds['business1'] = Str::uuid(),
-                'name' => 'QuickPrint Services',
+                'name' => 'Baguio QuickPrint Services',
                 'email' => 'quickprint@business.com',
                 'position' => 'Shop Manager',
                 'department' => 'Management',
@@ -38,7 +38,7 @@ class NewUsersSeeder extends Seeder
             ],
             [
                 'user_id' => $userIds['business2'] = Str::uuid(),
-                'name' => 'Elite Copy Center',
+                'name' => 'Baguio Elite Copy Center',
                 'email' => 'elite@business.com',
                 'position' => 'Business Owner',
                 'department' => 'Management',
@@ -47,7 +47,7 @@ class NewUsersSeeder extends Seeder
             ],
             [
                 'user_id' => $userIds['business3'] = Str::uuid(),
-                'name' => 'Digital Print Hub',
+                'name' => 'Baguio Digital Print Hub',
                 'email' => 'digitalhub@business.com',
                 'position' => 'Customer Service Rep',
                 'department' => 'Customer Service',
@@ -58,7 +58,7 @@ class NewUsersSeeder extends Seeder
             // Customer Users
             [
                 'user_id' => $userIds['customer1'] = Str::uuid(),
-                'name' => 'Sarah Customer',
+                'name' => 'Sarah Dela Cruz',
                 'email' => 'customer@uniprint.com',
                 'position' => 'Customer',
                 'department' => 'External',
@@ -67,8 +67,8 @@ class NewUsersSeeder extends Seeder
             ],
             [
                 'user_id' => $userIds['customer2'] = Str::uuid(),
-                'name' => 'John Martinez',
-                'email' => 'john.martinez@email.com',
+                'name' => 'Juan Martinez',
+                'email' => 'juan.martinez@email.com',
                 'position' => 'Customer',
                 'department' => 'External',
                 'created_at' => now(),
@@ -294,7 +294,7 @@ class NewUsersSeeder extends Seeder
         
         // Create sample chat messages
         $messages = [
-            // Conversation 1: Sarah Customer & QuickPrint Services
+            // Conversation 1: Sarah Dela Cruz & Baguio QuickPrint Services
             [
                 'message_id' => Str::uuid(),
                 'conversation_id' => $conversationId1,
@@ -336,7 +336,7 @@ class NewUsersSeeder extends Seeder
                 'updated_at' => now()->subHours(1),
             ],
             
-            // Conversation 2: John Martinez & Elite Copy Center
+            // Conversation 2: Juan Martinez & Baguio Elite Copy Center
             [
                 'message_id' => Str::uuid(),
                 'conversation_id' => $conversationId2,
@@ -351,7 +351,7 @@ class NewUsersSeeder extends Seeder
                 'message_id' => Str::uuid(),
                 'conversation_id' => $conversationId2,
                 'sender_id' => $userIds['business2'],
-                'message_text' => 'Good morning John! Absolutely! We specialize in wedding invitations. How many invitations do you need and do you have a design ready?',
+                'message_text' => 'Good morning Juan! Absolutely! We specialize in wedding invitations. How many invitations do you need and do you have a design ready?',
                 'message_type' => 'text',
                 'is_read' => true,
                 'created_at' => now()->subDays(1)->addMinutes(20),
@@ -378,7 +378,7 @@ class NewUsersSeeder extends Seeder
                 'updated_at' => now()->subMinutes(30),
             ],
             
-            // Conversation 3: Maria Santos & Digital Print Hub
+            // Conversation 3: Maria Santos & Baguio Digital Print Hub
             [
                 'message_id' => Str::uuid(),
                 'conversation_id' => $conversationId3,
@@ -420,7 +420,7 @@ class NewUsersSeeder extends Seeder
                 'updated_at' => now()->subMinutes(15),
             ],
             
-            // Conversation 4: Sarah Customer & Elite Copy Center (second conversation)
+            // Conversation 4: Sarah Dela Cruz & Baguio Elite Copy Center (second conversation)
             [
                 'message_id' => Str::uuid(),
                 'conversation_id' => $conversationId4,
@@ -467,16 +467,16 @@ class NewUsersSeeder extends Seeder
         echo "  Username: digitalhub  | Password: business123\n\n";
         echo "Customer Accounts:\n";
         echo "  Username: customer | Password: customer123\n";
-        echo "  Username: john     | Password: customer123\n";
+        echo "  Username: juan     | Password: customer123\n";
         echo "  Username: maria    | Password: customer123\n";
         echo "  Username: alex     | Password: customer123\n\n";
         echo "Sample Conversations Created:\n";
-        echo "• Sarah Customer ↔ QuickPrint Services (business cards)\n";
-        echo "• John Martinez ↔ Elite Copy Center (wedding invitations)\n";
-        echo "• Maria Santos ↔ Digital Print Hub (urgent presentation)\n";
-        echo "• Sarah Customer ↔ Elite Copy Center (corporate brochures)\n\n";
+        echo "• Sarah Dela Cruz ↔ Baguio QuickPrint Services (business cards)\n";
+        echo "• Juan Martinez ↔ Baguio Elite Copy Center (wedding invitations)\n";
+        echo "• Maria Santos ↔ Baguio Digital Print Hub (urgent presentation)\n";
+        echo "• Sarah Dela Cruz ↔ Baguio Elite Copy Center (corporate brochures)\n\n";
         echo "Test the chat by:\n";
-        echo "1. Login as any customer (customer/john/maria/alex)\n";
+        echo "1. Login as any customer (customer/juan/maria/alex)\n";
         echo "2. Navigate to customer dashboard\n";
         echo "3. Click on chat or orders section\n";
         echo "4. View existing conversations or start new ones\n";

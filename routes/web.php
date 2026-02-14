@@ -19,6 +19,7 @@ use App\Http\Controllers\ChatController;
 use App\Http\Controllers\BusinessOnboardingController;
 use App\Http\Controllers\BusinessVerificationController;
 use App\Http\Controllers\UserReportController;
+use App\Http\Controllers\SystemFeedbackController;
 use App\Http\Middleware\EnsureBusinessVerified;
 use App\Http\Middleware\EnsureAiGenerationLimit;
 use App\Http\Middleware\TwoFactorVerify;
@@ -189,6 +190,10 @@ Route::prefix('admin')->middleware([\App\Http\Middleware\CheckAuth::class, \App\
     Route::get('/reports', [AdminController::class, 'reports'])->name('reports');
     Route::get('/user-reports', [AdminController::class, 'userReports'])->name('user-reports');
     Route::post('/user-reports/{id}/resolve', [AdminController::class, 'resolveUserReport'])->whereUuid('id')->name('user-reports.resolve');
+
+    Route::get('/system-feedback', [AdminController::class, 'systemFeedback'])->name('system-feedback');
+    Route::post('/system-feedback/{id}/review', [AdminController::class, 'markSystemFeedbackReviewed'])->whereUuid('id')->name('system-feedback.review');
+    Route::post('/system-feedback/{id}/address', [AdminController::class, 'markSystemFeedbackAddressed'])->whereUuid('id')->name('system-feedback.address');
     Route::get('/audit-logs', [AdminController::class, 'auditLogs'])->name('audit-logs');
     
     // Real-time API endpoints
@@ -370,5 +375,6 @@ Route::middleware([\App\Http\Middleware\CheckAuth::class])->group(function () {
 
 Route::middleware([\App\Http\Middleware\CheckAuth::class, \App\Http\Middleware\CheckRole::class.':customer'])->group(function () {
     Route::post('/reports', [UserReportController::class, 'store'])->name('reports.store');
+    Route::post('/system-feedback', [SystemFeedbackController::class, 'store'])->name('system-feedback.store');
 });
 

@@ -10,73 +10,85 @@ class UsersTableSeeder extends Seeder
 {
     public function run(): void
     {
-        // Clear existing users
-        User::query()->delete();
+        // NOTE: This is a legacy seeder kept for compatibility. It should be safe to run multiple times
+        // and should not delete all users.
 
         // Admin users
-        User::create([
-            'username' => 'admin',
-            'password_hash' => Hash::make('admin123'),
-            'email' => 'admin@uniprint.com',
-            'role_type' => 'admin',
-            'is_active' => true,
-        ]);
+        User::firstOrCreate(
+            ['email' => 'admin@uniprint.com'],
+            [
+                'username' => 'admin',
+                'password_hash' => Hash::make('admin123'),
+                'role_type' => 'admin',
+                'is_active' => true,
+            ]
+        );
 
-        User::create([
-            'username' => 'admin_john',
-            'password_hash' => Hash::make('password123'),
-            'email' => 'john.admin@uniprint.com',
-            'role_type' => 'admin',
-            'is_active' => true,
-        ]);
+        User::firstOrCreate(
+            ['email' => 'juan.admin@uniprint.com'],
+            [
+                'username' => 'admin_juan',
+                'password_hash' => Hash::make('password123'),
+                'role_type' => 'admin',
+                'is_active' => true,
+            ]
+        );
 
-        // Business users
-        User::create([
-            'username' => 'printshop_owner',
-            'password_hash' => Hash::make('password123'),
-            'email' => 'owner@printmaster.com',
-            'role_type' => 'business_user',
-            'is_active' => true,
-        ]);
+        // Business users (Baguio context)
+        User::firstOrCreate(
+            ['email' => 'owner@baguioprintshop.com'],
+            [
+                'username' => 'baguioprint_owner',
+                'password_hash' => Hash::make('password123'),
+                'role_type' => 'business_user',
+                'is_active' => true,
+            ]
+        );
 
-        User::create([
-            'username' => 'tshirt_manager',
-            'password_hash' => Hash::make('password123'),
-            'email' => 'manager@tshirtpro.com',
-            'role_type' => 'business_user',
-            'is_active' => true,
-        ]);
+        User::firstOrCreate(
+            ['email' => 'manager@sessionroadprints.com'],
+            [
+                'username' => 'sessionroad_manager',
+                'password_hash' => Hash::make('password123'),
+                'role_type' => 'business_user',
+                'is_active' => true,
+            ]
+        );
 
-        User::create([
-            'username' => 'poster_staff',
-            'password_hash' => Hash::make('password123'),
-            'email' => 'staff@posterhub.com',
-            'role_type' => 'business_user',
-            'is_active' => true,
-        ]);
+        User::firstOrCreate(
+            ['email' => 'staff@mabiniprints.com'],
+            [
+                'username' => 'mabini_staff',
+                'password_hash' => Hash::make('password123'),
+                'role_type' => 'business_user',
+                'is_active' => true,
+            ]
+        );
 
-        // Customers
+        // Customers (Filipino names)
         $customers = [
-            ['username' => 'sarah_jones', 'email' => 'sarah.jones@email.com'],
-            ['username' => 'mike_wilson', 'email' => 'mike.wilson@email.com'],
-            ['username' => 'emma_davis', 'email' => 'emma.davis@email.com'],
-            ['username' => 'james_brown', 'email' => 'james.brown@email.com'],
-            ['username' => 'lisa_garcia', 'email' => 'lisa.garcia@email.com'],
-            ['username' => 'david_martin', 'email' => 'david.martin@email.com'],
-            ['username' => 'amy_lee', 'email' => 'amy.lee@email.com'],
-            ['username' => 'chris_taylor', 'email' => 'chris.taylor@email.com'],
-            ['username' => 'jennifer_white', 'email' => 'jennifer.white@email.com'],
-            ['username' => 'robert_anderson', 'email' => 'robert.anderson@email.com'],
+            ['username' => 'sarah_delacruz', 'email' => 'sarah.delacruz@email.com'],
+            ['username' => 'juan_martinez', 'email' => 'juan.martinez@email.com'],
+            ['username' => 'maria_santos', 'email' => 'maria.santos@email.com'],
+            ['username' => 'alex_rivera', 'email' => 'alex.rivera@email.com'],
+            ['username' => 'paolo_reyes', 'email' => 'paolo.reyes@email.com'],
+            ['username' => 'angelica_cruz', 'email' => 'angelica.cruz@email.com'],
+            ['username' => 'mark_dizon', 'email' => 'mark.dizon@email.com'],
+            ['username' => 'janelle_bautista', 'email' => 'janelle.bautista@email.com'],
+            ['username' => 'carlo_garcia', 'email' => 'carlo.garcia@email.com'],
+            ['username' => 'kate_mendoza', 'email' => 'kate.mendoza@email.com'],
         ];
 
         foreach ($customers as $customer) {
-            User::create([
-                'username' => $customer['username'],
-                'password_hash' => Hash::make('customer123'),
-                'email' => $customer['email'],
-                'role_type' => 'customer',
-                'is_active' => true,
-            ]);
+            User::firstOrCreate(
+                ['email' => $customer['email']],
+                [
+                    'username' => $customer['username'],
+                    'password_hash' => Hash::make('customer123'),
+                    'role_type' => 'customer',
+                    'is_active' => true,
+                ]
+            );
         }
     }
 }

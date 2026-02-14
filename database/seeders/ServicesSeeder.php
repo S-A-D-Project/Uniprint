@@ -11,13 +11,18 @@ class ServicesSeeder extends Seeder
     public function run(): void
     {
         $enterprises = DB::table('enterprises')->get();
-        $printMaster = $enterprises->where('name', 'PrintMaster Solutions')->first();
-        $tshirtPro = $enterprises->where('name', 'T-Shirt Pro Baguio')->first();
-        $posterHub = $enterprises->where('name', 'Poster Hub')->first();
+        // Legacy seeder: keep it compatible with the Baguio-only dataset
+        $printMaster = $enterprises->first();
+        $tshirtPro = $enterprises->skip(1)->first();
+        $posterHub = $enterprises->skip(2)->first();
+
+        if (! $printMaster || ! $tshirtPro || ! $posterHub) {
+            return;
+        }
 
         // PrintMaster Services
         $bcService = Str::uuid();
-        DB::table('services')->insert([
+        DB::table('services')->insertOrIgnore([
             [
                 'service_id' => $bcService,
                 'enterprise_id' => $printMaster->enterprise_id,
@@ -41,7 +46,7 @@ class ServicesSeeder extends Seeder
         ]);
 
         // Business Card Customizations
-        DB::table('customization_options')->insert([
+        DB::table('customization_options')->insertOrIgnore([
             [
                 'option_id' => Str::uuid(),
                 'service_id' => $bcService,
@@ -91,7 +96,7 @@ class ServicesSeeder extends Seeder
 
         // T-Shirt Pro Services
         $tshirtService = Str::uuid();
-        DB::table('services')->insert([
+        DB::table('services')->insertOrIgnore([
             [
                 'service_id' => $tshirtService,
                 'enterprise_id' => $tshirtPro->enterprise_id,
@@ -105,7 +110,7 @@ class ServicesSeeder extends Seeder
         ]);
 
         // T-Shirt Customizations
-        DB::table('customization_options')->insert([
+        DB::table('customization_options')->insertOrIgnore([
             [
                 'option_id' => Str::uuid(),
                 'service_id' => $tshirtService,
@@ -154,7 +159,7 @@ class ServicesSeeder extends Seeder
         ]);
 
         // Poster Hub Services
-        DB::table('services')->insert([
+        DB::table('services')->insertOrIgnore([
             [
                 'service_id' => Str::uuid(),
                 'enterprise_id' => $posterHub->enterprise_id,

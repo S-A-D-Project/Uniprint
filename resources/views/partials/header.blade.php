@@ -188,6 +188,11 @@
                             </span>
                         @endif
                     </a>
+
+                    <button type="button" class="hidden md:inline-flex items-center gap-2 px-4 py-2 rounded-md border border-border hover:bg-accent hover:text-accent-foreground transition-smooth" data-up-feedback>
+                        <i data-lucide="message-square" class="h-5 w-5"></i>
+                        <span class="text-sm font-medium">System Feedback</span>
+                    </button>
                 @endif
 
                 <!-- Notifications -->

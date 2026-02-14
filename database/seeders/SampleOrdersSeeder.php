@@ -30,23 +30,31 @@ class SampleOrdersSeeder extends Seeder
             return;
         }
 
-        $customer = $customers->first();
+        $customersArr = $customers->values();
 
-        // Create 5 sample orders
-        for ($i = 1; $i <= 5; $i++) {
+        // Seed a realistic February testing dataset (orders distributed across February)
+        $year = (int) now()->year;
+        $febStart = now()->setYear($year)->month(2)->startOfMonth();
+        $febEnd = now()->setYear($year)->month(2)->endOfMonth();
+
+        // Create 40 sample orders
+        for ($i = 1; $i <= 40; $i++) {
             $enterprise = $enterprises->random();
+            $customer = $customersArr->random();
             $orderId = Str::uuid();
             $orderNo = 'ORD-' . date('Y') . '-' . str_pad($i, 5, '0', STR_PAD_LEFT);
             
             // Determine status based on order age
-            $status = match($i) {
-                1 => $statusDelivered,
-                2 => $statusInProgress,
-                3, 4 => $statusConfirmed,
+            $bucket = $i % 10;
+            $status = match ($bucket) {
+                0, 1 => $statusDelivered,
+                2, 3 => $statusInProgress,
+                4, 5, 6 => $statusConfirmed,
                 default => $statusPending,
             };
 
-            $createdAt = now()->subDays(10 - $i * 2);
+            // Random timestamp within February
+            $createdAt = $febStart->copy()->addSeconds(rand(0, max(1, $febEnd->diffInSeconds($febStart))));
             
             // Get 1-3 random products from this enterprise
             $enterpriseProducts = DB::table('services')

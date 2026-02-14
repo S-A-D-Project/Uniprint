@@ -22,7 +22,7 @@
                 </button>
             </form>
         @endif
-        @if(($currentStatusName ?? null) === 'Delivered')
+        @if(in_array(($currentStatusName ?? null), ['Ready for Pickup', 'Delivered'], true))
             <form action="{{ route('customer.orders.confirm-completion', $order->purchase_order_id) }}" method="POST" data-up-global-loader>
                 @csrf
                 <button type="submit" class="btn btn-success" data-up-button-loader>

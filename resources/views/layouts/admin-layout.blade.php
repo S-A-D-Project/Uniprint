@@ -362,6 +362,13 @@
                         <span>User Reports</span>
                     </a>
 
+                    <a href="{{ route('admin.system-feedback') }}" 
+                       class="nav-link {{ request()->routeIs('admin.system-feedback') ? 'active' : '' }}"
+                       aria-label="System Feedback">
+                        <i data-lucide="message-square" class="h-5 w-5"></i>
+                        <span>System Feedback</span>
+                    </a>
+
                     @if (\Illuminate\Support\Facades\Route::has('admin.audit-logs'))
                         <a href="{{ route('admin.audit-logs') }}" 
                            class="nav-link {{ request()->routeIs('admin.audit-logs') ? 'active' : '' }}"

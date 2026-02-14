@@ -299,6 +299,58 @@
                     </div>
                 </div>
             </div>
+
+            <div class="modal fade" id="systemFeedbackModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <form method="POST" action="{{ route('system-feedback.store') }}" data-up-global-loader>
+                            @csrf
+                            <div class="modal-header">
+                                <h5 class="modal-title">System Feedback</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">Category</label>
+                                    <select name="category" class="form-select" required>
+                                        <option value="general">General</option>
+                                        <option value="bug">Bug / Issue</option>
+                                        <option value="ui">UI / UX</option>
+                                        <option value="performance">Performance</option>
+                                        <option value="feature_request">Feature Request</option>
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">Rating (optional)</label>
+                                    <select name="rating" class="form-select">
+                                        <option value="">No rating</option>
+                                        <option value="5">5 - Excellent</option>
+                                        <option value="4">4 - Good</option>
+                                        <option value="3">3 - Okay</option>
+                                        <option value="2">2 - Needs improvement</option>
+                                        <option value="1">1 - Poor</option>
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">Subject</label>
+                                    <input name="subject" class="form-control" maxlength="255" required placeholder="Short summary" />
+                                </div>
+
+                                <div class="mb-0">
+                                    <label class="form-label fw-semibold">Message</label>
+                                    <textarea name="message" class="form-control" rows="4" maxlength="5000" required placeholder="Tell us what you think and what we can improve..."></textarea>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary" data-up-button-loader>Submit Feedback</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
         @endif
     @endauth
 
@@ -339,6 +391,19 @@
             if (et) et.value = entityType;
             if (eid) eid.value = enterpriseId;
             if (sid) sid.value = serviceId;
+
+            const inst = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+            inst.show();
+        });
+    </script>
+
+    <script>
+        document.addEventListener('click', function (e) {
+            const btn = e.target.closest('[data-up-feedback]');
+            if (!btn) return;
+
+            const modalEl = document.getElementById('systemFeedbackModal');
+            if (!modalEl || typeof bootstrap === 'undefined') return;
 
             const inst = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
             inst.show();

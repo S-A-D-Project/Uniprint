@@ -5,9 +5,9 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use App\Traits\SafePropertyAccess;
 
@@ -1304,6 +1304,79 @@ class AdminController extends Controller
         $this->logAudit('update', 'user_report', $id, 'Resolved user report');
 
         return redirect()->back()->with('success', 'Report resolved.');
+    }
+
+    public function systemFeedback(Request $request)
+    {
+        if (! Schema::hasTable('system_feedback')) {
+            $feedback = new \Illuminate\Pagination\LengthAwarePaginator([], 0, 25);
+            return view('admin.system-feedback', compact('feedback'));
+        }
+
+        $query = DB::table('system_feedback as sf')
+            ->leftJoin('users as u', 'sf.user_id', '=', 'u.user_id')
+            ->select('sf.*', 'u.name as user_name')
+            ->orderBy('sf.created_at', 'desc');
+
+        if ($request->filled('status')) {
+            $query->where('sf.status', $request->string('status')->toString());
+        }
+
+        if ($request->filled('category')) {
+            $query->where('sf.category', $request->string('category')->toString());
+        }
+
+        $feedback = $query->paginate(25)->withQueryString();
+
+        return view('admin.system-feedback', compact('feedback'));
+    }
+
+    public function markSystemFeedbackReviewed(Request $request, string $id)
+    {
+        if (! Schema::hasTable('system_feedback')) {
+            return redirect()->back()->with('error', 'System feedback table is not available.');
+        }
+
+        $updated = DB::table('system_feedback')
+            ->where('feedback_id', $id)
+            ->update([
+                'status' => 'reviewed',
+                'reviewed_by' => session('user_id'),
+                'reviewed_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+        if (! $updated) {
+            return redirect()->back()->with('error', 'Unable to mark feedback as reviewed.');
+        }
+
+        $this->logAudit('update', 'system_feedback', $id, 'Marked system feedback as reviewed');
+
+        return redirect()->back()->with('success', 'Feedback marked as reviewed.');
+    }
+
+    public function markSystemFeedbackAddressed(Request $request, string $id)
+    {
+        if (! Schema::hasTable('system_feedback')) {
+            return redirect()->back()->with('error', 'System feedback table is not available.');
+        }
+
+        $updated = DB::table('system_feedback')
+            ->where('feedback_id', $id)
+            ->update([
+                'status' => 'addressed',
+                'reviewed_by' => session('user_id'),
+                'reviewed_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+        if (! $updated) {
+            return redirect()->back()->with('error', 'Unable to mark feedback as addressed.');
+        }
+
+        $this->logAudit('update', 'system_feedback', $id, 'Marked system feedback as addressed');
+
+        return redirect()->back()->with('success', 'Feedback marked as addressed.');
     }
 
     /**

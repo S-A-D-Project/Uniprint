@@ -214,9 +214,373 @@ class BusinessController extends Controller
         $enterprise = $this->getUserEnterprise();
         $order = DB::table('customer_orders')->join('users', 'customer_orders.customer_id', '=', 'users.user_id')->where('customer_orders.purchase_order_id', $id)->where('customer_orders.enterprise_id', $enterprise->enterprise_id)->select('customer_orders.*', 'users.name as customer_name', 'users.email as customer_email')->first();
         if (!$order) abort(404);
-        $items = DB::table('order_items')->leftJoin('services', 'order_items.service_id', '=', 'services.service_id')->where('order_items.purchase_order_id', $id)->select('order_items.*', 'services.service_name')->get();
-        if ($request->ajax()) return view('business.orders.details-partial', compact('order', 'items'))->render();
-        return view('business.orders.details', compact('order', 'items', 'enterprise', 'userName'));
+
+        $orderItems = DB::table('order_items')
+            ->leftJoin('services', 'order_items.service_id', '=', 'services.service_id')
+            ->where('order_items.purchase_order_id', $id)
+            ->select('order_items.*', 'services.service_name')
+            ->get();
+
+        foreach ($orderItems as $item) {
+            $item->customizations = collect();
+            if (Schema::hasTable('order_item_customizations') && Schema::hasTable('customization_options')) {
+                $item->customizations = DB::table('order_item_customizations')
+                    ->join('customization_options', 'order_item_customizations.option_id', '=', 'customization_options.option_id')
+                    ->where('order_item_customizations.order_item_id', $item->item_id)
+                    ->select('customization_options.*', 'order_item_customizations.price_snapshot')
+                    ->get();
+            }
+        }
+
+        $statusHistory = collect();
+        if (Schema::hasTable('order_status_history') && Schema::hasTable('statuses')) {
+            $statusHistory = DB::table('order_status_history')
+                ->join('statuses', 'order_status_history.status_id', '=', 'statuses.status_id')
+                ->leftJoin('users', 'order_status_history.user_id', '=', 'users.user_id')
+                ->where('order_status_history.purchase_order_id', $id)
+                ->select('order_status_history.*', 'statuses.status_name', 'statuses.description', 'users.name as user_name')
+                ->orderBy('order_status_history.timestamp', 'desc')
+                ->get();
+        }
+
+        $designFiles = collect();
+        if (Schema::hasTable('order_design_files')) {
+            $designFiles = DB::table('order_design_files')
+                ->leftJoin('users as uploader', 'order_design_files.uploaded_by', '=', 'uploader.user_id')
+                ->leftJoin('users as approver', 'order_design_files.approved_by', '=', 'approver.user_id')
+                ->where('order_design_files.purchase_order_id', $id)
+                ->select(
+                    'order_design_files.*',
+                    'uploader.name as uploaded_by_name',
+                    'approver.name as approved_by_name'
+                )
+                ->orderBy('order_design_files.created_at', 'desc')
+                ->get();
+        }
+
+        $latestExtensionRequest = null;
+        if (Schema::hasTable('order_extension_requests')) {
+            $latestExtensionRequest = DB::table('order_extension_requests')
+                ->where('purchase_order_id', $id)
+                ->orderBy('created_at', 'desc')
+                ->first();
+        }
+
+        $currentStatusName = 'Pending';
+        if (Schema::hasTable('order_status_history') && Schema::hasTable('statuses')) {
+            $currentStatusName = DB::table('order_status_history')
+                ->join('statuses', 'order_status_history.status_id', '=', 'statuses.status_id')
+                ->where('order_status_history.purchase_order_id', $id)
+                ->orderBy('order_status_history.timestamp', 'desc')
+                ->value('statuses.status_name') ?? 'Pending';
+        }
+
+        $statusIds = [];
+        if (Schema::hasTable('statuses')) {
+            $statusIds = DB::table('statuses')
+                ->select('status_id', 'status_name')
+                ->get()
+                ->pluck('status_id', 'status_name')
+                ->toArray();
+        }
+
+        $businessActions = [];
+        $nextByStatus = [
+            'Pending' => 'Confirmed',
+            'Confirmed' => 'In Progress',
+            'Processing' => 'In Progress',
+            'In Progress' => 'Ready for Pickup',
+        ];
+        $nextName = $nextByStatus[$currentStatusName] ?? null;
+        if ($nextName && !empty($statusIds[$nextName])) {
+            $label = match ($nextName) {
+                'Confirmed' => 'Confirm Order',
+                'In Progress' => 'Start Production',
+                'Ready for Pickup' => 'Mark Ready for Pickup',
+                default => $nextName,
+            };
+            $businessActions[] = ['id' => $statusIds[$nextName], 'name' => $nextName, 'label' => $label];
+        }
+        if (($currentStatusName === 'In Progress') && !empty($statusIds['Delivered'])) {
+            $businessActions[] = ['id' => $statusIds['Delivered'], 'name' => 'Delivered', 'label' => 'Mark Delivered'];
+        }
+        if (!empty($statusIds['Cancelled']) && !in_array($currentStatusName, ['Completed', 'Cancelled'], true)) {
+            $businessActions[] = ['id' => $statusIds['Cancelled'], 'name' => 'Cancelled', 'label' => 'Cancel Order'];
+        }
+
+        $payment = null;
+        $isPaid = false;
+        if (Schema::hasTable('payments')) {
+            $payment = DB::table('payments')->where('purchase_order_id', $id)->first();
+            if ($payment) {
+                $amountPaid = (float) ($payment->amount_paid ?? 0);
+                $amountDue = (float) ($payment->amount_due ?? 0);
+                $isPaid = !empty($payment->is_verified) && ($amountPaid + 0.00001 >= $amountDue);
+            }
+        } elseif (Schema::hasColumn('customer_orders', 'payment_status')) {
+            $isPaid = (($order->payment_status ?? null) === 'paid');
+        }
+
+        $canConfirmPayment = false;
+        if (! $isPaid) {
+            $canConfirmPayment = true;
+        }
+
+        if ($request->ajax()) {
+            $items = $orderItems;
+            return view('business.orders.details-partial', compact('order', 'orderItems', 'items', 'statusHistory', 'designFiles', 'latestExtensionRequest', 'currentStatusName', 'statusIds', 'businessActions', 'payment', 'isPaid', 'canConfirmPayment'))->render();
+        }
+
+        return view('business.orders.details', compact('order', 'orderItems', 'statusHistory', 'designFiles', 'latestExtensionRequest', 'currentStatusName', 'statusIds', 'businessActions', 'payment', 'isPaid', 'canConfirmPayment', 'enterprise', 'userName'));
+    }
+
+    public function confirmOrder(Request $request, string $id)
+    {
+        $enterprise = $this->getUserEnterprise();
+        $order = DB::table('customer_orders')
+            ->where('purchase_order_id', $id)
+            ->where('enterprise_id', $enterprise->enterprise_id)
+            ->first();
+
+        if (! $order) {
+            abort(404);
+        }
+
+        $currentStatusName = null;
+        if (Schema::hasTable('order_status_history') && Schema::hasTable('statuses')) {
+            $currentStatusName = DB::table('order_status_history')
+                ->join('statuses', 'order_status_history.status_id', '=', 'statuses.status_id')
+                ->where('order_status_history.purchase_order_id', $id)
+                ->orderBy('order_status_history.timestamp', 'desc')
+                ->value('statuses.status_name');
+        }
+        $currentStatusName = $currentStatusName ?: 'Pending';
+
+        if ($currentStatusName !== 'Pending') {
+            return redirect()->back()->with('error', 'Only pending orders can be confirmed.');
+        }
+
+        $confirmedStatusId = DB::table('statuses')->where('status_name', 'Confirmed')->value('status_id');
+        if (! $confirmedStatusId) {
+            $newId = (string) Str::uuid();
+            DB::table('statuses')->insertOrIgnore([
+                'status_id' => $newId,
+                'status_name' => 'Confirmed',
+                'description' => 'Order confirmed by the business',
+            ]);
+            $confirmedStatusId = DB::table('statuses')->where('status_name', 'Confirmed')->value('status_id');
+        }
+
+        if (! $confirmedStatusId) {
+            return redirect()->back()->with('error', 'Status "Confirmed" is not configured.');
+        }
+
+        if (Schema::hasTable('order_status_history')) {
+            DB::table('order_status_history')->insert([
+                'approval_id' => (string) Str::uuid(),
+                'purchase_order_id' => $id,
+                'user_id' => session('user_id'),
+                'status_id' => $confirmedStatusId,
+                'remarks' => 'Order confirmed by business',
+                'timestamp' => now(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        DB::table('customer_orders')
+            ->where('purchase_order_id', $id)
+            ->where('enterprise_id', $enterprise->enterprise_id)
+            ->update([
+                'status_id' => $confirmedStatusId,
+                'updated_at' => now(),
+            ]);
+
+        if (Schema::hasTable('order_notifications')) {
+            DB::table('order_notifications')->insert([
+                'notification_id' => (string) Str::uuid(),
+                'purchase_order_id' => $id,
+                'recipient_id' => $order->customer_id,
+                'notification_type' => 'status_change',
+                'title' => 'Order Confirmed',
+                'message' => "Your order #" . ($order->order_no ?? substr($id, 0, 12)) . " has been confirmed by the business.",
+                'is_read' => false,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        return redirect()->back()->with('success', 'Order confirmed.');
+    }
+
+    public function updateOrderStatus(Request $request, string $id)
+    {
+        $enterprise = $this->getUserEnterprise();
+        $order = DB::table('customer_orders')
+            ->where('purchase_order_id', $id)
+            ->where('enterprise_id', $enterprise->enterprise_id)
+            ->first();
+
+        if (! $order) {
+            abort(404);
+        }
+
+        $request->validate([
+            'status_id' => 'required|uuid',
+            'remarks' => 'nullable|string|max:500',
+        ]);
+
+        $targetStatus = DB::table('statuses')->where('status_id', $request->input('status_id'))->first();
+        if (! $targetStatus) {
+            return redirect()->back()->with('error', 'Invalid status.');
+        }
+
+        $currentStatusName = null;
+        if (Schema::hasTable('order_status_history') && Schema::hasTable('statuses')) {
+            $currentStatusName = DB::table('order_status_history')
+                ->join('statuses', 'order_status_history.status_id', '=', 'statuses.status_id')
+                ->where('order_status_history.purchase_order_id', $id)
+                ->orderBy('order_status_history.timestamp', 'desc')
+                ->value('statuses.status_name');
+        }
+        $currentStatusName = $currentStatusName ?: 'Pending';
+
+        $allowedNext = [
+            'Pending' => ['Confirmed', 'Cancelled'],
+            'Confirmed' => ['In Progress', 'Processing', 'Cancelled'],
+            'Processing' => ['In Progress', 'Ready for Pickup', 'Delivered', 'Cancelled'],
+            'In Progress' => ['Ready for Pickup', 'Delivered', 'Cancelled'],
+            'Ready for Pickup' => ['Cancelled'],
+            'Delivered' => ['Cancelled'],
+        ];
+
+        $targetName = (string) ($targetStatus->status_name ?? '');
+        $allowed = $allowedNext[$currentStatusName] ?? [];
+        if (! in_array($targetName, $allowed, true)) {
+            return redirect()->back()->with('error', 'This status change is not allowed from the current status.');
+        }
+
+        if (Schema::hasTable('order_status_history')) {
+            DB::table('order_status_history')->insert([
+                'approval_id' => (string) Str::uuid(),
+                'purchase_order_id' => $id,
+                'user_id' => session('user_id'),
+                'status_id' => $targetStatus->status_id,
+                'remarks' => $request->input('remarks'),
+                'timestamp' => now(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        DB::table('customer_orders')
+            ->where('purchase_order_id', $id)
+            ->where('enterprise_id', $enterprise->enterprise_id)
+            ->update([
+                'status_id' => $targetStatus->status_id,
+                'updated_at' => now(),
+            ]);
+
+        if (Schema::hasTable('order_notifications')) {
+            DB::table('order_notifications')->insert([
+                'notification_id' => (string) Str::uuid(),
+                'purchase_order_id' => $id,
+                'recipient_id' => $order->customer_id,
+                'notification_type' => 'status_change',
+                'title' => 'Order Status Updated',
+                'message' => "Your order #" . ($order->order_no ?? substr($id, 0, 12)) . " status is now: {$targetName}.",
+                'is_read' => false,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        return redirect()->back()->with('success', 'Order status updated.');
+    }
+
+    public function confirmPayment(Request $request, string $id)
+    {
+        $enterprise = $this->getUserEnterprise();
+        $order = DB::table('customer_orders')
+            ->where('purchase_order_id', $id)
+            ->where('enterprise_id', $enterprise->enterprise_id)
+            ->first();
+
+        if (! $order) {
+            abort(404);
+        }
+
+        $isPaid = false;
+        $payment = null;
+
+        if (Schema::hasTable('payments')) {
+            $payment = DB::table('payments')->where('purchase_order_id', $id)->first();
+            if ($payment) {
+                $amountPaid = (float) ($payment->amount_paid ?? 0);
+                $amountDue = (float) ($payment->amount_due ?? 0);
+                $isPaid = !empty($payment->is_verified) && ($amountPaid + 0.00001 >= $amountDue);
+            }
+        } elseif (Schema::hasColumn('customer_orders', 'payment_status')) {
+            $isPaid = (($order->payment_status ?? null) === 'paid');
+        }
+
+        if ($isPaid) {
+            return redirect()->back()->with('success', 'Payment is already confirmed.');
+        }
+
+        if (Schema::hasTable('payments')) {
+            if (! $payment) {
+                DB::table('payments')->insert([
+                    'payment_id' => (string) Str::uuid(),
+                    'purchase_order_id' => $id,
+                    'payment_method' => (string) ($order->payment_method ?? 'cash'),
+                    'amount_paid' => (float) ($order->total ?? 0),
+                    'amount_due' => (float) ($order->total ?? 0),
+                    'payment_date_time' => now(),
+                    'is_verified' => true,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            } else {
+                $amountDue = (float) ($payment->amount_due ?? 0);
+                if ($amountDue <= 0) {
+                    $amountDue = (float) ($order->total ?? 0);
+                }
+
+                DB::table('payments')
+                    ->where('purchase_order_id', $id)
+                    ->update([
+                        'is_verified' => true,
+                        'amount_due' => $amountDue,
+                        'amount_paid' => (float) ($payment->amount_paid ?? 0) ?: $amountDue,
+                        'updated_at' => now(),
+                    ]);
+            }
+        } elseif (Schema::hasColumn('customer_orders', 'payment_status')) {
+            DB::table('customer_orders')
+                ->where('purchase_order_id', $id)
+                ->where('enterprise_id', $enterprise->enterprise_id)
+                ->update([
+                    'payment_status' => 'paid',
+                    'updated_at' => now(),
+                ]);
+        }
+
+        if (Schema::hasTable('order_notifications')) {
+            DB::table('order_notifications')->insert([
+                'notification_id' => (string) Str::uuid(),
+                'purchase_order_id' => $id,
+                'recipient_id' => $order->customer_id,
+                'notification_type' => 'payment',
+                'title' => 'Payment Confirmed',
+                'message' => "Payment for order #" . ($order->order_no ?? substr($id, 0, 12)) . " has been confirmed by the business.",
+                'is_read' => false,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        return redirect()->back()->with('success', 'Payment confirmed.');
     }
 
     public function services()
@@ -255,6 +619,78 @@ class BusinessController extends Controller
     {
         $enterprise = $this->getUserEnterprise();
         return view('business.services.form', ['enterprise' => $enterprise, 'userName' => session('user_name')]);
+    }
+
+    public function storeService(Request $request)
+    {
+        $request->validate([
+            'service_name' => 'required|string|max:255',
+            'base_price' => 'required|numeric|min:0',
+            'fulfillment_type' => 'required|string|in:pickup,delivery,both',
+            'allowed_payment_methods' => 'nullable|array',
+            'allowed_payment_methods.*' => 'string|in:gcash,cash,paypal',
+            'supports_rush' => 'nullable|boolean',
+            'is_active' => 'nullable|boolean',
+            'images' => 'nullable|array',
+            'images.*' => 'image|mimes:jpeg,png,jpg,gif,webp|max:5120',
+        ]);
+
+        $enterprise = $this->getUserEnterprise();
+
+        $serviceId = (string) Str::uuid();
+        $now = now();
+
+        $insert = [
+            'service_id' => $serviceId,
+            'enterprise_id' => $enterprise->enterprise_id,
+            'service_name' => $request->input('service_name'),
+            'description' => $request->input('description'),
+            'base_price' => $request->input('base_price'),
+            'is_active' => $request->boolean('is_active', true),
+            'created_at' => $now,
+            'updated_at' => $now,
+        ];
+
+        if (Schema::hasColumn('services', 'fulfillment_type')) {
+            $insert['fulfillment_type'] = $request->input('fulfillment_type');
+        }
+        if (Schema::hasColumn('services', 'allowed_payment_methods')) {
+            $insert['allowed_payment_methods'] = json_encode($request->input('allowed_payment_methods', []));
+        }
+        if (Schema::hasColumn('services', 'supports_rush')) {
+            $insert['supports_rush'] = $request->boolean('supports_rush');
+        }
+
+        DB::table('services')->insert($insert);
+
+        // Optional: store service images if supported
+        if ($request->hasFile('images') && Schema::hasTable('service_images')) {
+            $disk = config('filesystems.default', 'public');
+            $images = (array) $request->file('images');
+            $isFirst = true;
+
+            foreach ($images as $img) {
+                if (! $img) {
+                    continue;
+                }
+
+                $fileName = time() . '_' . $img->getClientOriginalName();
+                $path = $img->storeAs('service_images/' . $serviceId, $fileName, $disk);
+
+                DB::table('service_images')->insert([
+                    'image_id' => (string) Str::uuid(),
+                    'service_id' => $serviceId,
+                    'image_path' => $path,
+                    'is_primary' => $isFirst,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+
+                $isFirst = false;
+            }
+        }
+
+        return redirect()->route('business.services.index')->with('success', 'Service created');
     }
 
     public function updateEnterprise(Request $request)
@@ -354,7 +790,9 @@ class BusinessController extends Controller
         $service->base_price = $request->base_price;
         $service->is_active = $request->has('is_active');
         $service->fulfillment_type = $request->fulfillment_type;
-        $service->allowed_payment_methods = $request->input('allowed_payment_methods', []);
+        if (Schema::hasColumn('services', 'allowed_payment_methods')) {
+            $service->allowed_payment_methods = $request->input('allowed_payment_methods', []);
+        }
         $service->supports_rush = $request->has('supports_rush');
         $service->save();
 
@@ -466,6 +904,285 @@ class BusinessController extends Controller
         $customizations = DB::table('customization_options')->where('service_id', $serviceId)->get();
         $customFields = DB::table('service_custom_fields')->where('service_id', $serviceId)->get();
         return view('business.customizations.index', compact('service', 'customizations', 'customFields', 'enterprise'));
+    }
+
+    public function storeCustomization(Request $request, string $serviceId)
+    {
+        $enterprise = $this->getUserEnterprise();
+
+        $service = DB::table('services')
+            ->where('service_id', $serviceId)
+            ->where('enterprise_id', $enterprise->enterprise_id)
+            ->first();
+
+        if (! $service) {
+            abort(404);
+        }
+
+        if (! Schema::hasTable('customization_options')) {
+            return redirect()->back()->with('error', 'Customization options are not available. Please run migrations.');
+        }
+
+        $request->validate([
+            'option_name' => 'required|string|max:100',
+            'option_type' => 'required|string|max:50',
+            'price_modifier' => 'nullable|numeric',
+            'is_default' => 'nullable|boolean',
+        ]);
+
+        $insert = [
+            'option_id' => (string) Str::uuid(),
+            'service_id' => $serviceId,
+            'option_name' => $request->string('option_name')->toString(),
+            'option_type' => $request->string('option_type')->toString(),
+            'price_modifier' => (float) $request->input('price_modifier', 0),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ];
+
+        if (Schema::hasColumn('customization_options', 'is_default')) {
+            $insert['is_default'] = $request->boolean('is_default');
+        }
+
+        DB::table('customization_options')->insert($insert);
+
+        return redirect()->back()->with('success', 'Customization option added.');
+    }
+
+    public function updateCustomization(Request $request, string $serviceId, string $optionId)
+    {
+        $enterprise = $this->getUserEnterprise();
+
+        $service = DB::table('services')
+            ->where('service_id', $serviceId)
+            ->where('enterprise_id', $enterprise->enterprise_id)
+            ->first();
+
+        if (! $service) {
+            abort(404);
+        }
+
+        if (! Schema::hasTable('customization_options')) {
+            return redirect()->back()->with('error', 'Customization options are not available. Please run migrations.');
+        }
+
+        $request->validate([
+            'option_name' => 'required|string|max:100',
+            'option_type' => 'required|string|max:50',
+            'price_modifier' => 'nullable|numeric',
+            'is_default' => 'nullable|boolean',
+        ]);
+
+        $update = [
+            'option_name' => $request->string('option_name')->toString(),
+            'option_type' => $request->string('option_type')->toString(),
+            'price_modifier' => (float) $request->input('price_modifier', 0),
+            'updated_at' => now(),
+        ];
+
+        if (Schema::hasColumn('customization_options', 'is_default')) {
+            $update['is_default'] = $request->boolean('is_default');
+        }
+
+        $updated = DB::table('customization_options')
+            ->where('option_id', $optionId)
+            ->where('service_id', $serviceId)
+            ->update($update);
+
+        if (! $updated) {
+            return redirect()->back()->with('error', 'Unable to update customization option.');
+        }
+
+        return redirect()->back()->with('success', 'Customization option updated.');
+    }
+
+    public function deleteCustomization(string $serviceId, string $optionId)
+    {
+        $enterprise = $this->getUserEnterprise();
+
+        $service = DB::table('services')
+            ->where('service_id', $serviceId)
+            ->where('enterprise_id', $enterprise->enterprise_id)
+            ->first();
+
+        if (! $service) {
+            abort(404);
+        }
+
+        if (! Schema::hasTable('customization_options')) {
+            return redirect()->back()->with('error', 'Customization options are not available. Please run migrations.');
+        }
+
+        $deleted = DB::table('customization_options')
+            ->where('option_id', $optionId)
+            ->where('service_id', $serviceId)
+            ->delete();
+
+        if (! $deleted) {
+            return redirect()->back()->with('error', 'Unable to delete customization option.');
+        }
+
+        return redirect()->back()->with('success', 'Customization option deleted.');
+    }
+
+    public function updateCustomSizeSettings(Request $request, string $serviceId)
+    {
+        $enterprise = $this->getUserEnterprise();
+
+        $service = DB::table('services')
+            ->where('service_id', $serviceId)
+            ->where('enterprise_id', $enterprise->enterprise_id)
+            ->first();
+
+        if (! $service) {
+            abort(404);
+        }
+
+        $request->validate([
+            'supports_custom_size' => 'nullable|boolean',
+            'custom_size_unit' => 'nullable|string|max:10',
+            'custom_size_min_width' => 'nullable|numeric|min:0',
+            'custom_size_max_width' => 'nullable|numeric|min:0',
+            'custom_size_min_height' => 'nullable|numeric|min:0',
+            'custom_size_max_height' => 'nullable|numeric|min:0',
+        ]);
+
+        $update = ['updated_at' => now()];
+
+        if (Schema::hasColumn('services', 'supports_custom_size')) {
+            $update['supports_custom_size'] = $request->boolean('supports_custom_size');
+        }
+        if (Schema::hasColumn('services', 'custom_size_unit')) {
+            $update['custom_size_unit'] = $request->filled('custom_size_unit') ? strtolower($request->string('custom_size_unit')->toString()) : null;
+        }
+        if (Schema::hasColumn('services', 'custom_size_min_width')) {
+            $update['custom_size_min_width'] = $request->filled('custom_size_min_width') ? (float) $request->input('custom_size_min_width') : null;
+        }
+        if (Schema::hasColumn('services', 'custom_size_max_width')) {
+            $update['custom_size_max_width'] = $request->filled('custom_size_max_width') ? (float) $request->input('custom_size_max_width') : null;
+        }
+        if (Schema::hasColumn('services', 'custom_size_min_height')) {
+            $update['custom_size_min_height'] = $request->filled('custom_size_min_height') ? (float) $request->input('custom_size_min_height') : null;
+        }
+        if (Schema::hasColumn('services', 'custom_size_max_height')) {
+            $update['custom_size_max_height'] = $request->filled('custom_size_max_height') ? (float) $request->input('custom_size_max_height') : null;
+        }
+
+        DB::table('services')
+            ->where('service_id', $serviceId)
+            ->where('enterprise_id', $enterprise->enterprise_id)
+            ->update($update);
+
+        return redirect()->back()->with('success', 'Custom size settings updated.');
+    }
+
+    public function storeCustomField(Request $request, string $serviceId)
+    {
+        $enterprise = $this->getUserEnterprise();
+
+        $service = DB::table('services')
+            ->where('service_id', $serviceId)
+            ->where('enterprise_id', $enterprise->enterprise_id)
+            ->first();
+
+        if (! $service) {
+            abort(404);
+        }
+
+        if (! Schema::hasTable('service_custom_fields')) {
+            return redirect()->back()->with('error', 'Custom fields are not available. Please run migrations.');
+        }
+
+        $request->validate([
+            'field_label' => 'required|string|max:255',
+            'placeholder' => 'nullable|string|max:255',
+            'is_required' => 'nullable|boolean',
+            'sort_order' => 'nullable|integer|min:0|max:1000',
+        ]);
+
+        DB::table('service_custom_fields')->insert([
+            'field_id' => (string) Str::uuid(),
+            'service_id' => $serviceId,
+            'field_label' => $request->string('field_label')->toString(),
+            'placeholder' => $request->filled('placeholder') ? $request->string('placeholder')->toString() : null,
+            'is_required' => $request->boolean('is_required'),
+            'sort_order' => $request->filled('sort_order') ? (int) $request->input('sort_order') : 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return redirect()->back()->with('success', 'Custom field added.');
+    }
+
+    public function updateCustomField(Request $request, string $serviceId, string $fieldId)
+    {
+        $enterprise = $this->getUserEnterprise();
+
+        $service = DB::table('services')
+            ->where('service_id', $serviceId)
+            ->where('enterprise_id', $enterprise->enterprise_id)
+            ->first();
+
+        if (! $service) {
+            abort(404);
+        }
+
+        if (! Schema::hasTable('service_custom_fields')) {
+            return redirect()->back()->with('error', 'Custom fields are not available. Please run migrations.');
+        }
+
+        $request->validate([
+            'field_label' => 'required|string|max:255',
+            'placeholder' => 'nullable|string|max:255',
+            'is_required' => 'nullable|boolean',
+            'sort_order' => 'nullable|integer|min:0|max:1000',
+        ]);
+
+        $updated = DB::table('service_custom_fields')
+            ->where('field_id', $fieldId)
+            ->where('service_id', $serviceId)
+            ->update([
+                'field_label' => $request->string('field_label')->toString(),
+                'placeholder' => $request->filled('placeholder') ? $request->string('placeholder')->toString() : null,
+                'is_required' => $request->boolean('is_required'),
+                'sort_order' => $request->filled('sort_order') ? (int) $request->input('sort_order') : 0,
+                'updated_at' => now(),
+            ]);
+
+        if (! $updated) {
+            return redirect()->back()->with('error', 'Unable to update custom field.');
+        }
+
+        return redirect()->back()->with('success', 'Custom field updated.');
+    }
+
+    public function deleteCustomField(string $serviceId, string $fieldId)
+    {
+        $enterprise = $this->getUserEnterprise();
+
+        $service = DB::table('services')
+            ->where('service_id', $serviceId)
+            ->where('enterprise_id', $enterprise->enterprise_id)
+            ->first();
+
+        if (! $service) {
+            abort(404);
+        }
+
+        if (! Schema::hasTable('service_custom_fields')) {
+            return redirect()->back()->with('error', 'Custom fields are not available. Please run migrations.');
+        }
+
+        $deleted = DB::table('service_custom_fields')
+            ->where('field_id', $fieldId)
+            ->where('service_id', $serviceId)
+            ->delete();
+
+        if (! $deleted) {
+            return redirect()->back()->with('error', 'Unable to delete custom field.');
+        }
+
+        return redirect()->back()->with('success', 'Custom field deleted.');
     }
 
     public function chat()

@@ -11,16 +11,17 @@ class StaffTableSeeder extends Seeder
 {
     public function run(): void
     {
-        // Clear existing staff
-        Staff::query()->delete();
-
         // Get users and enterprises
         $businessUsers = User::where('role_type', 'business_user')->get();
         $enterprises = Enterprise::all();
 
+        if ($businessUsers->count() < 3 || $enterprises->count() < 3) {
+            return;
+        }
+
         // Link business users to enterprises
         Staff::create([
-            'staff_name' => 'Michael Chen',
+            'staff_name' => 'Miguel Santos',
             'position' => 'Owner',
             'department' => 'Management',
             'user_id' => $businessUsers[0]->user_id,
@@ -28,7 +29,7 @@ class StaffTableSeeder extends Seeder
         ]);
 
         Staff::create([
-            'staff_name' => 'Sarah Thompson',
+            'staff_name' => 'Sarah Dela Cruz',
             'position' => 'Store Manager',
             'department' => 'Operations',
             'user_id' => $businessUsers[1]->user_id,
@@ -36,7 +37,7 @@ class StaffTableSeeder extends Seeder
         ]);
 
         Staff::create([
-            'staff_name' => 'David Rodriguez',
+            'staff_name' => 'David Reyes',
             'position' => 'Production Supervisor',
             'department' => 'Production',
             'user_id' => $businessUsers[2]->user_id,
@@ -45,6 +46,10 @@ class StaffTableSeeder extends Seeder
 
         // Admin staff (no enterprise)
         $adminUsers = User::where('role_type', 'admin')->get();
+
+        if ($adminUsers->isEmpty()) {
+            return;
+        }
         
         Staff::create([
             'staff_name' => 'Admin User',
@@ -54,12 +59,14 @@ class StaffTableSeeder extends Seeder
             'enterprise_id' => null,
         ]);
 
-        Staff::create([
-            'staff_name' => 'John Admin',
-            'position' => 'Platform Manager',
-            'department' => 'Management',
-            'user_id' => $adminUsers[1]->user_id,
-            'enterprise_id' => null,
-        ]);
+        if ($adminUsers->count() > 1) {
+            Staff::create([
+                'staff_name' => 'Juan Admin',
+                'position' => 'Platform Manager',
+                'department' => 'Management',
+                'user_id' => $adminUsers[1]->user_id,
+                'enterprise_id' => null,
+            ]);
+        }
     }
 }

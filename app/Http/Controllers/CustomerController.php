@@ -568,8 +568,8 @@ class CustomerController extends Controller
             ->orderBy('order_status_history.timestamp', 'desc')
             ->value('statuses.status_name') ?? 'Pending';
 
-        if ($currentStatusName !== 'Delivered') {
-            return redirect()->back()->with('error', 'You can only confirm orders that are marked as delivered.');
+        if (! in_array($currentStatusName, ['Ready for Pickup', 'Delivered'], true)) {
+            return redirect()->back()->with('error', 'You can only confirm orders that are ready for pickup or marked as delivered.');
         }
 
         $completedStatusId = DB::table('statuses')->where('status_name', 'Completed')->value('status_id');

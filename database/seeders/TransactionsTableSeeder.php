@@ -15,6 +15,9 @@ class TransactionsTableSeeder extends Seeder
         Transaction::query()->delete();
 
         $orders = CustomerOrder::all();
+        if ($orders->isEmpty()) {
+            return;
+        }
 
         // Create transactions for completed and shipped orders
         $completedOrders = $orders->whereIn('current_status', ['Complete', 'Shipped']);
@@ -35,7 +38,7 @@ class TransactionsTableSeeder extends Seeder
         if ($pendingOrder) {
             Transaction::create([
                 'order_id' => $pendingOrder->order_id,
-                'payment_method' => 'Credit Card',
+                'payment_method' => 'GCash',
                 'payment_reference_id' => 'TXN-' . strtoupper(uniqid()),
                 'payment_date_time' => $pendingOrder->order_creation_date->addHours(1),
                 'amount_paid' => $pendingOrder->total_order_amount,
@@ -46,7 +49,7 @@ class TransactionsTableSeeder extends Seeder
 
     private function getRandomPaymentMethod()
     {
-        $methods = ['Credit Card', 'PayPal', 'Bank Transfer', 'Cash on Delivery'];
+        $methods = ['Cash', 'GCash', 'Bank Transfer', 'PayPal'];
         return $methods[array_rand($methods)];
     }
 }

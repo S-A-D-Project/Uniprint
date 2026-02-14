@@ -11,12 +11,13 @@ class TestCustomerSeeder extends Seeder
 {
     public function run(): void
     {
-        // Create test customer user
-        $userId = Str::uuid();
-        
-        DB::table('users')->insert([
+        // Create test customer user (Filipino / Baguio testing)
+        $existing = DB::table('users')->where('email', 'test@uniprint.com')->first();
+        $userId = $existing?->user_id ?: (string) Str::uuid();
+
+        DB::table('users')->insertOrIgnore([
             'user_id' => $userId,
-            'name' => 'Test Customer',
+            'name' => 'Test Customer - Juan Dela Cruz',
             'email' => 'test@uniprint.com',
             'position' => 'Customer',
             'department' => 'External',
@@ -25,8 +26,8 @@ class TestCustomerSeeder extends Seeder
         ]);
 
         // Create login record
-        DB::table('login')->insert([
-            'login_id' => Str::uuid(),
+        DB::table('login')->insertOrIgnore([
+            'login_id' => (string) Str::uuid(),
             'user_id' => $userId,
             'username' => 'testcustomer',
             'password' => Hash::make('password123'),
@@ -37,8 +38,8 @@ class TestCustomerSeeder extends Seeder
         // Assign customer role
         $customerRole = DB::table('role_types')->where('user_role_type', 'customer')->first();
         if ($customerRole) {
-            DB::table('roles')->insert([
-                'role_id' => Str::uuid(),
+            DB::table('roles')->insertOrIgnore([
+                'role_id' => (string) Str::uuid(),
                 'user_id' => $userId,
                 'role_type_id' => $customerRole->role_type_id,
                 'created_at' => now(),

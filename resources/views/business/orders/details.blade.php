@@ -404,7 +404,13 @@
                         @endif
                     </div>
                 @else
-                    <p class="text-sm text-muted-foreground">Waiting for customer confirmation.</p>
+                    @if(($currentStatusName ?? null) === 'Pending')
+                        <p class="text-sm text-muted-foreground">Waiting for business confirmation.</p>
+                    @elseif(in_array(($currentStatusName ?? null), ['Ready for Pickup', 'Delivered'], true))
+                        <p class="text-sm text-muted-foreground">Waiting for customer pickup/confirmation.</p>
+                    @else
+                        <p class="text-sm text-muted-foreground">No actions available for the current status.</p>
+                    @endif
                 @endif
 
                 @if(($currentStatusName ?? null) === 'Pending' && empty($cancelAction))

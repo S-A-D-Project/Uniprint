@@ -13,39 +13,39 @@ class SuppliersSeeder extends Seeder
         $suppliers = [
             [
                 'supplier_id' => Str::uuid(),
-                'name' => 'ABC Office Supplies Inc.',
-                'address' => '123 Business Street, Metro Manila, Philippines',
+                'name' => 'Baguio Office Supplies Trading',
+                'address' => 'Magsaysay Ave, Baguio City, Benguet, Philippines',
                 'vat_type' => 'VAT',
                 'contact_person' => 'Maria Santos',
-                'contact_number' => '+63-2-1234-5678',
+                'contact_number' => '+63 917 123 4567',
                 'tin_no' => '123-456-789-000',
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
             [
                 'supplier_id' => Str::uuid(),
-                'name' => 'Tech Solutions Corp.',
-                'address' => '456 Technology Avenue, Makati City, Philippines',
+                'name' => 'Baguio Tech Solutions',
+                'address' => 'Upper Session Rd, Baguio City, Benguet, Philippines',
                 'vat_type' => 'VAT',
                 'contact_person' => 'Juan dela Cruz',
-                'contact_number' => '+63-2-9876-5432',
+                'contact_number' => '+63 918 987 6543',
                 'tin_no' => '987-654-321-000',
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
             [
                 'supplier_id' => Str::uuid(),
-                'name' => 'Manila Furniture Mart',
-                'address' => '789 Commerce Road, Quezon City, Philippines',
+                'name' => 'Baguio Packaging & Materials',
+                'address' => 'Harrison Rd, Baguio City, Benguet, Philippines',
                 'vat_type' => 'Non_VAT',
                 'contact_person' => 'Pedro Reyes',
-                'contact_number' => '+63-2-5555-1234',
+                'contact_number' => '+63 905 555 1234',
                 'tin_no' => '456-789-123-000',
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
         ];
 
-        DB::table('suppliers')->insert($suppliers);
+        DB::table('suppliers')->insertOrIgnore($suppliers);
     }
 }

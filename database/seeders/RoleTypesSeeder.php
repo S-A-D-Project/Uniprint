@@ -11,16 +11,21 @@ class RoleTypesSeeder extends Seeder
     public function run(): void
     {
         $roleTypes = [
-            ['role_type_id' => Str::uuid(), 'user_role_type' => 'customer'],
-            ['role_type_id' => Str::uuid(), 'user_role_type' => 'business_user'],
-            ['role_type_id' => Str::uuid(), 'user_role_type' => 'admin'],
+            'customer',
+            'business_user',
+            'admin',
         ];
 
-        foreach ($roleTypes as $roleType) {
-            DB::table('role_types')->updateOrInsert(
-                ['user_role_type' => $roleType['user_role_type']],
-                ['role_type_id' => $roleType['role_type_id']]
-            );
+        foreach ($roleTypes as $type) {
+            $exists = DB::table('role_types')->where('user_role_type', $type)->exists();
+            if ($exists) {
+                continue;
+            }
+
+            DB::table('role_types')->insert([
+                'role_type_id' => (string) Str::uuid(),
+                'user_role_type' => $type,
+            ]);
         }
     }
 }

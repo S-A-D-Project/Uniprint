@@ -87,11 +87,24 @@ UniPrint operates as a three-sided marketplace with distinct user roles:
 - **Profile Management** — Update personal info, password, profile picture
 - **Social Account Linking** — Connect Facebook account for easier login
 
+#### Security & Access Control
+- **Rate-Limited Authentication** — Login/register protected via Laravel rate limiting
+- **2FA Challenge Flow** — Dedicated verification/challenge pages before accessing protected areas
+- **Security Settings Page** — Enable/confirm/resend/disable email-based 2FA
+
 #### Service Discovery
 - **Marketplace Browse** — View all available print services
 - **Enterprise Profiles** — Browse print shop profiles and their service catalogs
 - **Service Details** — Comprehensive service info with pricing, options, reviews
 - **Search & Filter** — Find services by category, price, location
+
+#### Service Saving (Cart-like)
+- **Saved Services List** — View all saved services
+- **Save/Unsave Service** — Add/remove services from saved list
+- **Update Saved Item Configuration** — Update quantity/options/notes on saved items
+- **Bulk Clear Saved Services** — Remove all saved services
+- **Saved Services Count Endpoint** — Lightweight endpoint for header/cart badge count
+- **Checkout Selection** — Select a subset of saved services for checkout and clear selection
 
 #### Ordering System
 - **Save Services** — Bookmark services for later ordering
@@ -99,6 +112,11 @@ UniPrint operates as a three-sided marketplace with distinct user roles:
 - **Design Upload** — Upload design files (with file type validation)
 - **AI Design Generation** — Generate designs using AI (with usage limits)
 - **Saved Collections** — Organize saved services into collections
+
+#### Design Assets & Files
+- **AI Design Library** — View previously generated AI designs
+- **Delete AI Designs** — Remove generated designs from your library
+- **Order Design Files** — Upload/replace design files associated with orders (where enabled)
 
 #### Checkout & Payment
 - **Multi-Service Checkout** — Order from multiple businesses simultaneously
@@ -108,20 +126,42 @@ UniPrint operates as a three-sided marketplace with distinct user roles:
 - **Fulfillment Options** — Pickup or delivery selection
 - **Order Scheduling** — Request specific fulfillment dates
 
+#### PayPal Checkout Integration
+- **Create PayPal Order** — Server-side PayPal order creation
+- **Capture PayPal Order** — Server-side PayPal capture/confirmation
+
 #### Order Management
 - **Order Tracking** — Real-time status updates (Pending → Confirmed → Processing → Ready → Completed)
 - **Design File Management** — Upload/replace design files post-order
 - **Extension Requests** — Request order deadline extensions
+- **Extension Request Responses** — Accept/decline business-proposed extensions
 - **Order Cancellation** — Cancel orders before processing begins
 - **Completion Confirmation** — Confirm receipt and satisfaction
+
+#### Notifications
+- **In-app Notifications** — Order and workflow updates surfaced in the UI
+- **Mark Notifications Read** — Explicit action to mark notifications as read
 
 #### Communication
 - **Real-time Chat** — Direct messaging with business owners
 - **Notifications** — In-app notifications for order updates, messages
 - **Review System** — Rate and review completed orders
 
+#### Chat (Realtime)
+- **Conversation List** — View all conversations
+- **Start Chat with a Print Shop** — Open chat from enterprise/service context
+- **Typing Indicators** — Real-time typing events
+- **Read Receipts** — Mark messages as read
+- **Online Status** — Update/check online status
+- **Pusher Auth** — Authenticate private channels for real-time messaging
+
 #### Reporting
 - **Report Businesses/Services** — Flag inappropriate content or issues to admins
+- **System Feedback** — Submit reviews and improvement suggestions directly to admins
+
+#### Public Pages
+- **Terms Page** — Public terms and conditions page
+- **Enterprise Listing Page** — Browse all enterprises
 
 ---
 
@@ -131,6 +171,10 @@ UniPrint operates as a three-sided marketplace with distinct user roles:
 - **Business Registration** — Onboarding flow for new print businesses
 - **Document Verification** — Submit business documents for admin verification
 - **Enterprise Profile** — Business name, description, contact info, branding
+
+#### Business Verification Status Gate
+- **Verified Business Access Control** — Unverified businesses are blocked from full dashboard access until verified
+- **Pending Page** — Dedicated page/flow for businesses awaiting verification
 
 #### Service Management
 - **Service Creation** — Create print services with detailed specifications
@@ -145,11 +189,18 @@ UniPrint operates as a three-sided marketplace with distinct user roles:
 - **Service Images** — Upload multiple images, set primary image
 - **Service Status** — Activate/deactivate services
 
+#### Upload Controls
+- **Enable/Disable Design Upload** — Toggle file upload per service
+- **Require Design Upload** — Force customers to upload files for a service
+
 #### Pricing & Customization
 - **Pricing Rules** — Advanced pricing based on quantity, options, formulas
 - **Customization Groups** — Organize options into logical groups
 - **Option Pricing** — Price modifiers for each customization choice
 - **Custom Size Support** — Enable and price custom sizing
+
+#### Custom Fields
+- **Custom Field Builder** — Create/update/delete service-specific custom fields
 
 #### Order Management
 - **Order Dashboard** — View all incoming orders with status filters
@@ -163,9 +214,16 @@ UniPrint operates as a three-sided marketplace with distinct user roles:
 - **Walk-in Orders** — Create orders for in-person customers
 - **Design File Approval** — Review and approve/reject customer uploads
 
+#### Order Documents
+- **Printable Order View** — Print-ready order details for shop processing
+
 #### Customer Communication
 - **Real-time Chat** — Respond to customer inquiries via integrated chat
 - **Notification Management** — Mark notifications as read/unread
+
+#### Notifications
+- **Order Notifications** — Receive order/extension/payment notifications
+- **Mark Notifications Read** — Acknowledge notifications from the business dashboard
 
 #### Business Settings
 - **Account Settings** — Update business info, contact details
@@ -174,6 +232,9 @@ UniPrint operates as a three-sided marketplace with distinct user roles:
   - Supported fulfillment methods
   - Rush options with custom fees and lead times
 - **GCash Settings** — Configure GCash payment receiving
+
+#### Branding
+- **Shop Logo Upload** — Upload shop logo for enterprise profile
 
 ---
 
@@ -206,6 +267,7 @@ UniPrint operates as a three-sided marketplace with distinct user roles:
 #### Content Moderation
 - **User Reports** — Review customer reports about businesses/services
 - **Report Resolution** — Mark reports as resolved with notes
+- **System Feedback Review** — View user-submitted feedback and mark as reviewed/addressed
 
 #### System Administration
 - **System Settings**:
@@ -216,6 +278,56 @@ UniPrint operates as a three-sided marketplace with distinct user roles:
 - **Database Management** — Create/download backups, database reset
 - **Cache Management** — Clear cache, optimize application
 - **Audit Logs** — View system activity logs
+
+#### Admin Real-time / API Endpoints
+- **Dashboard Stats API** — Endpoint for live-updating dashboard metrics
+- **Enterprise Stats API** — Endpoint for enterprise analytics widgets
+
+---
+
+## HTTP API (Session + Sanctum-ready)
+
+This project includes API routes (see `routes/api.php`). Some endpoints are designed for SPA-style fetch calls and are **Sanctum-ready**.
+
+### Authentication API
+- **Issue Token** — `POST /api/auth/token`
+- **Logout / Revoke Token** — `POST /api/auth/logout` (requires `auth:sanctum`)
+
+### Marketplace API (Customer)
+- **List services** — `GET /api/marketplace/services`
+- **Search suggestions** — `GET /api/marketplace/search-suggestions`
+- **Service details** — `GET /api/marketplace/service/{serviceId}`
+- **Toggle favorite** — `POST /api/marketplace/toggle-favorite`
+- **Categories** — `GET /api/marketplace/categories`
+- **Enterprises** — `GET /api/marketplace/enterprises`
+- **Locations** — `GET /api/marketplace/locations`
+
+### Customer Dashboard API
+- **Services** — `GET /api/customer/services`
+- **Orders** — `GET /api/customer/orders`
+- **Payments history** — `GET /api/customer/payments`
+- **Update profile** — `POST /api/customer/profile`
+- **Dashboard stats** — `GET /api/customer/stats`
+- **Saved services** — `GET /api/customer/saved-services`
+
+### Chat API
+- **Resolve enterprise owner** — `POST /api/chat/enterprise-owner`
+- **Conversations** — `GET /api/chat/conversations`
+- **Get/create conversation** — `POST /api/chat/conversations`
+- **Conversation details** — `GET /api/chat/conversations/{conversationId}`
+- **Messages** — `GET /api/chat/conversations/{conversationId}/messages`
+- **Send message** — `POST /api/chat/messages`
+- **Mark as read** — `POST /api/chat/messages/read`
+- **Typing** — `POST /api/chat/typing`
+- **Online status** — `POST /api/chat/online-status`
+- **Online status check** — `POST /api/chat/online-status/check`
+- **Available businesses** — `GET /api/chat/available-businesses`
+- **Pusher auth** — `POST /api/chat/pusher/auth`
+- **Cleanup** — `POST /api/chat/cleanup`
+- **Health check** — `GET /api/chat/health`
+
+### Pricing API
+- **Calculate price** — `POST /api/pricing/calculate`
 
 ---
 
@@ -351,6 +463,167 @@ discount_codes                 -- Promotional codes
 GET  /admin/api/dashboard-stats      -- Dashboard metrics
 GET  /admin/api/enterprise-stats     -- Enterprise analytics
 ```
+
+---
+
+## February Software Testing Dataset (Baguio Demo Seed)
+
+This project includes a **realistic demo dataset** intended to simulate continuous platform usage throughout **the month of February** during software testing / QA.
+
+### What gets seeded
+
+- **Baguio-based enterprises only**
+  - Print shops use Baguio/Philippines addresses (e.g., Session Rd, Mabini St, Bonifacio St).
+- **Filipino test users**
+  - Customer and business user profiles use Filipino names.
+- **Chat activity**
+  - Seeded conversations and chat messages simulate typical customer ↔ business communication (design help, rush printing requests, pricing inquiries).
+- **February order activity**
+  - Orders are distributed across February timestamps to mimic daily usage.
+  - Orders include multiple items and random customization selections where available.
+  - Status history + transactions are generated for completed/delivered orders.
+
+### Why this matters (testing realism)
+
+This dataset is used to test the system under conditions that feel "alive":
+
+- **Dashboards have real numbers** (orders, customers, business activity)
+- **Order timelines look realistic** (varying status, timestamps across the month)
+- **Customization + pricing paths are exercised** (options, price modifiers, totals)
+- **Chat UIs have real conversations** (read/unread states, timestamps)
+
+### How to seed
+
+```bash
+php artisan migrate:fresh --seed
+```
+
+The default `DatabaseSeeder` runs the demo seeders:
+
+- `RoleTypesSeeder`
+- `StatusesSeeder`
+- `NewUsersSeeder`
+- `BaguioPrintshopsSeeder`
+- `SampleOrdersSeeder`
+
+
+---
+
+## System Complexity & Advanced Features
+
+### Dynamic Customization Engine
+
+UniPrint implements a sophisticated **rule-based customization system** that allows businesses to create complex product configurations while maintaining data integrity and user experience:
+
+#### **Multi-Level Customization Architecture**
+```
+Services
+├── Customization Groups (logical categories)
+│   ├── Customization Options (individual choices)
+│   └── Customization Rules (dependencies & constraints)
+└── Pricing Rules (dynamic calculations)
+```
+
+#### **Smart Dependency Resolution**
+- **Rule Types**: `requires`, `conflicts`, `requires_any`
+- **Real-time Validation**: Frontend updates available options based on current selections
+- **Caching Layer**: 5-minute cache for available options to optimize performance
+- **Bulk Operations**: Import/export entire customization configurations for similar services
+
+**Example**: A "Glossy Finish" option might require "Premium Paper" and conflict with "Matte Coating"
+
+#### **Space-Efficient Design Choices**
+- **Option IDs as strings**: Eliminates integer sequence gaps, saves storage
+- **JSON Storage**: Complex rules and tier structures stored as JSON, avoiding normalization overhead
+- **Selective Loading**: Only loads customization data when needed (lazy loading)
+- **Cache Invalidation**: Targeted cache clearing prevents full cache rebuilds
+
+### Advanced Pricing Engine
+
+The **PricingEngine** service provides enterprise-grade pricing calculations with multiple strategies:
+
+#### **Multi-Dimensional Pricing**
+- **Base Price**: Service-specific starting price
+- **Customization Modifiers**: Individual option price impacts
+- **Quantity Tiers**: Volume discounts with configurable thresholds
+- **Dynamic Rules**: Time-based, customer-type, and order-value pricing
+- **Safe Formula Evaluation**: Custom math parser (NO eval()) for complex calculations
+
+#### **Pricing Rule Conditions**
+```php
+// Example rule: 15% discount for orders over 5000 with rush delivery
+{
+  'conditions': [
+    ['field' => 'subtotal', 'operator' => '>', 'value' => 5000],
+    ['field' => 'is_rush', 'operator' => '=', 'value' => true]
+  ],
+  'calculation_method' => 'percentage',
+  'value' => 15
+}
+```
+
+#### **Performance Optimizations**
+- **Rule Caching**: 1-hour cache for enterprise pricing rules
+- **Batch Processing**: Calculate multiple items in single database round-trip
+- **Priority Ordering**: Rules processed by priority to ensure correct application
+
+### Workflow Automation System
+
+**OrderWorkflow** provides customizable order processing pipelines with intelligent deadline management:
+
+#### **Dynamic Workflow Assignment**
+- **Context-Aware**: Workflows selected based on order complexity, value, and type
+- **Conditional Logic**: Support for priority, amount, and category-based routing
+- **Fallback Mechanism**: Default workflow when no specific rules match
+
+#### **Automated Deadline Calculations**
+```php
+// Rush options with business-day awareness
+'same_day'  => +3 hours (if before 2 PM)
+'rush'      => +6 hours (next business day)
+'express'   => +24 hours (next business day at 5 PM)
+'standard'  => +48 hours (2 business days at 5 PM)
+```
+
+#### **Progress Tracking & Analytics**
+- **Stage Progression**: Automatic advancement through workflow stages
+- **Timeline Visualization**: Real-time order progress with estimated vs actual times
+- **Performance Metrics**: Average completion time per workflow type
+- **Business Day Calculations**: Weekends and holidays excluded from deadlines
+
+### Saved Service Architecture
+
+**SavedServiceCollection** implements a sophisticated cart-like system with enterprise features:
+
+#### **Space-Optimized Storage**
+- **UUID Primary Keys**: Distributed ID generation prevents bottlenecks
+- **JSON Customizations**: Complex selections stored as JSON arrays
+- **Price Caching**: Pre-calculated totals stored to avoid recalculation
+- **Lazy Relationships**: Service data loaded only when displayed
+
+#### **Collection Management**
+- **Multi-Enterprise Support**: Save services from different businesses
+- **Bulk Operations**: Clear, update, and remove operations with single queries
+- **Relationship Optimization**: Eager loading prevents N+1 query problems
+
+### Database Design Optimizations
+
+#### **Multi-Tenant Architecture**
+- **Enterprise Scoping**: Global scopes ensure data isolation between businesses
+- **Shared Tables**: Common tables (users, statuses) shared for efficiency
+- **Tenant-Specific Tables**: Business data separated for security and performance
+
+#### **Performance Patterns**
+- **Composite Indexes**: Optimized for common query patterns
+- **Soft Deletes**: Data retention without performance impact
+- **Audit Trails**: Automatic history tracking for compliance
+- **Connection Pooling**: Database connection reuse for high concurrency
+
+#### **Scalability Considerations**
+- **Horizontal Scaling**: Stateless design enables multiple app servers
+- **Read Replicas**: Read-heavy operations can be offloaded
+- **Cache Layers**: Redis-ready for distributed caching
+- **Queue System**: Background processing for heavy operations
 
 ---
 
