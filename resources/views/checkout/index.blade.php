@@ -201,26 +201,27 @@
                     @php
                         $pm = $availablePaymentMethods ?? ['gcash', 'cash'];
                     @endphp
-                    @if(in_array('gcash', $pm))
-                    <label class="relative cursor-pointer">
-                        <input type="radio" name="payment_method" value="gcash" checked class="sr-only peer">
-                        <div class="border-2 border-gray-200 rounded-lg p-4 text-center transition-all peer-checked:border-primary peer-checked:bg-primary/5 hover:border-gray-300">
-                            <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                                <i data-lucide="smartphone" class="h-6 w-6 text-blue-600"></i>
-                            </div>
-                            <h4 class="font-semibold text-gray-900 mb-1">GCash</h4>
-                            <p class="text-sm text-gray-600">Mobile wallet payment</p>
-                            <div class="absolute top-3 right-3 w-5 h-5 border-2 border-gray-300 rounded-full peer-checked:border-primary peer-checked:bg-primary flex items-center justify-center">
-                                <div class="w-2 h-2 bg-white rounded-full opacity-0 peer-checked:opacity-100"></div>
+                    <x-ui.tooltip text="Online payments are not yet available. Please use Cash for now.">
+                        <div class="relative opacity-60 cursor-not-allowed" aria-disabled="true">
+                            <input type="radio" name="payment_method" value="gcash" class="sr-only" disabled>
+                            <div class="border-2 border-gray-200 rounded-lg p-4 text-center transition-all">
+                                <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                    <i data-lucide="smartphone" class="h-6 w-6 text-blue-600"></i>
+                                </div>
+                                <div class="flex items-center justify-center gap-2 mb-1">
+                                    <h4 class="font-semibold text-gray-900">GCash</h4>
+                                    <span class="inline-flex items-center px-2 py-0.5 text-[11px] font-medium bg-secondary text-secondary-foreground rounded-full">Not yet available</span>
+                                </div>
+                                <p class="text-sm text-gray-600">Mobile wallet payment</p>
+                                <p class="text-xs text-gray-500 mt-2">Coming soon</p>
                             </div>
                         </div>
-                    </label>
-                    @endif
+                    </x-ui.tooltip>
                     
                     <!-- Cash Payment -->
                     @if(in_array('cash', $pm))
                     <label class="relative cursor-pointer">
-                        <input type="radio" name="payment_method" value="cash" {{ !in_array('gcash', $pm) ? 'checked' : '' }} class="sr-only peer">
+                        <input type="radio" name="payment_method" value="cash" checked class="sr-only peer">
                         <div class="border-2 border-gray-200 rounded-lg p-4 text-center transition-all peer-checked:border-primary peer-checked:bg-primary/5 hover:border-gray-300">
                             <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
                                 <i data-lucide="banknote" class="h-6 w-6 text-green-600"></i>
@@ -234,31 +235,27 @@
                     </label>
                     @endif
 
-                    @if(in_array('paypal', $pm))
-                    <label class="relative cursor-pointer">
-                        <input type="radio" name="payment_method" value="paypal" class="sr-only peer">
-                        <div class="border-2 border-gray-200 rounded-lg p-4 text-center transition-all peer-checked:border-primary peer-checked:bg-primary/5 hover:border-gray-300">
-                            <div class="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                                <i data-lucide="wallet" class="h-6 w-6 text-yellow-700"></i>
-                            </div>
-                            <h4 class="font-semibold text-gray-900 mb-1">PayPal</h4>
-                            <p class="text-sm text-gray-600">Card / PayPal balance</p>
-                            <div class="absolute top-3 right-3 w-5 h-5 border-2 border-gray-300 rounded-full peer-checked:border-primary peer-checked:bg-primary flex items-center justify-center">
-                                <div class="w-2 h-2 bg-white rounded-full opacity-0 peer-checked:opacity-100"></div>
+                    <x-ui.tooltip text="Online payments are not yet available. Please use Cash for now.">
+                        <div class="relative opacity-60 cursor-not-allowed" aria-disabled="true">
+                            <input type="radio" name="payment_method" value="paypal" class="sr-only" disabled>
+                            <div class="border-2 border-gray-200 rounded-lg p-4 text-center transition-all">
+                                <div class="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                    <i data-lucide="wallet" class="h-6 w-6 text-yellow-700"></i>
+                                </div>
+                                <div class="flex items-center justify-center gap-2 mb-1">
+                                    <h4 class="font-semibold text-gray-900">PayPal</h4>
+                                    <span class="inline-flex items-center px-2 py-0.5 text-[11px] font-medium bg-secondary text-secondary-foreground rounded-full">Not yet available</span>
+                                </div>
+                                <p class="text-sm text-gray-600">Card / PayPal balance</p>
+                                <p class="text-xs text-gray-500 mt-2">Coming soon</p>
                             </div>
                         </div>
-                    </label>
-                    @endif
+                    </x-ui.tooltip>
                 </div>
 
-                @if(in_array('paypal', $pm))
-                    <div id="paypal-buttons-wrapper" class="mt-4" style="display:none;">
-                        <div class="text-sm text-gray-600 mb-2">Complete PayPal payment first, then place your order.</div>
-                        <div id="paypal-buttons"></div>
-                        <input type="hidden" name="paypal_order_id" id="paypal_order_id" value="" />
-                        <div id="paypal-status" class="text-xs text-gray-500 mt-2"></div>
-                    </div>
-                @endif
+                <div class="mt-4 text-xs text-muted-foreground">
+                    Online payments are shown for visibility, but are not yet available.
+                </div>
             </div>
 
             <!-- Additional Notes -->
@@ -343,9 +340,6 @@
 @endsection
 
 @push('scripts')
-@if(in_array('paypal', $availablePaymentMethods ?? []) && !empty(config('services.paypal.client_id')))
-    <script id="paypal-sdk" src="https://www.paypal.com/sdk/js?client-id={{ config('services.paypal.client_id') }}&currency={{ config('services.paypal.currency', 'PHP') }}&intent=capture"></script>
-@endif
 <script>
 const subtotal = {{ $subtotal }};
 const taxRate = 0.12;

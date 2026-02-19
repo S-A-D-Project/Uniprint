@@ -221,28 +221,35 @@ $breadcrumbs = [
                         </td>
                         <td class="p-4">
                             <div class="flex items-center gap-2">
-                                <a href="{{ route('admin.enterprises.details', $enterprise->enterprise_id) }}"
-                                   class="p-2 hover:bg-secondary rounded-md transition-colors js-enterprise-details"
-                                   title="View Details"
-                                   data-enterprise-details-url="{{ route('admin.enterprises.details', $enterprise->enterprise_id) }}">
-                                    <i data-lucide="eye" class="h-4 w-4"></i>
-                                </a>
-                                <a href="{{ route('admin.services', ['enterprise_id' => $enterprise->enterprise_id]) }}" class="p-2 hover:bg-secondary rounded-md transition-colors" title="Manage Services">
-                                    <i data-lucide="package" class="h-4 w-4"></i>
-                                </a>
-                                <a href="{{ route('admin.orders', ['enterprise_id' => $enterprise->enterprise_id]) }}" class="p-2 hover:bg-secondary rounded-md transition-colors" title="View Orders">
-                                    <i data-lucide="shopping-cart" class="h-4 w-4"></i>
-                                </a>
-                                <form method="POST" action="{{ route('admin.enterprises.toggle-active', $enterprise->enterprise_id) }}">
-                                    @csrf
-                                    <button type="submit" class="p-2 hover:bg-secondary rounded-md transition-colors" title="Toggle Active">
-                                        @if($isActive)
-                                            <i data-lucide="x-circle" class="h-4 w-4"></i>
-                                        @else
-                                            <i data-lucide="check-circle" class="h-4 w-4"></i>
-                                        @endif
-                                    </button>
-                                </form>
+                                <x-ui.tooltip text="View enterprise details">
+                                    <a href="{{ route('admin.enterprises.details', $enterprise->enterprise_id) }}"
+                                       class="p-2 hover:bg-secondary rounded-md transition-colors js-enterprise-details"
+                                       data-enterprise-details-url="{{ route('admin.enterprises.details', $enterprise->enterprise_id) }}">
+                                        <i data-lucide="eye" class="h-4 w-4"></i>
+                                    </a>
+                                </x-ui.tooltip>
+                                <x-ui.tooltip text="Manage enterprise services">
+                                    <a href="{{ route('admin.services', ['enterprise_id' => $enterprise->enterprise_id]) }}" class="p-2 hover:bg-secondary rounded-md transition-colors">
+                                        <i data-lucide="package" class="h-4 w-4"></i>
+                                    </a>
+                                </x-ui.tooltip>
+                                <x-ui.tooltip text="View enterprise orders">
+                                    <a href="{{ route('admin.orders', ['enterprise_id' => $enterprise->enterprise_id]) }}" class="p-2 hover:bg-secondary rounded-md transition-colors">
+                                        <i data-lucide="shopping-cart" class="h-4 w-4"></i>
+                                    </a>
+                                </x-ui.tooltip>
+                                <x-ui.tooltip text="{{ $isActive ? 'Deactivate this enterprise' : 'Activate this enterprise' }}">
+                                    <form method="POST" action="{{ route('admin.enterprises.toggle-active', $enterprise->enterprise_id) }}">
+                                        @csrf
+                                        <button type="submit" class="p-2 hover:bg-secondary rounded-md transition-colors">
+                                            @if($isActive)
+                                                <i data-lucide="x-circle" class="h-4 w-4"></i>
+                                            @else
+                                                <i data-lucide="check-circle" class="h-4 w-4"></i>
+                                            @endif
+                                        </button>
+                                    </form>
+                                </x-ui.tooltip>
                             </div>
                         </td>
                     </tr>

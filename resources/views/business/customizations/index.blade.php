@@ -41,7 +41,9 @@
                                     <h3 class="font-semibold text-lg">{{ $type }}</h3>
                                     <button type="button"
                                             class="inline-flex items-center gap-2 px-3 py-1.5 text-sm border border-input rounded-md hover:bg-secondary transition-smooth"
-                                            onclick="openAddCustomizationForType(@json($type))">
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#addCustomizationModal"
+                                            data-option-type="{{ $type }}">
                                         <i data-lucide="plus" class="h-4 w-4"></i>
                                         Add option
                                     </button>
@@ -62,13 +64,13 @@
                                             </div>
                                             <div class="flex gap-2">
                                                 <x-ui.tooltip text="Edit this customization option">
-                                                    <button type="button" class="px-3 py-1 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80" onclick="editCustomization('{{ $option->option_id }}', '{{ $option->option_type }}', '{{ $option->option_name }}', '{{ $option->price_modifier }}')">
-                                                        <i class="bi bi-pencil"></i>
+                                                    <button type="button" aria-label="Edit option" class="inline-flex items-center justify-center px-3 py-2 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 focus:outline-none focus:ring-2 focus:ring-ring" onclick="editCustomization('{{ $option->option_id }}', '{{ $option->option_type }}', '{{ $option->option_name }}', '{{ $option->price_modifier }}')">
+                                                        <i class="bi bi-pencil text-base"></i>
                                                     </button>
                                                 </x-ui.tooltip>
                                                 <x-ui.tooltip text="Delete this customization option">
-                                                    <button type="button" class="px-3 py-1 text-sm bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90" onclick="deleteCustomization('{{ $option->option_id }}', '{{ $option->option_name }}')">
-                                                        <i class="bi bi-trash"></i>
+                                                    <button type="button" aria-label="Delete option" class="inline-flex items-center justify-center px-3 py-2 text-sm bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90 focus:outline-none focus:ring-2 focus:ring-ring" onclick="deleteCustomization('{{ $option->option_id }}', '{{ $option->option_name }}')">
+                                                        <i class="bi bi-trash text-base"></i>
                                                     </button>
                                                 </x-ui.tooltip>
                                             </div>
@@ -109,13 +111,13 @@
                                 </div>
                                 <div class="flex gap-2">
                                     <x-ui.tooltip text="Edit this text field">
-                                        <button type="button" class="px-3 py-1 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80" onclick="editCustomField('{{ $field->field_id }}', '{{ $field->field_label }}', '{{ $field->placeholder ?? '' }}', {{ (int)($field->is_required ?? 0) }}, {{ (int)($field->sort_order ?? 0) }})">
-                                            <i class="bi bi-pencil"></i>
+                                        <button type="button" aria-label="Edit text field" class="inline-flex items-center justify-center px-3 py-2 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 focus:outline-none focus:ring-2 focus:ring-ring" onclick="editCustomField('{{ $field->field_id }}', '{{ $field->field_label }}', '{{ $field->placeholder ?? '' }}', {{ (int)($field->is_required ?? 0) }}, {{ (int)($field->sort_order ?? 0) }})">
+                                            <i class="bi bi-pencil text-base"></i>
                                         </button>
                                     </x-ui.tooltip>
                                     <x-ui.tooltip text="Delete this text field">
-                                        <button type="button" class="px-3 py-1 text-sm bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90" onclick="deleteCustomField('{{ $field->field_id }}', '{{ $field->field_label }}')">
-                                            <i class="bi bi-trash"></i>
+                                        <button type="button" aria-label="Delete text field" class="inline-flex items-center justify-center px-3 py-2 text-sm bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90 focus:outline-none focus:ring-2 focus:ring-ring" onclick="deleteCustomField('{{ $field->field_id }}', '{{ $field->field_label }}')">
+                                            <i class="bi bi-trash text-base"></i>
                                         </button>
                                     </x-ui.tooltip>
                                 </div>
@@ -461,6 +463,55 @@ function syncAddOptionTypeHidden() {
     }
 }
 
+document.addEventListener('DOMContentLoaded', function () {
+    const select = document.getElementById('add_option_type_select');
+    const inputNew = document.getElementById('add_option_type_new');
+    if (select) {
+        select.addEventListener('change', syncAddOptionTypeHidden);
+    }
+    if (inputNew) {
+        inputNew.addEventListener('input', syncAddOptionTypeHidden);
+    }
+
+    syncAddOptionTypeHidden();
+});
+
+document.addEventListener('DOMContentLoaded', function () {
+    const modalEl = document.getElementById('addCustomizationModal');
+    if (!modalEl) return;
+
+    modalEl.addEventListener('show.bs.modal', function (event) {
+        const trigger = event.relatedTarget;
+        const optionType = trigger?.getAttribute ? (trigger.getAttribute('data-option-type') || '') : '';
+        if (optionType) {
+            const select = document.getElementById('add_option_type_select');
+            const hidden = document.getElementById('add_option_type');
+            const inputNew = document.getElementById('add_option_type_new');
+            const raw = optionType || '';
+
+            if (select && hidden && inputNew) {
+                const hasMatching = Array.from(select.options).some(o => o.value === raw);
+                if (hasMatching) {
+                    select.value = raw;
+                } else {
+                    select.value = '__new__';
+                    inputNew.value = raw;
+                }
+                syncAddOptionTypeHidden();
+            } else if (hidden) {
+                hidden.value = raw;
+            }
+        }
+    });
+
+    modalEl.addEventListener('shown.bs.modal', function () {
+        setTimeout(() => {
+            const nameInput = modalEl.querySelector('input[name="option_name"]');
+            if (nameInput) nameInput.focus();
+        }, 50);
+    });
+});
+
 function openAddCustomizationForType(optionType) {
     const select = document.getElementById('add_option_type_select');
     const hidden = document.getElementById('add_option_type');
@@ -620,15 +671,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 document.addEventListener('DOMContentLoaded', function () {
-    const select = document.getElementById('add_option_type_select');
-    const inputNew = document.getElementById('add_option_type_new');
     const form = document.getElementById('addCustomizationForm');
-    if (select) {
-        select.addEventListener('change', syncAddOptionTypeHidden);
-    }
-    if (inputNew) {
-        inputNew.addEventListener('input', syncAddOptionTypeHidden);
-    }
     if (form) {
         form.addEventListener('submit', function () {
             syncAddOptionTypeHidden();

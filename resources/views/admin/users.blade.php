@@ -92,12 +92,14 @@ $breadcrumbs = [
                     </td>
                     <td>
                         <div class="flex items-center gap-2">
-                            <x-admin.button size="sm"
-                                           variant="ghost"
-                                           icon="eye"
-                                           href="{{ route('admin.users.details', $user->user_id) }}"
-                                           class="js-user-details"
-                                           data-user-details-url="{{ route('admin.users.details', $user->user_id) }}" />
+                            <x-ui.tooltip text="View user details">
+                                <x-admin.button size="sm"
+                                               variant="ghost"
+                                               icon="eye"
+                                               href="{{ route('admin.users.details', $user->user_id) }}"
+                                               class="js-user-details"
+                                               data-user-details-url="{{ route('admin.users.details', $user->user_id) }}" />
+                            </x-ui.tooltip>
                         </div>
                     </td>
                 </tr>

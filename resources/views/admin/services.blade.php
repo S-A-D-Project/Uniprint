@@ -59,28 +59,32 @@ $breadcrumbs = [
         </div>
 
         <div class="flex items-center gap-2">
-            <button type="button"
-                   onclick="openAdminServiceFormModal('{{ route('admin.services.details', $service->service_id) }}')"
-                   class="p-2 hover:bg-secondary rounded-md transition-colors"
-                   title="View Details">
-                <i data-lucide="eye" class="h-4 w-4 text-primary"></i>
-            </button>
+            <x-ui.tooltip text="View service details">
+                <button type="button"
+                       onclick="openAdminServiceFormModal('{{ route('admin.services.details', $service->service_id) }}')"
+                       class="p-2 hover:bg-secondary rounded-md transition-colors">
+                    <i data-lucide="eye" class="h-4 w-4 text-primary"></i>
+                </button>
+            </x-ui.tooltip>
 
-            <button type="button"
-                   onclick="openAdminServiceFormModal('{{ route('business.services.edit', $service->service_id) }}?enterprise_id={{ $service->enterprise_id }}')"
-                   class="p-2 hover:bg-secondary rounded-md transition-colors"
-                   title="Edit Service">
-                <i data-lucide="pencil" class="h-4 w-4 text-primary"></i>
-            </button>
+            <x-ui.tooltip text="Edit this service">
+                <button type="button"
+                       onclick="openAdminServiceFormModal('{{ route('business.services.edit', $service->service_id) }}?enterprise_id={{ $service->enterprise_id }}')"
+                       class="p-2 hover:bg-secondary rounded-md transition-colors">
+                    <i data-lucide="pencil" class="h-4 w-4 text-primary"></i>
+                </button>
+            </x-ui.tooltip>
 
-            <form method="POST" action="{{ route('admin.services.toggle-active', $service->service_id) }}">
-                @csrf
-                @if(($service->is_available ?? true))
-                    <x-admin.button size="sm" variant="ghost" icon="x-circle" type="submit" />
-                @else
-                    <x-admin.button size="sm" variant="ghost" icon="check-circle" type="submit" />
-                @endif
-            </form>
+            <x-ui.tooltip text="{{ ($service->is_available ?? true) ? 'Deactivate this service' : 'Activate this service' }}">
+                <form method="POST" action="{{ route('admin.services.toggle-active', $service->service_id) }}">
+                    @csrf
+                    @if(($service->is_available ?? true))
+                        <x-admin.button size="sm" variant="ghost" icon="x-circle" type="submit" />
+                    @else
+                        <x-admin.button size="sm" variant="ghost" icon="check-circle" type="submit" />
+                    @endif
+                </form>
+            </x-ui.tooltip>
         </div>
     </x-admin.card>
     @empty

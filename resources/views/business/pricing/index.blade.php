@@ -66,19 +66,25 @@
                                 </td>
                                 <td class="px-6 py-4">
                                     <div class="flex items-center gap-2">
-                                        <a href="{{ route('business.pricing.edit', $rule->rule_id) }}" 
-                                           class="text-primary hover:text-primary/80 text-sm font-medium js-pricing-edit"
-                                           data-pricing-edit-url="{{ route('business.pricing.edit', $rule->rule_id) }}">
-                                            Edit
-                                        </a>
+                                        <x-ui.tooltip text="Edit this pricing rule">
+                                            <a href="{{ route('business.pricing.edit', $rule->rule_id) }}" 
+                                               class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-medium text-primary hover:bg-primary/10 rounded-md transition-smooth focus:outline-none focus:ring-2 focus:ring-ring js-pricing-edit"
+                                               data-pricing-edit-url="{{ route('business.pricing.edit', $rule->rule_id) }}">
+                                                <i data-lucide="pencil" class="h-3.5 w-3.5"></i>
+                                                Edit
+                                            </a>
+                                        </x-ui.tooltip>
                                         <form id="delete-pricing-rule-{{ $rule->rule_id }}" action="{{ route('business.pricing.delete', $rule->rule_id) }}" method="POST">
                                             @csrf
                                             @method('DELETE')
-                                            <button type="button"
-                                                    class="text-destructive hover:text-destructive/80 text-sm font-medium"
-                                                    onclick="confirmPricingRuleDelete('{{ $rule->rule_id }}', @json($rule->rule_name))">
-                                                Delete
-                                            </button>
+                                            <x-ui.tooltip text="Delete this pricing rule permanently">
+                                                <button type="button"
+                                                        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-medium text-destructive hover:bg-destructive/10 rounded-md transition-smooth focus:outline-none focus:ring-2 focus:ring-ring"
+                                                        onclick="confirmPricingRuleDelete('{{ $rule->rule_id }}', @json($rule->rule_name))">
+                                                    <i data-lucide="trash-2" class="h-3.5 w-3.5"></i>
+                                                    Delete
+                                                </button>
+                                            </x-ui.tooltip>
                                         </form>
                                     </div>
                                 </td>

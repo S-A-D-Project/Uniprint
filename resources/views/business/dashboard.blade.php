@@ -92,10 +92,12 @@
                 </div>
                 Recent Orders
             </h2>
-            <a href="{{ route('business.orders.index') }}" class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:shadow-glow transition-smooth">
-                <span>View All</span>
-                <i data-lucide="arrow-right" class="h-4 w-4"></i>
-            </a>
+            <x-ui.tooltip text="View all orders">
+                <a href="{{ route('business.orders.index') }}" class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:shadow-glow transition-smooth">
+                    <span>View All</span>
+                    <i data-lucide="arrow-right" class="h-4 w-4"></i>
+                </a>
+            </x-ui.tooltip>
         </div>
         
         @if($recent_orders->count() > 0)
@@ -130,11 +132,13 @@
                             </td>
                             <td class="px-4 lg:px-6 py-4 text-sm text-muted-foreground hidden md:table-cell">{{ date('M d', strtotime($order->created_at)) }}</td>
                             <td class="px-4 lg:px-6 py-4">
-                                <a href="{{ route('business.orders.details', $order->purchase_order_id) }}" 
-                                   class="inline-flex items-center gap-1 text-primary hover:text-primary/80 font-medium text-sm transition-smooth">
-                                    <span class="hidden sm:inline">View</span>
-                                    <i data-lucide="arrow-right" class="h-4 w-4"></i>
-                                </a>
+                                <x-ui.tooltip text="View order details">
+                                    <a href="{{ route('business.orders.details', $order->purchase_order_id) }}" 
+                                       class="inline-flex items-center gap-1 text-primary hover:text-primary/80 font-medium text-sm transition-smooth">
+                                        <span class="hidden sm:inline">View</span>
+                                        <i data-lucide="arrow-right" class="h-4 w-4"></i>
+                                    </a>
+                                </x-ui.tooltip>
                             </td>
                         </tr>
                         @endforeach

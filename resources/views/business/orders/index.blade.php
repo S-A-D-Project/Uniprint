@@ -131,16 +131,22 @@
                                 @endif
                             </td>
                             <td class="px-6 py-4">
-                                <div class="flex items-center gap-3">
-                                    <button type="button"
-                                            onclick="openBusinessOrderReviewModal('{{ route('business.orders.details', $order->purchase_order_id, false) }}')"
-                                            class="text-sm font-medium text-primary hover:text-primary/80">
-                                        Review
-                                    </button>
-                                    <a href="{{ route('business.orders.details', $order->purchase_order_id) }}" 
-                                       class="text-primary hover:text-primary/80 font-medium text-sm">
-                                        View Details →
-                                    </a>
+                                <div class="flex items-center gap-2">
+                                    <x-ui.tooltip text="Quick view order details in modal">
+                                        <button type="button"
+                                                onclick="openBusinessOrderReviewModal('{{ route('business.orders.details', $order->purchase_order_id, false) }}')"
+                                                class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-medium text-primary hover:bg-primary/10 rounded-md transition-smooth focus:outline-none focus:ring-2 focus:ring-ring">
+                                            <i data-lucide="eye" class="h-3.5 w-3.5"></i>
+                                            Review
+                                        </button>
+                                    </x-ui.tooltip>
+                                    <x-ui.tooltip text="View full order details page">
+                                        <a href="{{ route('business.orders.details', $order->purchase_order_id) }}" 
+                                           class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-medium text-primary hover:bg-primary/10 rounded-md transition-smooth focus:outline-none focus:ring-2 focus:ring-ring">
+                                            <i data-lucide="arrow-right" class="h-3.5 w-3.5"></i>
+                                            Details
+                                        </a>
+                                    </x-ui.tooltip>
                                 </div>
                             </td>
                         </tr>

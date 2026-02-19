@@ -137,16 +137,22 @@
                         @if(!empty(config('services.turnstile.site_key')))
                             <div class="space-y-2">
                                 <div class="flex justify-center">
-                                    <div class="cf-turnstile" data-sitekey="{{ config('services.turnstile.site_key') }}"></div>
+                                    <div class="cf-turnstile" data-sitekey="{{ config('services.turnstile.site_key') }}" data-form="login"></div>
                                 </div>
                                 @error('cf-turnstile-response')
                                     <p class="text-sm text-destructive">{{ $message }}</p>
                                 @enderror
                             </div>
                         @endif
-                        <button type="submit" data-up-loading-text="Signing in..." class="w-full px-4 py-2 bg-primary text-primary-foreground font-medium rounded-md hover:shadow-glow transition-smooth">
-                            Sign In
+                        <button id="login-submit" type="submit" data-up-loading-text="Signing in..." class="w-full px-4 py-2 bg-primary text-primary-foreground font-medium rounded-md hover:shadow-glow transition-smooth disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:shadow-none" @if(!empty(config('services.turnstile.site_key'))) disabled @endif>
+                            <span class="inline-flex items-center gap-2">
+                                <span id="login-submit-spinner" class="hidden h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground"></span>
+                                <span id="login-submit-text">Sign In</span>
+                            </span>
                         </button>
+                        @if(!empty(config('services.turnstile.site_key')))
+                            <p id="login-turnstile-hint" class="text-xs text-muted-foreground">Complete the security check above to enable Sign In.</p>
+                        @endif
                     </div>
                 </form>
                 
@@ -241,16 +247,22 @@
                         @if(!empty(config('services.turnstile.site_key')))
                             <div class="space-y-2">
                                 <div class="flex justify-center">
-                                    <div class="cf-turnstile" data-sitekey="{{ config('services.turnstile.site_key') }}"></div>
+                                    <div class="cf-turnstile" data-sitekey="{{ config('services.turnstile.site_key') }}" data-form="signup"></div>
                                 </div>
                                 @error('cf-turnstile-response')
                                     <p class="text-sm text-destructive">{{ $message }}</p>
                                 @enderror
                             </div>
                         @endif
-                        <button type="submit" data-up-loading-text="Creating account..." class="w-full px-4 py-2 bg-primary text-primary-foreground font-medium rounded-md hover:shadow-glow transition-smooth">
-                            Sign Up
+                        <button id="signup-submit" type="submit" data-up-loading-text="Creating account..." class="w-full px-4 py-2 bg-primary text-primary-foreground font-medium rounded-md hover:shadow-glow transition-smooth disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:shadow-none" @if(!empty(config('services.turnstile.site_key'))) disabled @endif>
+                            <span class="inline-flex items-center gap-2">
+                                <span id="signup-submit-spinner" class="hidden h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground"></span>
+                                <span id="signup-submit-text">Sign Up</span>
+                            </span>
                         </button>
+                        @if(!empty(config('services.turnstile.site_key')))
+                            <p id="signup-turnstile-hint" class="text-xs text-muted-foreground">Complete the security check above to enable Sign Up.</p>
+                        @endif
                     </div>
                 </form>
 
@@ -310,7 +322,35 @@
                 const sitekey = el.getAttribute('data-sitekey');
                 if (!sitekey) return;
                 try {
-                    window.turnstile.render(el, { sitekey });
+                    const formType = el.getAttribute('data-form') || '';
+                    window.turnstile.render(el, {
+                        sitekey,
+                        callback: function () {
+                            if (formType === 'signup') {
+                                const btn = document.getElementById('signup-submit');
+                                if (btn) btn.disabled = false;
+                                const hint = document.getElementById('signup-turnstile-hint');
+                                if (hint) hint.textContent = 'Security check complete. You can sign up now.';
+                            } else {
+                                const btn = document.getElementById('login-submit');
+                                if (btn) btn.disabled = false;
+                                const hint = document.getElementById('login-turnstile-hint');
+                                if (hint) hint.textContent = 'Security check complete. You can sign in now.';
+                            }
+                        },
+                        'expired-callback': function () {
+                            const btn = formType === 'signup' ? document.getElementById('signup-submit') : document.getElementById('login-submit');
+                            if (btn) btn.disabled = true;
+                            const hint = formType === 'signup' ? document.getElementById('signup-turnstile-hint') : document.getElementById('login-turnstile-hint');
+                            if (hint) hint.textContent = 'Security check expired. Please complete it again.';
+                        },
+                        'error-callback': function () {
+                            const btn = formType === 'signup' ? document.getElementById('signup-submit') : document.getElementById('login-submit');
+                            if (btn) btn.disabled = true;
+                            const hint = formType === 'signup' ? document.getElementById('signup-turnstile-hint') : document.getElementById('login-turnstile-hint');
+                            if (hint) hint.textContent = 'Security check failed. Please refresh and try again.';
+                        }
+                    });
                     el.dataset.rendered = '1';
                 } catch (e) {
                     // no-op

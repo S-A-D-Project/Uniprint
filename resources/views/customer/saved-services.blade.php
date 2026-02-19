@@ -52,9 +52,11 @@
                                         <form action="{{ route('saved-services.remove', $item->saved_service_id) }}" method="POST" class="remove-item-form">
                                             @csrf
                                             @method('DELETE')
-                                            <button type="submit" class="text-destructive hover:text-destructive/80 p-1">
-                                                <i data-lucide="trash-2" class="h-5 w-5"></i>
-                                            </button>
+                                            <x-ui.tooltip text="Remove this item from saved services">
+                                                <button type="submit" class="text-destructive hover:text-destructive/80 p-1">
+                                                    <i data-lucide="trash-2" class="h-5 w-5"></i>
+                                                </button>
+                                            </x-ui.tooltip>
                                         </form>
                                     </div>
 
@@ -123,17 +125,23 @@
                             <span class="text-primary">₱{{ number_format($savedServices->sum('total_price'), 2) }}</span>
                         </div>
 
-                        <button type="button" onclick="checkoutSelected()" class="block w-full text-center px-6 py-3 bg-primary text-primary-foreground font-medium rounded-lg hover:shadow-glow transition-smooth mb-3">
-                            Proceed to Checkout (Selected)
-                        </button>
+                        <x-ui.tooltip text="Checkout selected items only">
+                            <button type="button" onclick="checkoutSelected()" class="block w-full text-center px-6 py-3 bg-primary text-primary-foreground font-medium rounded-lg hover:shadow-glow transition-smooth mb-3">
+                                Proceed to Checkout (Selected)
+                            </button>
+                        </x-ui.tooltip>
 
-                        <a href="{{ route('checkout.index') }}" class="block w-full text-center px-6 py-3 border border-input rounded-lg hover:bg-secondary transition-smooth mb-3">
-                            Proceed to Checkout (All)
-                        </a>
+                        <x-ui.tooltip text="Checkout all saved items">
+                            <a href="{{ route('checkout.index') }}" class="block w-full text-center px-6 py-3 border border-input rounded-lg hover:bg-secondary transition-smooth mb-3">
+                                Proceed to Checkout (All)
+                            </a>
+                        </x-ui.tooltip>
                         
-                        <a href="{{ route('enterprises.index') }}" class="block w-full text-center px-6 py-3 border border-input rounded-lg hover:bg-secondary transition-smooth">
-                            Continue Shopping
-                        </a>
+                        <x-ui.tooltip text="Browse more services">
+                            <a href="{{ route('enterprises.index') }}" class="block w-full text-center px-6 py-3 border border-input rounded-lg hover:bg-secondary transition-smooth">
+                                Continue Shopping
+                            </a>
+                        </x-ui.tooltip>
                     </div>
                 </div>
             </div>

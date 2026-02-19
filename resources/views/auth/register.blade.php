@@ -163,7 +163,7 @@
                     @if(!empty(config('services.turnstile.site_key')))
                         <div class="space-y-2">
                             <div class="flex justify-center">
-                                <div class="cf-turnstile" data-sitekey="{{ config('services.turnstile.site_key') }}"></div>
+                                <div class="cf-turnstile" data-sitekey="{{ config('services.turnstile.site_key') }}" data-form="register"></div>
                             </div>
                             @error('cf-turnstile-response')
                                 <p class="text-sm text-destructive">{{ $message }}</p>
@@ -171,7 +171,7 @@
                         </div>
                     @endif
                     
-                    <button type="submit" data-up-loading-text="Creating account..." class="w-full px-4 py-2 bg-primary text-primary-foreground font-medium rounded-md hover:shadow-glow transition-smooth">
+                    <button id="register-submit" type="submit" data-up-loading-text="Creating account..." class="w-full px-4 py-2 bg-primary text-primary-foreground font-medium rounded-md hover:shadow-glow transition-smooth" @if(!empty(config('services.turnstile.site_key'))) disabled @endif>
                         Create Account
                     </button>
                     
@@ -228,7 +228,28 @@
                 const sitekey = el.getAttribute('data-sitekey');
                 if (!sitekey) return;
                 try {
-                    window.turnstile.render(el, { sitekey });
+                    const formType = el.getAttribute('data-form') || '';
+                    window.turnstile.render(el, {
+                        sitekey,
+                        callback: function () {
+                            if (formType === 'register') {
+                                const btn = document.getElementById('register-submit');
+                                if (btn) btn.disabled = false;
+                            }
+                        },
+                        'expired-callback': function () {
+                            if (formType === 'register') {
+                                const btn = document.getElementById('register-submit');
+                                if (btn) btn.disabled = true;
+                            }
+                        },
+                        'error-callback': function () {
+                            if (formType === 'register') {
+                                const btn = document.getElementById('register-submit');
+                                if (btn) btn.disabled = true;
+                            }
+                        }
+                    });
                     el.dataset.rendered = '1';
                 } catch (e) {
                     // no-op

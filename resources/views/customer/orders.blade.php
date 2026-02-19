@@ -167,40 +167,50 @@ use Illuminate\Support\Facades\DB;
             <div class="px-4 py-3 border-t border-gray-100 bg-gray-50">
                 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div class="flex items-center gap-2">
-                        <button onclick="openOrderChat('{{ $order->purchase_order_id }}', '{{ $order->enterprise_id }}', '{{ $order->enterprise_name }}')"
-                                class="inline-flex items-center px-3 py-2 border border-primary text-primary text-sm font-medium rounded-md hover:bg-primary hover:text-white transition-colors">
-                            <i data-lucide="message-circle" class="h-4 w-4 mr-1"></i>
-                            Chat
-                        </button>
+                        <x-ui.tooltip text="Chat with the business about this order">
+                            <button onclick="openOrderChat('{{ $order->purchase_order_id }}', '{{ $order->enterprise_id }}', '{{ $order->enterprise_name }}')"
+                                    class="inline-flex items-center gap-1.5 px-3 py-2 border border-primary text-primary text-xs sm:text-sm font-medium rounded-md hover:bg-primary hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-ring">
+                                <i data-lucide="message-circle" class="h-3.5 w-3.5"></i>
+                                Chat
+                            </button>
+                        </x-ui.tooltip>
                         @if(($order->status_name ?? 'Pending') === 'Completed')
-                            <a href="{{ route('customer.orders.reviews.fragment', $order->purchase_order_id) }}"
-                               class="inline-flex items-center px-3 py-2 border border-gray-200 text-gray-700 text-sm font-medium rounded-md hover:bg-white transition-colors js-customer-order-review">
-                                <i data-lucide="star" class="h-4 w-4 mr-1"></i>
-                                Review
-                            </a>
+                            <x-ui.tooltip text="View or add a review for this order">
+                                <a href="{{ route('customer.orders.reviews.fragment', $order->purchase_order_id) }}"
+                                   class="inline-flex items-center gap-1.5 px-3 py-2 border border-gray-200 text-gray-700 text-xs sm:text-sm font-medium rounded-md hover:bg-white transition-colors focus:outline-none focus:ring-2 focus:ring-ring js-customer-order-review">
+                                    <i data-lucide="star" class="h-3.5 w-3.5"></i>
+                                    Review
+                                </a>
+                            </x-ui.tooltip>
                         @endif
-                        <a href="{{ route('customer.order.details', $order->purchase_order_id, false) }}"
-                           class="inline-flex items-center px-3 py-2 border border-gray-200 text-gray-700 text-sm font-medium rounded-md hover:bg-white transition-colors js-customer-order-details">
-                            <i data-lucide="eye" class="h-4 w-4 mr-1"></i>
-                            View
-                        </a>
+                        <x-ui.tooltip text="View full order details">
+                            <a href="{{ route('customer.order.details', $order->purchase_order_id, false) }}"
+                               class="inline-flex items-center gap-1.5 px-3 py-2 border border-gray-200 text-gray-700 text-xs sm:text-sm font-medium rounded-md hover:bg-white transition-colors focus:outline-none focus:ring-2 focus:ring-ring js-customer-order-details">
+                                <i data-lucide="eye" class="h-3.5 w-3.5"></i>
+                                View
+                            </a>
+                        </x-ui.tooltip>
                         @if(($order->status_name ?? 'Pending') === 'Delivered')
-                            <form action="{{ route('customer.orders.confirm-completion', $order->purchase_order_id) }}" method="POST" onsubmit="return confirm('Confirm you received this order?');" data-up-global-loader>
-                                @csrf
-                                <button type="submit" class="inline-flex items-center px-3 py-2 border border-success/30 text-success text-sm font-medium rounded-md hover:bg-success/10 transition-colors" data-up-button-loader>
-                                    <i data-lucide="check-circle" class="h-4 w-4 mr-1"></i>
-                                    Confirm Received
-                                </button>
-                            </form>
+                            <x-ui.tooltip text="Confirm you have received this order">
+                                <form action="{{ route('customer.orders.confirm-completion', $order->purchase_order_id) }}" method="POST" onsubmit="return confirm('Confirm you received this order?');" data-up-global-loader>
+                                    @csrf
+                                    <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-2 border border-success/30 text-success text-xs sm:text-sm font-medium rounded-md hover:bg-success/10 transition-colors focus:outline-none focus:ring-2 focus:ring-ring" data-up-button-loader>
+                                        <i data-lucide="check-circle" class="h-3.5 w-3.5"></i>
+                                        Confirm
+                                    </button>
+                                </form>
+                            </x-ui.tooltip>
                         @endif
                         @if(($order->status_name ?? 'Pending') === 'Pending')
-                            <form action="{{ route('customer.orders.cancel', $order->purchase_order_id) }}" method="POST" onsubmit="return confirm('Cancel this order?');" data-up-global-loader>
-                                @csrf
-                                <button type="submit" class="inline-flex items-center px-3 py-2 border border-red-200 text-red-600 text-sm font-medium rounded-md hover:bg-red-50 transition-colors" data-up-button-loader>
-                                    <i data-lucide="x-circle" class="h-4 w-4 mr-1"></i>
-                                    Cancel
-                                </button>
-                            </form>
+                            <x-ui.tooltip text="Cancel this order">
+                                <form action="{{ route('customer.orders.cancel', $order->purchase_order_id) }}" method="POST" onsubmit="return confirm('Cancel this order?');" data-up-global-loader>
+                                    @csrf
+                                    <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-2 border border-red-200 text-red-600 text-xs sm:text-sm font-medium rounded-md hover:bg-red-50 transition-colors focus:outline-none focus:ring-2 focus:ring-ring" data-up-button-loader>
+                                        <i data-lucide="x-circle" class="h-3.5 w-3.5"></i>
+                                        Cancel
+                                    </button>
+                                </form>
+                            </x-ui.tooltip>
                         @endif
                     </div>
 

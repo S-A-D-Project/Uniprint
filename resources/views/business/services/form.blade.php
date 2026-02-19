@@ -168,13 +168,19 @@
                 </div>
 
                 <div class="flex gap-3 pt-6">
-                    <a href="{{ route('business.services.index') }}" 
-                       class="flex-1 px-6 py-3 text-center border border-input rounded-lg hover:bg-secondary transition-smooth">
-                        Cancel
-                    </a>
-                    <button type="submit" class="flex-1 px-6 py-3 bg-primary text-primary-foreground font-medium rounded-lg hover:shadow-glow transition-smooth" data-up-button-loader>
-                        {{ $isEdit ? 'Update Service' : 'Create Service' }}
-                    </button>
+                    <x-ui.tooltip text="Go back without saving changes">
+                        <a href="{{ route('business.services.index') }}" 
+                           class="inline-flex items-center justify-center gap-2 flex-1 px-6 py-3 text-center border border-input rounded-lg hover:bg-secondary transition-smooth focus:outline-none focus:ring-2 focus:ring-ring">
+                            <i data-lucide="x" class="h-4 w-4"></i>
+                            Cancel
+                        </a>
+                    </x-ui.tooltip>
+                    <x-ui.tooltip text="Save this service">
+                        <button type="submit" class="inline-flex items-center justify-center gap-2 flex-1 px-6 py-3 bg-primary text-primary-foreground font-medium rounded-lg hover:shadow-glow transition-smooth focus:outline-none focus:ring-2 focus:ring-ring" data-up-button-loader>
+                            <i data-lucide="save" class="h-4 w-4"></i>
+                            {{ $isEdit ? 'Update Service' : 'Create Service' }}
+                        </button>
+                    </x-ui.tooltip>
                 </div>
             </div>
         </form>

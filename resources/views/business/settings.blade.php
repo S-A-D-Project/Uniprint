@@ -38,9 +38,11 @@
             </div>
 
             <div class="pt-2">
-                <button type="submit" class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:shadow-glow transition-smooth">
-                    Save Account
-                </button>
+                <x-ui.tooltip text="Save your account information">
+                    <button type="submit" class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:shadow-glow transition-smooth">
+                        Save Account
+                    </button>
+                </x-ui.tooltip>
             </div>
         </form>
     </div>
@@ -275,9 +277,11 @@
             @endif
 
             <div class="pt-2">
-                <button type="submit" class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:shadow-glow transition-smooth">
-                    Save Print Shop
-                </button>
+                <x-ui.tooltip text="Save print shop information">
+                    <button type="submit" class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:shadow-glow transition-smooth">
+                        Save Print Shop
+                    </button>
+                </x-ui.tooltip>
             </div>
         </form>
     </div>

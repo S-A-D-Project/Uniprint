@@ -47,9 +47,11 @@
 
                                     @if(!empty($notification->purchase_order_id))
                                         <div class="mt-3">
-                                            <a href="{{ route('business.orders.details', $notification->purchase_order_id) }}" class="text-primary hover:text-primary/80 font-medium text-sm">
-                                                View order →
-                                            </a>
+                                            <x-ui.tooltip text="View the related order details">
+                                                <a href="{{ route('business.orders.details', $notification->purchase_order_id) }}" class="text-primary hover:text-primary/80 font-medium text-sm">
+                                                    View order →
+                                                </a>
+                                            </x-ui.tooltip>
                                         </div>
                                     @endif
                                 </div>
@@ -58,9 +60,11 @@
                             @if(!$notification->is_read)
                                 <form action="{{ route('business.notifications.read', $notification->notification_id) }}" method="POST">
                                     @csrf
-                                    <button type="submit" class="px-3 py-1 text-sm border border-input rounded-md hover:bg-secondary">
-                                        Mark Read
-                                    </button>
+                                    <x-ui.tooltip text="Mark this notification as read">
+                                        <button type="submit" class="px-3 py-1 text-sm border border-input rounded-md hover:bg-secondary">
+                                            Mark Read
+                                        </button>
+                                    </x-ui.tooltip>
                                 </form>
                             @endif
                         </div>

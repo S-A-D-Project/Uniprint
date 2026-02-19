@@ -5,15 +5,19 @@
 @section('page-subtitle', 'Placed on ' . date('F d, Y', strtotime($order->created_at)))
 
 @section('header-actions')
-<a href="{{ route('business.orders.index') }}" class="inline-flex items-center gap-2 px-4 py-2 text-sm border border-input rounded-lg hover:bg-secondary transition-smooth">
-    <i data-lucide="arrow-left" class="h-4 w-4"></i>
-    Back to Orders
-</a>
+<x-ui.tooltip text="Go back to orders list">
+    <a href="{{ route('business.orders.index') }}" class="inline-flex items-center gap-2 px-4 py-2 text-sm border border-input rounded-lg hover:bg-secondary transition-smooth">
+        <i data-lucide="arrow-left" class="h-4 w-4"></i>
+        Back to Orders
+    </a>
+</x-ui.tooltip>
 
-<a href="{{ route('business.orders.print', $order->purchase_order_id) }}" target="_blank" class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:shadow-glow transition-smooth">
-    <i data-lucide="printer" class="h-4 w-4"></i>
-    Print
-</a>
+<x-ui.tooltip text="Print this order">
+    <a href="{{ route('business.orders.print', $order->purchase_order_id) }}" target="_blank" class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:shadow-glow transition-smooth">
+        <i data-lucide="printer" class="h-4 w-4"></i>
+        Print
+    </a>
+</x-ui.tooltip>
 @endsection
 
 @section('content')
@@ -169,19 +173,25 @@
                                         @else
                                             <form action="{{ route('business.design-files.approve', $file->file_id) }}" method="POST" class="inline" data-up-global-loader>
                                                 @csrf
-                                                <button type="submit" class="px-3 py-1 text-sm bg-success text-white rounded-md hover:bg-success/90" data-up-button-loader>
-                                                    Approve
-                                                </button>
+                                                <x-ui.tooltip text="Approve this design file">
+                                                    <button type="submit" class="px-3 py-1 text-sm bg-success text-white rounded-md hover:bg-success/90" data-up-button-loader>
+                                                        Approve
+                                                    </button>
+                                                </x-ui.tooltip>
                                             </form>
-                                            <button type="button" onclick="openRejectDesignFileModal('{{ $file->file_id }}')" 
-                                                    class="px-3 py-1 text-sm bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90">
-                                                Reject
-                                            </button>
+                                            <x-ui.tooltip text="Reject this design file">
+                                                <button type="button" onclick="openRejectDesignFileModal('{{ $file->file_id }}')" 
+                                                        class="px-3 py-1 text-sm bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90">
+                                                    Reject
+                                                </button>
+                                            </x-ui.tooltip>
                                         @endif
-                                        <a href="{{ asset('storage/' . $file->file_path) }}" target="_blank" 
-                                           class="px-3 py-1 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90">
-                                            Download
-                                        </a>
+                                        <x-ui.tooltip text="Download this file">
+                                            <a href="{{ asset('storage/' . $file->file_path) }}" target="_blank" 
+                                               class="px-3 py-1 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90">
+                                                Download
+                                            </a>
+                                        </x-ui.tooltip>
                                     </div>
                                 </div>
                             </div>

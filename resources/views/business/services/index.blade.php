@@ -65,29 +65,41 @@
                     </div>
                     
                     <div class="grid grid-cols-3 gap-2">
-                        <a href="{{ route('business.customizations.index', $service->service_id) }}"
-                           class="px-3 py-2 text-xs sm:text-sm text-center border border-input rounded-md hover:bg-secondary transition-smooth whitespace-nowrap">
-                            Customizations
-                        </a>
-                        <a href="{{ route('business.services.edit', $service->service_id) }}"
-                           class="px-3 py-2 text-xs sm:text-sm text-center bg-primary text-primary-foreground rounded-md hover:shadow-glow transition-smooth js-business-service-edit whitespace-nowrap">
-                            Edit
-                        </a>
+                        <x-ui.tooltip text="Manage customization options for this service">
+                            <a href="{{ route('business.customizations.index', $service->service_id) }}"
+                               class="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs sm:text-sm text-center border border-input rounded-md hover:bg-secondary transition-smooth whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-ring">
+                                <i data-lucide="sliders" class="h-3.5 w-3.5"></i>
+                                Customizations
+                            </a>
+                        </x-ui.tooltip>
+                        <x-ui.tooltip text="Edit service details and settings">
+                            <a href="{{ route('business.services.edit', $service->service_id) }}"
+                               class="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs sm:text-sm text-center bg-primary text-primary-foreground rounded-md hover:shadow-glow transition-smooth js-business-service-edit whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-ring">
+                                <i data-lucide="pencil" class="h-3.5 w-3.5"></i>
+                                Edit
+                            </a>
+                        </x-ui.tooltip>
 
                         @if($hasRequiresFileUpload)
-                            <button type="button"
-                                    class="px-3 py-2 text-xs sm:text-sm border border-input rounded-md hover:bg-secondary transition-smooth whitespace-nowrap"
-                                    onclick="openServiceUploadSettings('{{ $service->service_id }}', @json($service->service_name), {{ !empty($service->file_upload_enabled ?? false) ? 'true' : 'false' }}, {{ !empty($service->requires_file_upload) ? 'true' : 'false' }})">
-                                Files
-                            </button>
+                            <x-ui.tooltip text="Configure file upload settings">
+                                <button type="button"
+                                        class="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs sm:text-sm border border-input rounded-md hover:bg-secondary transition-smooth whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-ring"
+                                        onclick="openServiceUploadSettings('{{ $service->service_id }}', @json($service->service_name), {{ !empty($service->file_upload_enabled ?? false) ? 'true' : 'false' }}, {{ !empty($service->requires_file_upload) ? 'true' : 'false' }})">
+                                    <i data-lucide="upload" class="h-3.5 w-3.5"></i>
+                                    Files
+                                </button>
+                            </x-ui.tooltip>
                         @else
                             <form id="delete-service-{{ $service->service_id }}" action="{{ route('business.services.delete', $service->service_id) }}" method="POST">
                                 @csrf
                                 @method('DELETE')
-                                <button type="button" class="w-full px-3 py-2 text-xs sm:text-sm bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90"
-                                        onclick="confirmServiceDelete('{{ $service->service_id }}', @json($service->service_name))">
-                                    <i data-lucide="trash-2" class="h-4 w-4 inline"></i>
-                                </button>
+                                <x-ui.tooltip text="Delete this service permanently">
+                                    <button type="button" class="inline-flex items-center justify-center gap-1.5 w-full px-3 py-2 text-xs sm:text-sm bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90 focus:outline-none focus:ring-2 focus:ring-ring"
+                                            onclick="confirmServiceDelete('{{ $service->service_id }}', @json($service->service_name))">
+                                        <i data-lucide="trash-2" class="h-3.5 w-3.5"></i>
+                                        <span>Delete</span>
+                                    </button>
+                                </x-ui.tooltip>
                             </form>
                         @endif
                     </div>
@@ -97,10 +109,13 @@
                             <form id="delete-service-{{ $service->service_id }}" action="{{ route('business.services.delete', $service->service_id) }}" method="POST">
                                 @csrf
                                 @method('DELETE')
-                                <button type="button" class="px-3 py-2 text-xs sm:text-sm bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90"
-                                        onclick="confirmServiceDelete('{{ $service->service_id }}', @json($service->service_name))">
-                                    <i data-lucide="trash-2" class="h-4 w-4 inline"></i>
-                                </button>
+                                <x-ui.tooltip text="Delete this service permanently">
+                                    <button type="button" class="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs sm:text-sm bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90 focus:outline-none focus:ring-2 focus:ring-ring"
+                                            onclick="confirmServiceDelete('{{ $service->service_id }}', @json($service->service_name))">
+                                        <i data-lucide="trash-2" class="h-3.5 w-3.5"></i>
+                                        <span>Delete</span>
+                                    </button>
+                                </x-ui.tooltip>
                             </form>
                         </div>
                     @endif

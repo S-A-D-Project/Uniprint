@@ -36,15 +36,19 @@
                             </a>
 
                             <div class="flex items-center gap-2">
-                                <a href="{{ route('customer.enterprise.services', $service->enterprise_id) }}" class="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary">
-                                    <i data-lucide="arrow-left" class="h-4 w-4"></i>
-                                    Back to shop
-                                </a>
+                                <x-ui.tooltip text="Go back to the shop">
+                                    <a href="{{ route('customer.enterprise.services', $service->enterprise_id) }}" class="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary">
+                                        <i data-lucide="arrow-left" class="h-4 w-4"></i>
+                                        Back to shop
+                                    </a>
+                                </x-ui.tooltip>
 
-                                <button type="button" class="inline-flex items-center gap-2 text-sm border border-destructive text-destructive px-3 py-2 rounded-md hover:bg-destructive/10 transition-smooth" data-up-report data-entity-type="service" data-service-id="{{ $service->service_id }}">
-                                    <i data-lucide="flag" class="h-4 w-4"></i>
-                                    Report
-                                </button>
+                                <x-ui.tooltip text="Report this service to admin">
+                                    <button type="button" class="inline-flex items-center gap-2 text-sm border border-destructive text-destructive px-3 py-2 rounded-md hover:bg-destructive/10 transition-smooth" data-up-report data-entity-type="service" data-service-id="{{ $service->service_id }}">
+                                        <i data-lucide="flag" class="h-4 w-4"></i>
+                                        Report
+                                    </button>
+                                </x-ui.tooltip>
                             </div>
                         </div>
 

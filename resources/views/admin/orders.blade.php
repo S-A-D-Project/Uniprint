@@ -73,7 +73,9 @@ $breadcrumbs = [
                     </td>
                     <td>
                         <div class="flex items-center gap-2">
-                            <x-admin.button size="sm" variant="ghost" icon="eye" href="{{ route('admin.orders.details', $order->purchase_order_id) }}" />
+                            <x-ui.tooltip text="View order details">
+                                <x-admin.button size="sm" variant="ghost" icon="eye" href="{{ route('admin.orders.details', $order->purchase_order_id) }}" />
+                            </x-ui.tooltip>
                         </div>
                     </td>
                 </tr>
