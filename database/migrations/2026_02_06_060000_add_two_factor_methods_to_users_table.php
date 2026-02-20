@@ -51,6 +51,28 @@ return new class extends Migration
                 ->whereNotNull('two_factor_enabled_at')
                 ->update(['two_factor_totp_enabled' => true]);
         }
+
+        // Default-on: enable Email 2FA for existing non-admin users.
+        // This matches Option B (enabled by default, but user can disable in Security Settings).
+        if (Schema::hasColumn('users', 'two_factor_email_enabled')) {
+            try {
+                DB::table('users')
+                    ->where(function ($q) {
+                        $q->whereNull('two_factor_email_enabled')
+                            ->orWhere('two_factor_email_enabled', false);
+                    })
+                    ->whereExists(function ($q) {
+                        $q->select(DB::raw(1))
+                            ->from('roles')
+                            ->join('role_types', 'roles.role_type_id', '=', 'role_types.role_type_id')
+                            ->whereColumn('roles.user_id', 'users.user_id')
+                            ->whereIn('role_types.user_role_type', ['business_user', 'customer']);
+                    })
+                    ->update(['two_factor_email_enabled' => true]);
+            } catch (\Throwable $e) {
+                // Best-effort backfill; schema or role tables may not exist in some environments.
+            }
+        }
     }
 
     public function down(): void

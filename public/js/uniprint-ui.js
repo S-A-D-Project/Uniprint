@@ -227,7 +227,7 @@
 
     setTimeout(() => {
       node.classList.add('up-toast--hide');
-      setTimeout(() => node.remove(), 250);
+      setTimeout(() => node.remove(), 100);
     }, timeout);
   };
 

@@ -336,8 +336,13 @@ async function uploadDesigns() {
     
     // Show progress and disable button
     uploadProgress.style.display = 'block';
-    uploadButton.disabled = true;
-    uploadButton.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Uploading...';
+    const originalText = uploadButton.innerHTML;
+    if (window.UniPrintUI && typeof UniPrintUI.setButtonLoading === 'function') {
+        UniPrintUI.setButtonLoading(uploadButton, true, { text: 'Uploading...' });
+    } else {
+        uploadButton.disabled = true;
+        uploadButton.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Uploading...';
+    }
     
     try {
         const formData = new FormData();
@@ -388,8 +393,12 @@ async function uploadDesigns() {
     } finally {
         // Reset UI
         uploadProgress.style.display = 'none';
-        uploadButton.disabled = false;
-        uploadButton.innerHTML = '<i class="bi bi-cloud-upload me-2"></i>Upload Assets';
+        if (window.UniPrintUI && typeof UniPrintUI.setButtonLoading === 'function') {
+            UniPrintUI.setButtonLoading(uploadButton, false);
+        } else {
+            uploadButton.disabled = false;
+            uploadButton.innerHTML = originalText;
+        }
         progressBar.style.width = '0%';
         progressText.textContent = '0%';
     }

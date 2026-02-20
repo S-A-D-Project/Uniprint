@@ -9,11 +9,11 @@
 .shadow-card-hover{box-shadow:0 10px 15px -3px rgb(0 0 0 / .1),0 4px 6px -4px rgb(0 0 0 / .1)}
 .shadow-glow{box-shadow:0 0 20px hsl(0 84% 60% / .3)}
 
-.transition-smooth{transition:all .3s cubic-bezier(.4,0,.2,1)}
+.transition-smooth{transition:all .15s ease}
 
 .bg-clip-text{-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
 
- .admin-card{background:#fff;border:1px solid hsl(240 5.9% 90%);border-radius:12px;box-shadow:0 1px 3px 0 rgb(0 0 0 / .06)}
+ .admin-card{background:#fff;border:1px solid hsl(240 5.9% 90%);border-radius:12px;box-shadow:0 1px 3px 0 rgb(0 0 0 / .06);transition:transform .1s ease,box-shadow .1s ease}
  .admin-card-hover:hover{box-shadow:0 10px 15px -3px rgb(0 0 0 / .08),0 4px 6px -4px rgb(0 0 0 / .08);transform:translateY(-1px)}
  .admin-card-header{padding:16px 18px;border-bottom:1px solid hsl(240 5.9% 92%)}
  .admin-card-body{padding:16px 18px}

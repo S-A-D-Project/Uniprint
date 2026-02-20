@@ -59,13 +59,13 @@ class ProfileController extends Controller
 
             // Get user's enterprise information (if business user)
             if ($roleInfo && $roleInfo->user_role_type === 'business_user') {
-                if (\Illuminate\Support\Facades\Schema::hasColumn('enterprises', 'owner_user_id')) {
+                if (\Illuminate\Support\Facades\schema_has_column('enterprises', 'owner_user_id')) {
                     $enterprise = DB::table('enterprises')
                         ->where('owner_user_id', $userId)
                         ->first();
                 }
 
-                if (! $enterprise && \Illuminate\Support\Facades\Schema::hasTable('staff')) {
+                if (! $enterprise && \Illuminate\Support\Facades\schema_has_table('staff')) {
                     $enterprise = DB::table('staff')
                         ->join('enterprises', 'staff.enterprise_id', '=', 'enterprises.enterprise_id')
                         ->where('staff.user_id', $userId)
@@ -152,7 +152,7 @@ class ProfileController extends Controller
         }
 
         try {
-            if (Schema::hasTable('user_payment_accounts')) {
+            if (schema_has_table('user_payment_accounts')) {
                 $paypal = DB::table('user_payment_accounts')
                     ->where('user_id', $userId)
                     ->where('provider', 'paypal')
@@ -285,7 +285,7 @@ class ProfileController extends Controller
                 'updated_at' => now(),
             ];
 
-            if (!Schema::hasTable('user_payment_accounts')) {
+            if (!schema_has_table('user_payment_accounts')) {
                 return redirect()->route('profile.index')->with('error', 'Payment accounts table missing. Please run migrations.');
             }
 
@@ -326,7 +326,7 @@ class ProfileController extends Controller
         }
 
         try {
-            if (Schema::hasTable('user_payment_accounts')) {
+            if (schema_has_table('user_payment_accounts')) {
                 DB::table('user_payment_accounts')
                     ->where('user_id', $userId)
                     ->where('provider', 'paypal')

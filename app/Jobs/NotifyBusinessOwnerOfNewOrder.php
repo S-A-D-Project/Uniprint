@@ -29,17 +29,17 @@ class NotifyBusinessOwnerOfNewOrder implements ShouldQueue
                 return;
             }
 
-            if (!Schema::hasTable('order_notifications')) {
+            if (!schema_has_table('order_notifications')) {
                 return;
             }
 
             $businessUserId = null;
-            if (Schema::hasColumn('enterprises', 'owner_user_id')) {
+            if (schema_has_column('enterprises', 'owner_user_id')) {
                 $businessUserId = DB::table('enterprises')
                     ->where('enterprise_id', $order->enterprise_id)
                     ->value('owner_user_id');
             }
-            if (!$businessUserId && Schema::hasTable('staff')) {
+            if (!$businessUserId && schema_has_table('staff')) {
                 $businessUserId = DB::table('staff')
                     ->where('enterprise_id', $order->enterprise_id)
                     ->orderByRaw("CASE WHEN position = 'Owner' THEN 0 ELSE 1 END")

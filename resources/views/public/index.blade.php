@@ -12,7 +12,7 @@
                 <div class="space-y-8">
                     <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium">
                         <i data-lucide="store" class="h-4 w-4"></i>
-                        AI-Enhanced Printing Platform
+                        Smart Printing Platform
                     </div>
                     
                     <h1 class="text-foreground">
@@ -20,17 +20,13 @@
                     </h1>
                     
                     <p class="text-xl text-muted-foreground max-w-xl">
-                        Order custom prints online with AI-powered design tools, instant chatbot support, and real-time job tracking. Modernizing Baguio's printing industry.
+                        Order custom prints online with instant chatbot support, and real-time job tracking. Modernizing Baguio's printing industry.
                     </p>
                     
                     <div class="flex flex-col sm:flex-row gap-4">
                         <a href="{{ route('enterprises.index') }}" class="inline-flex items-center justify-center gap-2 px-8 py-4 text-lg font-semibold text-white gradient-primary rounded-lg hover:shadow-glow transition-smooth">
                             Browse Printing Shops
                             <i data-lucide="arrow-right" class="h-5 w-5"></i>
-                        </a>
-                        
-                        <a href="#" class="inline-flex items-center justify-center px-8 py-4 text-lg font-semibold border border-input rounded-lg hover:bg-accent hover:text-accent-foreground transition-smooth">
-                            Try AI Design Tool
                         </a>
                     </div>
 
@@ -64,9 +60,9 @@
     <section class="py-20 bg-secondary/30">
         <div class="container mx-auto px-4">
             <div class="text-center mb-12">
-                <h2 class="mb-4">AI-Enhanced Printing Platform</h2>
+                <h2 class="mb-4">Smart Printing Platform</h2>
                 <p class="text-lg text-muted-foreground max-w-2xl mx-auto">
-                    UniPrint combines traditional printing services with cutting-edge AI technology to streamline operations and enhance customer experience
+                    UniPrint connects you with professional printing services to streamline operations and enhance customer experience
                 </p>
             </div>
 
@@ -76,8 +72,8 @@
                     <div class="mb-4 inline-flex p-3 rounded-lg gradient-primary">
                         <i data-lucide="sparkles" class="h-6 w-6 text-primary-foreground"></i>
                     </div>
-                    <h3 class="text-xl font-bold mb-2">AI-Powered Design Tools</h3>
-                    <p class="text-muted-foreground">Generate custom designs with our built-in AI image generation tool. Create professional prints without design experience.</p>
+                    <h3 class="text-xl font-bold mb-2">Design Tools</h3>
+                    <p class="text-muted-foreground">Upload your own designs or work with our design partners. Popular formats include PDF, PNG, and AI files.</p>
                 </div>
 
                 <!-- Feature 2 -->
@@ -86,7 +82,7 @@
                         <i data-lucide="message-square" class="h-6 w-6 text-primary-foreground"></i>
                     </div>
                     <h3 class="text-xl font-bold mb-2">Smart Chatbot Support</h3>
-                    <p class="text-muted-foreground">Get instant answers to your questions with our AI chatbot. Real-time assistance for orders, pricing, and specifications.</p>
+                    <p class="text-muted-foreground">Get instant answers to your questions with our smart chatbot. Real-time assistance for orders, pricing, and specifications.</p>
                 </div>
 
                 <!-- Feature 3 -->
@@ -129,8 +125,8 @@
                         2
                     </div>
                     <h3 class="text-lg font-bold mb-2">Customize Order</h3>
-                    <p class="text-muted-foreground text-sm">
-                        Select services and customize with our AI tools
+                    <p class="text-sm text-muted-foreground">
+                        Select services, upload designs, and specify requirements
                     </p>
                 </div>
 

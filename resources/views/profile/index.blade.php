@@ -523,8 +523,13 @@ if (confirmDeleteBtn) confirmDeleteBtn.addEventListener('click', async function(
     }
     
     const btn = this;
-    btn.disabled = true;
-    btn.innerHTML = 'Deleting...';
+    const originalText = btn.innerHTML;
+    if (window.UniPrintUI && typeof UniPrintUI.setButtonLoading === 'function') {
+        UniPrintUI.setButtonLoading(btn, true, { text: 'Deleting...' });
+    } else {
+        btn.disabled = true;
+        btn.innerHTML = 'Deleting...';
+    }
     
     try {
         const response = await fetch('{{ route("profile.delete") }}', {
@@ -551,8 +556,12 @@ if (confirmDeleteBtn) confirmDeleteBtn.addEventListener('click', async function(
         console.error('Error:', error);
         showToast('Network error. Please try again.', 'error');
     } finally {
-        btn.disabled = false;
-        btn.innerHTML = 'Delete Account';
+        if (window.UniPrintUI && typeof UniPrintUI.setButtonLoading === 'function') {
+            UniPrintUI.setButtonLoading(btn, false);
+        } else {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
     }
 });
 

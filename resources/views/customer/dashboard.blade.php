@@ -193,15 +193,6 @@
                                 <p class="text-xs text-muted-foreground">Explore printing services</p>
                             </div>
                         </a>
-                        <a href="{{ route('ai-design.index') }}" class="flex items-center gap-3 p-3 rounded-lg hover:bg-secondary transition-smooth">
-                            <div class="p-2 bg-primary/10 rounded-lg">
-                                <i data-lucide="sparkles" class="h-5 w-5 text-primary"></i>
-                            </div>
-                            <div>
-                                <p class="font-medium">AI Design Tool</p>
-                                <p class="text-xs text-muted-foreground">Create custom designs</p>
-                            </div>
-                        </a>
                         <a href="{{ route('customer.my-orders') }}" class="flex items-center gap-3 p-3 rounded-lg hover:bg-secondary transition-smooth">
                             <div class="p-2 bg-primary/10 rounded-lg">
                                 <i data-lucide="package" class="h-5 w-5 text-primary"></i>

@@ -3,14 +3,14 @@
 @section('title', 'UniPrint - Smart Printing Services for Baguio')
 
 @push('styles')
-<meta name="description" content="UniPrint - AI-enhanced printing platform connecting customers with local printing businesses. Order custom prints with AI design tools, instant chatbot support, and real-time tracking.">
-<meta name="keywords" content="printing services, AI design, online printing, business cards, flyers, banners, custom printing, print shop, Baguio">
+<meta name="description" content="UniPrint - Smart printing platform connecting customers with local printing businesses. Order custom prints with instant chatbot support, and real-time tracking.">
+<meta name="keywords" content="printing services, online printing, business cards, flyers, banners, custom printing, print shop, Baguio">
 <meta name="author" content="UniPrint">
 
 <!-- Open Graph / Facebook -->
 <meta property="og:type" content="website">
 <meta property="og:title" content="UniPrint - Smart Printing Services for Baguio">
-<meta property="og:description" content="AI-enhanced printing platform with design tools, chatbot support, and real-time tracking">
+<meta property="og:description" content="Smart printing platform with chatbot support, and real-time tracking">
 <meta property="og:image" content="{{ asset('images/og-image.jpg') }}">
 
 <!-- Twitter -->
@@ -25,16 +25,18 @@
     <div class="container mx-auto px-4 py-12 lg:py-16">
         <div class="grid lg:grid-cols-2 gap-10 items-center">
             <div class="space-y-6">
-                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
-                    <i data-lucide="sparkles" class="h-4 w-4"></i>
-                    AI-Enhanced Printing Platform
+                <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium">
+                    <i data-lucide="store" class="h-4 w-4"></i>
+                    Smart Printing Platform
                 </div>
 
                 <div>
-                    <div class="text-sm text-muted-foreground mb-2">UniPrint: Smart Printing Services for Baguio</div>
+                    <p class="text-sm text-muted-foreground">
+                        Smart printing platform connecting customers with local printing shops in Baguio City.
+                    </p>
                     <h1 class="text-4xl md:text-5xl font-bold tracking-tight">Order custom prints online</h1>
                     <p class="mt-4 text-muted-foreground text-base md:text-lg leading-relaxed">
-                        Order custom prints online with AI-powered design tools, instant chatbot support, and real-time job tracking. Modernizing Baguio's printing industry.
+                        Find the perfect printing shop for your needs, instant chatbot support, and real-time job tracking. Modernizing Baguio's printing industry.
                     </p>
                 </div>
 
@@ -43,23 +45,16 @@
                         Browse Printing Shops
                         <i data-lucide="arrow-right" class="h-5 w-5"></i>
                     </a>
-                    <a href="{{ route('ai-design.index') }}" class="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-lg border border-input bg-background hover:bg-secondary transition-colors font-semibold">
-                        Try AI Design Tool
-                    </a>
                 </div>
 
                 <div class="flex gap-10 pt-2">
                     <div>
-                        <div class="text-2xl font-bold text-primary">{{ $stats['total_enterprises'] ?? $enterprises->count() }}+</div>
+                        <div class="text-2xl font-bold text-primary">{{ $stats['total_enterprises'] ?? count($enterprises) }}+</div>
                         <div class="text-xs text-muted-foreground">Printing Shops</div>
                     </div>
                     <div>
                         <div class="text-2xl font-bold text-primary">10K+</div>
                         <div class="text-xs text-muted-foreground">Print Jobs</div>
-                    </div>
-                    <div>
-                        <div class="text-2xl font-bold text-primary">AI</div>
-                        <div class="text-xs text-muted-foreground">Powered</div>
                     </div>
                 </div>
             </div>
@@ -86,10 +81,10 @@
 <section class="py-14 bg-background">
     <div class="container mx-auto px-4">
         <div class="text-center mb-10">
-            <div class="text-xs uppercase tracking-wider text-muted-foreground mb-2">AI-Enhanced Printing Platform</div>
-            <h2 class="text-3xl md:text-4xl font-bold mb-3">Streamline printing with AI</h2>
-            <p class="text-muted-foreground max-w-2xl mx-auto">
-                UniPrint combines traditional printing services with cutting-edge AI technology to streamline operations and enhance customer experience
+            <div class="text-xs uppercase tracking-wider text-muted-foreground mb-2">Printing Platform</div>
+            <h2 class="text-3xl md:text-4xl font-bold">Smart Printing Platform</h2>
+            <p class="text-lg text-muted-foreground max-w-2xl mx-auto">
+                UniPrint connects you with professional printing services to streamline operations and enhance customer experience
             </p>
         </div>
 
@@ -98,8 +93,8 @@
                 <div class="w-10 h-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center mb-4">
                     <i data-lucide="sparkles" class="h-5 w-5"></i>
                 </div>
-                <h3 class="font-semibold text-lg mb-2">AI-Powered Design Tools</h3>
-                <p class="text-sm text-muted-foreground">Generate custom designs with our built-in AI image generation tool. Create professional prints without design experience.</p>
+                <h3 class="font-semibold text-lg mb-2">Design Tools</h3>
+                <p class="text-sm text-muted-foreground">Upload your own designs or work with our design partners. Popular formats include PDF, PNG, and AI files.</p>
             </div>
 
             <div class="bg-card border border-border rounded-xl shadow-card p-6">
@@ -107,7 +102,7 @@
                     <i data-lucide="message-square" class="h-5 w-5"></i>
                 </div>
                 <h3 class="font-semibold text-lg mb-2">Smart Chatbot Support</h3>
-                <p class="text-sm text-muted-foreground">Get instant answers to your questions with our AI chatbot. Real-time assistance for orders, pricing, and specifications.</p>
+                <p class="text-sm text-muted-foreground">Get instant answers to your questions with our smart chatbot. Real-time assistance for orders, pricing, and specifications.</p>
             </div>
 
             <div class="bg-card border border-border rounded-xl shadow-card p-6">
@@ -128,7 +123,7 @@
         <!-- Dashboard Header -->
         <div class="text-center mb-12">
             <h2 class="mb-4">Welcome back, {{ explode(' ', session('user_name', 'Customer'))[0] }}! 👋</h2>
-            <p class="lead">Your printing dashboard with AI-powered tools and real-time tracking</p>
+            <p class="lead">Your printing dashboard with smart tools and real-time tracking</p>
         </div>
 
         <!-- Quick Stats -->
@@ -180,16 +175,7 @@
         </div>
 
         <!-- Quick Actions -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <a href="{{ route('ai-design.index') }}" class="card card-hover shadow-card transition-smooth">
-                <div class="card-body text-center">
-                    <div class="feature-icon mx-auto mb-4">
-                        <i data-lucide="sparkles" class="h-6 w-6 text-primary-foreground"></i>
-                    </div>
-                    <h3 class="text-lg font-semibold mb-2">AI Design</h3>
-                    <p class="text-sm text-muted-foreground">Create designs with AI</p>
-                </div>
-            </a>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <a href="{{ route('customer.orders') }}" class="card card-hover shadow-card transition-smooth">
                 <div class="card-body text-center">
                     <div class="feature-icon mx-auto mb-4">
@@ -236,24 +222,24 @@
                     <div class="flex items-start justify-between gap-3 mb-4">
                         <div>
                             <div class="text-sm text-muted-foreground">Printing Services</div>
-                            <div class="text-lg font-semibold">{{ $enterprise->enterprise_name }}</div>
+                            <div class="text-lg font-semibold">{{ $enterprise['enterprise_name'] ?? $enterprise['name'] ?? 'Unknown' }}</div>
                         </div>
-                        <span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-secondary text-secondary-foreground rounded-md">{{ $enterprise->category }}</span>
+                        <span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-secondary text-secondary-foreground rounded-md">{{ $enterprise['category'] ?? 'General' }}</span>
                     </div>
 
-                    @if($enterprise->address_text)
+                    @if(!empty($enterprise['address_text']))
                         <div class="flex items-start gap-2 text-sm text-muted-foreground mb-2">
                             <i data-lucide="map-pin" class="h-4 w-4 mt-0.5"></i>
-                            <span>{{ Str::limit($enterprise->address_text, 55) }}</span>
+                            <span>{{ Str::limit($enterprise['address_text'], 55) }}</span>
                         </div>
                     @endif
 
                     <div class="flex items-center gap-2 text-sm text-muted-foreground mb-5">
                         <i data-lucide="package" class="h-4 w-4"></i>
-                        <span>{{ $enterprise->services_count }} Services Available</span>
+                        <span>{{ $enterprise['services_count'] ?? 0 }} Services Available</span>
                     </div>
 
-                    <a href="{{ route('enterprises.show', $enterprise->enterprise_id) }}" class="w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground font-medium rounded-md hover:bg-primary/90 transition-colors">
+                    <a href="{{ route('enterprises.show', $enterprise['enterprise_id'] ?? $enterprise['id'] ?? '') }}" class="w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground font-medium rounded-md hover:bg-primary/90 transition-colors">
                         View Services
                         <i data-lucide="arrow-right" class="h-4 w-4"></i>
                     </a>
@@ -267,7 +253,7 @@
             @endforelse
         </div>
 
-        @if($enterprises->count() > 0)
+        @if(count($enterprises) > 0)
             <div class="text-center mt-10">
                 <a href="{{ route('enterprises.index') }}" class="inline-flex items-center justify-center gap-2 px-6 py-3 bg-primary text-primary-foreground font-semibold rounded-lg hover:bg-primary/90 transition-colors">
                     View All Businesses

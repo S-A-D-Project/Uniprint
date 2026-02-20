@@ -507,8 +507,12 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             
             if (btn) {
-                btn.disabled = true;
-                btn.innerHTML = '<span class="up-inline-spinner" aria-hidden="true"></span><span>Processing...</span>';
+                if (window.UniPrintUI && typeof UniPrintUI.setButtonLoading === 'function') {
+                    UniPrintUI.setButtonLoading(btn, true, { text: 'Processing...' });
+                } else {
+                    btn.disabled = true;
+                    btn.innerHTML = '<span class="up-inline-spinner" aria-hidden="true"></span><span>Processing...</span>';
+                }
             }
 
             try {
@@ -563,8 +567,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
 
                 if (btn) {
-                    btn.disabled = false;
-                    btn.innerHTML = originalText;
+                    if (window.UniPrintUI && typeof UniPrintUI.setButtonLoading === 'function') {
+                        UniPrintUI.setButtonLoading(btn, false);
+                    } else {
+                        btn.disabled = false;
+                        btn.innerHTML = originalText;
+                    }
                 }
                 
                 if (typeof lucide !== 'undefined') {

@@ -143,7 +143,7 @@ class SavedService extends Model
             throw new \InvalidArgumentException('Please fill in required fields: ' . implode(', ', $missing));
         }
 
-        if (\Illuminate\Support\Facades\Schema::hasColumn('services', 'supports_custom_size') && !empty($service->supports_custom_size)) {
+        if (\Illuminate\Support\Facades\schema_has_column('services', 'supports_custom_size') && !empty($service->supports_custom_size)) {
             $customSizeOptionId = DB::table('customization_options')
                 ->where('service_id', $serviceId)
                 ->whereRaw('LOWER(option_type) = ?', ['size'])
@@ -167,10 +167,10 @@ class SavedService extends Model
                     throw new \InvalidArgumentException('Custom width and height must be greater than 0.');
                 }
 
-                $minW = \Illuminate\Support\Facades\Schema::hasColumn('services', 'custom_size_min_width') ? (float) ($service->custom_size_min_width ?? 0) : 0;
-                $maxW = \Illuminate\Support\Facades\Schema::hasColumn('services', 'custom_size_max_width') ? (float) ($service->custom_size_max_width ?? 0) : 0;
-                $minH = \Illuminate\Support\Facades\Schema::hasColumn('services', 'custom_size_min_height') ? (float) ($service->custom_size_min_height ?? 0) : 0;
-                $maxH = \Illuminate\Support\Facades\Schema::hasColumn('services', 'custom_size_max_height') ? (float) ($service->custom_size_max_height ?? 0) : 0;
+                $minW = \Illuminate\Support\Facades\schema_has_column('services', 'custom_size_min_width') ? (float) ($service->custom_size_min_width ?? 0) : 0;
+                $maxW = \Illuminate\Support\Facades\schema_has_column('services', 'custom_size_max_width') ? (float) ($service->custom_size_max_width ?? 0) : 0;
+                $minH = \Illuminate\Support\Facades\schema_has_column('services', 'custom_size_min_height') ? (float) ($service->custom_size_min_height ?? 0) : 0;
+                $maxH = \Illuminate\Support\Facades\schema_has_column('services', 'custom_size_max_height') ? (float) ($service->custom_size_max_height ?? 0) : 0;
 
                 if (($minW > 0 && $w < $minW) || ($maxW > 0 && $w > $maxW) || ($minH > 0 && $h < $minH) || ($maxH > 0 && $h > $maxH)) {
                     throw new \InvalidArgumentException('Custom size is out of the allowed range.');

@@ -13,7 +13,7 @@ class PricingEngine
         $fallback = 0.12;
 
         try {
-            if (!Schema::hasTable('system_settings')) {
+            if (!schema_has_table('system_settings')) {
                 return $fallback;
             }
 
@@ -212,7 +212,7 @@ class PricingEngine
                 ->get();
         });
 
-        if (!Schema::hasColumn('pricing_rules', 'service_id')) {
+        if (!schema_has_column('pricing_rules', 'service_id')) {
             return $allRules;
         }
 

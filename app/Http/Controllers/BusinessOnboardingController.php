@@ -19,13 +19,13 @@ class BusinessOnboardingController extends Controller
         }
 
         $existingEnterprise = null;
-        if (Schema::hasTable('enterprises') && Schema::hasColumn('enterprises', 'owner_user_id')) {
+        if (schema_has_table('enterprises') && schema_has_column('enterprises', 'owner_user_id')) {
             $existingEnterprise = DB::table('enterprises')
                 ->where('owner_user_id', $userId)
                 ->first();
         }
 
-        if (! $existingEnterprise && Schema::hasTable('staff')) {
+        if (! $existingEnterprise && schema_has_table('staff')) {
             $existingEnterprise = DB::table('staff')
                 ->where('user_id', $userId)
                 ->first();
@@ -45,18 +45,18 @@ class BusinessOnboardingController extends Controller
             return redirect()->route('login');
         }
 
-        if (! Schema::hasTable('enterprises')) {
+        if (! schema_has_table('enterprises')) {
             return back()->withInput()->with('error', 'Database schema is not ready. Please run migrations and try again.');
         }
 
         $existingEnterprise = null;
-        if (Schema::hasColumn('enterprises', 'owner_user_id')) {
+        if (schema_has_column('enterprises', 'owner_user_id')) {
             $existingEnterprise = DB::table('enterprises')
                 ->where('owner_user_id', $userId)
                 ->first();
         }
 
-        if (! $existingEnterprise && Schema::hasTable('staff')) {
+        if (! $existingEnterprise && schema_has_table('staff')) {
             $existingEnterprise = DB::table('staff')
                 ->where('user_id', $userId)
                 ->first();
@@ -66,8 +66,8 @@ class BusinessOnboardingController extends Controller
             return redirect()->route('business.dashboard');
         }
 
-        $proofEnabled = Schema::hasColumn('enterprises', 'verification_document_path')
-            && Schema::hasColumn('enterprises', 'verification_submitted_at');
+        $proofEnabled = schema_has_column('enterprises', 'verification_document_path')
+            && schema_has_column('enterprises', 'verification_submitted_at');
 
         $rules = [
             'name' => 'required|string|max:255',
@@ -80,7 +80,7 @@ class BusinessOnboardingController extends Controller
 
         if ($proofEnabled) {
             $rules['verification_document'] = 'required|file|max:5120|mimes:jpg,jpeg,png,pdf';
-            if (Schema::hasColumn('enterprises', 'verification_notes')) {
+            if (schema_has_column('enterprises', 'verification_notes')) {
                 $rules['verification_notes'] = 'nullable|string|max:2000';
             }
         }
@@ -101,23 +101,23 @@ class BusinessOnboardingController extends Controller
                 'updated_at' => now(),
             ];
 
-            if (Schema::hasColumn('enterprises', 'owner_user_id')) {
+            if (schema_has_column('enterprises', 'owner_user_id')) {
                 $enterpriseData['owner_user_id'] = $userId;
             }
 
-            if (Schema::hasColumn('enterprises', 'email')) {
+            if (schema_has_column('enterprises', 'email')) {
                 $enterpriseData['email'] = $request->email;
             }
 
-            if (Schema::hasColumn('enterprises', 'category')) {
+            if (schema_has_column('enterprises', 'category')) {
                 $enterpriseData['category'] = $request->category;
             }
 
-            if (Schema::hasColumn('enterprises', 'is_active')) {
+            if (schema_has_column('enterprises', 'is_active')) {
                 $enterpriseData['is_active'] = true;
             }
 
-            if (Schema::hasColumn('enterprises', 'is_verified')) {
+            if (schema_has_column('enterprises', 'is_verified')) {
                 $enterpriseData['is_verified'] = false;
             }
 
@@ -125,21 +125,21 @@ class BusinessOnboardingController extends Controller
                 $disk = config('filesystems.default', 'public');
                 $path = $request->file('verification_document')->store('business-verification', $disk);
 
-                if (Schema::hasColumn('enterprises', 'verification_document_path')) {
+                if (schema_has_column('enterprises', 'verification_document_path')) {
                     $enterpriseData['verification_document_path'] = $path;
                 }
-                if (Schema::hasColumn('enterprises', 'verification_notes')) {
+                if (schema_has_column('enterprises', 'verification_notes')) {
                     $enterpriseData['verification_notes'] = $request->input('verification_notes');
                 }
-                if (Schema::hasColumn('enterprises', 'verification_submitted_at')) {
+                if (schema_has_column('enterprises', 'verification_submitted_at')) {
                     $enterpriseData['verification_submitted_at'] = now();
                 }
             }
 
             // Legacy schema compatibility: some DBs still have VAT columns/constraints.
             // If vat_type_id exists and is required, ensure a placeholder vat type exists.
-            if (Schema::hasColumn('enterprises', 'vat_type_id')) {
-                if (! Schema::hasTable('vat_types')) {
+            if (schema_has_column('enterprises', 'vat_type_id')) {
+                if (! schema_has_table('vat_types')) {
                     throw new \RuntimeException('Database schema mismatch: enterprises.vat_type_id exists but vat_types table is missing.');
                 }
 
@@ -157,7 +157,7 @@ class BusinessOnboardingController extends Controller
             DB::table('enterprises')->insert($enterpriseData);
 
             // Legacy compatibility: if a staff table exists, keep a single Owner row.
-            if (Schema::hasTable('staff')) {
+            if (schema_has_table('staff')) {
                 $staffData = [
                     'staff_id' => (string) Str::uuid(),
                     'user_id' => $userId,
@@ -168,7 +168,7 @@ class BusinessOnboardingController extends Controller
                     'updated_at' => now(),
                 ];
 
-                if (Schema::hasColumn('staff', 'staff_name')) {
+                if (schema_has_column('staff', 'staff_name')) {
                     $staffData['staff_name'] = session('user_name') ?? 'Owner';
                 }
 
@@ -177,7 +177,7 @@ class BusinessOnboardingController extends Controller
 
             DB::commit();
 
-            if (Schema::hasColumn('enterprises', 'is_verified')) {
+            if (schema_has_column('enterprises', 'is_verified')) {
                 return redirect()->route('business.pending')->with('success', 'Business profile created. Your account is pending verification.');
             }
 

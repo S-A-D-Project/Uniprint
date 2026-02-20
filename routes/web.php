@@ -10,7 +10,6 @@ use App\Http\Controllers\CustomerDashboardController;
 use App\Http\Controllers\ModernCustomerDashboardController;
 use App\Http\Controllers\ServiceMarketplaceController;
 use App\Http\Controllers\HomeController;
-use App\Http\Controllers\AIDesignController;
 use App\Http\Controllers\SavedServiceController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\ProfileController;
@@ -21,7 +20,6 @@ use App\Http\Controllers\BusinessVerificationController;
 use App\Http\Controllers\UserReportController;
 use App\Http\Controllers\SystemFeedbackController;
 use App\Http\Middleware\EnsureBusinessVerified;
-use App\Http\Middleware\EnsureAiGenerationLimit;
 use App\Http\Middleware\TwoFactorVerify;
 use Illuminate\Http\Request;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -139,16 +137,6 @@ Route::middleware([\App\Http\Middleware\CheckAuth::class, TwoFactorVerify::class
     Route::get('/profile/paypal/connect', [ProfileController::class, 'redirectToPayPalConnect'])->name('profile.paypal.connect');
     Route::get('/profile/paypal/callback', [ProfileController::class, 'handlePayPalConnectCallback'])->name('profile.paypal.callback');
     Route::post('/profile/paypal/disconnect', [ProfileController::class, 'disconnectPayPal'])->name('profile.paypal.disconnect');
-    
-    // AI Design routes
-    Route::get('/ai-design', [AIDesignController::class, 'index'])->name('ai-design.index');
-    Route::get('/ai-design/usage', [AIDesignController::class, 'usage'])->name('ai-design.usage');
-    Route::post('/ai-design/generate', [AIDesignController::class, 'generate'])
-        ->middleware([EnsureAiGenerationLimit::class])
-        ->name('ai-design.generate');
-    Route::post('/ai-design/save', [AIDesignController::class, 'save'])->name('ai-design.save');
-    Route::get('/ai-design/my-designs', [AIDesignController::class, 'myDesigns'])->name('ai-design.my-designs');
-    Route::delete('/ai-design/{designId}', [AIDesignController::class, 'delete'])->name('ai-design.delete');
     
     // Checkout routes
     Route::get('/checkout', [\App\Http\Controllers\CheckoutController::class, 'index'])->name('checkout.index');

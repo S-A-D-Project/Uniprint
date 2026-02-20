@@ -14,13 +14,6 @@
         My Orders
     </a>
     
-    {{-- AI Design Tab --}}
-    <a href="{{ route('ai-design.index') }}" 
-       class="py-4 px-6 border-b-2 {{ request()->routeIs('ai-design.index') ? 'border-primary text-primary' : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300' }} font-medium text-sm whitespace-nowrap flex items-center gap-2 transition-colors">
-        <i data-lucide="sparkles" class="h-4 w-4"></i>
-        AI Design
-    </a>
-    
     {{-- Design Assets Tab --}}
     <a href="{{ route('customer.design-assets') }}" 
        class="py-4 px-6 border-b-2 {{ request()->routeIs('customer.design-assets') ? 'border-primary text-primary' : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300' }} font-medium text-sm whitespace-nowrap flex items-center gap-2 transition-colors">

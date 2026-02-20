@@ -16,10 +16,6 @@
     <i data-lucide="package" class="h-4 w-4"></i>
     My Orders
 </a>
-<a href="{{ route('ai-design.index') }}" class="py-4 px-6 border-b-2 border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300 font-medium text-sm whitespace-nowrap flex items-center gap-2 transition-colors">
-    <i data-lucide="sparkles" class="h-4 w-4"></i>
-    AI Design
-</a>
 <a href="{{ route('profile.index') }}" class="py-4 px-6 border-b-2 border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300 font-medium text-sm whitespace-nowrap flex items-center gap-2 transition-colors">
     <i data-lucide="user" class="h-4 w-4"></i>
     Account Settings
@@ -30,7 +26,7 @@
 <!-- Page Header -->
 <div class="mb-8">
     <h1 class="text-3xl font-bold text-gray-900 mb-2">Printing Shops in Baguio</h1>
-    <p class="text-gray-600 text-lg">Find the perfect printing shop for your needs with AI-enhanced ordering</p>
+    <p class="text-gray-600 text-lg">Find the perfect printing shop for your needs</p>
 </div>
 
 <!-- Search Bar -->

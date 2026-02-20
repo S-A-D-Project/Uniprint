@@ -10,7 +10,7 @@
                     </span>
                 </div>
                 <p class="text-sm text-muted-foreground">
-                    AI-enhanced printing platform connecting customers with local printing shops in Baguio City.
+                    Smart printing platform connecting customers with local printing shops in Baguio City.
                 </p>
                 <div class="flex gap-4">
                     <a href="#" class="text-muted-foreground hover:text-primary transition-smooth">

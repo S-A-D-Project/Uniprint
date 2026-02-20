@@ -22,9 +22,4 @@ class DesignAsset extends Model
     {
         return $this->belongsTo(User::class, 'user_id', 'user_id');
     }
-
-    public function aiImageGenerations()
-    {
-        return $this->hasMany(AiImageGeneration::class, 'related_asset_id', 'asset_id');
-    }
 }

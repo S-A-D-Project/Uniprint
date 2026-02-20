@@ -328,13 +328,13 @@ class CustomerDesignFileService
     {
         $businessUserId = null;
 
-        if (\Illuminate\Support\Facades\Schema::hasColumn('enterprises', 'owner_user_id')) {
+        if (\Illuminate\Support\Facades\schema_has_column('enterprises', 'owner_user_id')) {
             $businessUserId = DB::table('enterprises')
                 ->where('enterprise_id', $enterpriseId)
                 ->value('owner_user_id');
         }
 
-        if (! $businessUserId && \Illuminate\Support\Facades\Schema::hasTable('staff')) {
+        if (! $businessUserId && \Illuminate\Support\Facades\schema_has_table('staff')) {
             $businessUserId = DB::table('staff')
                 ->where('enterprise_id', $enterpriseId)
                 ->whereNotNull('user_id')

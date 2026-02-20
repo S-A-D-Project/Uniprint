@@ -131,7 +131,7 @@ class CheckoutController extends Controller
             }
 
             // Validate custom size inputs when Custom Size is selected
-            if (Schema::hasColumn('services', 'supports_custom_size') && !empty($service->supports_custom_size)) {
+            if (schema_has_column('services', 'supports_custom_size') && !empty($service->supports_custom_size)) {
                 $customSizeOptionId = DB::table('customization_options')
                     ->where('service_id', $service->service_id)
                     ->whereRaw('LOWER(option_type) = ?', ['size'])
@@ -155,10 +155,10 @@ class CheckoutController extends Controller
                         return redirect()->back()->with('error', 'Custom width and height must be greater than 0.');
                     }
 
-                    $minW = Schema::hasColumn('services', 'custom_size_min_width') ? (float) ($service->custom_size_min_width ?? 0) : 0;
-                    $maxW = Schema::hasColumn('services', 'custom_size_max_width') ? (float) ($service->custom_size_max_width ?? 0) : 0;
-                    $minH = Schema::hasColumn('services', 'custom_size_min_height') ? (float) ($service->custom_size_min_height ?? 0) : 0;
-                    $maxH = Schema::hasColumn('services', 'custom_size_max_height') ? (float) ($service->custom_size_max_height ?? 0) : 0;
+                    $minW = schema_has_column('services', 'custom_size_min_width') ? (float) ($service->custom_size_min_width ?? 0) : 0;
+                    $maxW = schema_has_column('services', 'custom_size_max_width') ? (float) ($service->custom_size_max_width ?? 0) : 0;
+                    $minH = schema_has_column('services', 'custom_size_min_height') ? (float) ($service->custom_size_min_height ?? 0) : 0;
+                    $maxH = schema_has_column('services', 'custom_size_max_height') ? (float) ($service->custom_size_max_height ?? 0) : 0;
 
                     if (($minW > 0 && $w < $minW) || ($maxW > 0 && $w > $maxW) || ($minH > 0 && $h < $minH) || ($maxH > 0 && $h > $maxH)) {
                         return redirect()->back()->with('error', 'Custom size is out of the allowed range.');
@@ -171,9 +171,9 @@ class CheckoutController extends Controller
             // Resolve upload flags (backward compatible)
             $requiresFileUpload = false;
             $uploadEnabled = false;
-            if (Schema::hasColumn('services', 'requires_file_upload')) {
+            if (schema_has_column('services', 'requires_file_upload')) {
                 $requiresFileUpload = (bool) $service->requires_file_upload;
-                if (Schema::hasColumn('services', 'file_upload_enabled')) {
+                if (schema_has_column('services', 'file_upload_enabled')) {
                     $uploadEnabled = (bool) $service->file_upload_enabled;
                 } else {
                     $uploadEnabled = $requiresFileUpload;
@@ -334,7 +334,7 @@ class CheckoutController extends Controller
             $supportsRushAll = (bool) ($serviceData->supports_rush ?? false);
 
             $requiresDownpayment = false;
-            if (Schema::hasColumn('services', 'requires_downpayment')) {
+            if (schema_has_column('services', 'requires_downpayment')) {
                 $requiresDownpayment = !empty($serviceData->requires_downpayment);
             }
 
@@ -353,7 +353,7 @@ class CheckoutController extends Controller
                 $availablePaymentMethods = array_values(array_diff($availablePaymentMethods, ['cash']));
             }
 
-            if (Schema::hasColumn('services', 'fulfillment_type') && !empty($serviceData->fulfillment_type)) {
+            if (schema_has_column('services', 'fulfillment_type') && !empty($serviceData->fulfillment_type)) {
                 $supported = $serviceData->fulfillment_type === 'pickup'
                     ? ['pickup']
                     : ($serviceData->fulfillment_type === 'delivery' ? ['delivery'] : ['pickup', 'delivery']);
@@ -563,7 +563,7 @@ class CheckoutController extends Controller
         }
 
         $tempDesignFiles = collect();
-        if (!$direct && Schema::hasTable('saved_service_design_files')) {
+        if (!$direct && schema_has_table('saved_service_design_files')) {
             $savedServiceIds = $savedServices
                 ->pluck('saved_service_id')
                 ->filter(fn ($v) => !empty($v))

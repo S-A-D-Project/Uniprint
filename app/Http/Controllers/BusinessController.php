@@ -45,10 +45,10 @@ class BusinessController extends Controller
             return $enterprise;
         }
 
-        if (Schema::hasColumn('enterprises', 'owner_user_id')) {
+        if (schema_has_column('enterprises', 'owner_user_id')) {
             $enterprise = DB::table('enterprises')->where('owner_user_id', $userId)->first();
         }
-        if (!$enterprise && Schema::hasTable('staff')) {
+        if (!$enterprise && schema_has_table('staff')) {
             $enterprise = DB::table('staff')
                 ->join('enterprises', 'staff.enterprise_id', '=', 'enterprises.enterprise_id')
                 ->where('staff.user_id', $userId)
@@ -149,11 +149,11 @@ class BusinessController extends Controller
             ->groupBy('purchase_order_id');
 
         $dueExpr = 'customer_orders.date_requested';
-        if (Schema::hasColumn('customer_orders', 'pickup_date')) {
+        if (schema_has_column('customer_orders', 'pickup_date')) {
             $dueExpr = 'customer_orders.pickup_date';
-        } elseif (Schema::hasColumn('customer_orders', 'requested_fulfillment_date')) {
+        } elseif (schema_has_column('customer_orders', 'requested_fulfillment_date')) {
             $dueExpr = 'customer_orders.requested_fulfillment_date';
-        } elseif (Schema::hasColumn('customer_orders', 'delivery_date')) {
+        } elseif (schema_has_column('customer_orders', 'delivery_date')) {
             $dueExpr = 'customer_orders.delivery_date';
         }
         $dueDateSql = "DATE({$dueExpr})";
@@ -172,7 +172,7 @@ class BusinessController extends Controller
             ->select('customer_orders.*', 'users.name as customer_name', 'statuses.status_name')
             ->addSelect(DB::raw("{$dueDateSql} as due_date"));
 
-        if (Schema::hasTable('payments')) {
+        if (schema_has_table('payments')) {
             $ordersQuery
                 ->leftJoin('payments', 'customer_orders.purchase_order_id', '=', 'payments.purchase_order_id')
                 ->addSelect(
@@ -181,7 +181,7 @@ class BusinessController extends Controller
                     'payments.is_verified as payment_is_verified'
                 )
                 ->addSelect(DB::raw("CASE WHEN payments.is_verified = true AND payments.amount_paid >= payments.amount_due THEN 1 ELSE 0 END as is_paid_calc"));
-        } elseif (Schema::hasColumn('customer_orders', 'payment_status')) {
+        } elseif (schema_has_column('customer_orders', 'payment_status')) {
             $ordersQuery
                 ->addSelect(DB::raw("CASE WHEN customer_orders.payment_status = 'paid' THEN 1 ELSE 0 END as is_paid_calc"));
         } else {
@@ -193,7 +193,7 @@ class BusinessController extends Controller
             $ordersQuery->whereIn('statuses.status_name', $statusFilter);
         }
 
-        if (Schema::hasColumn('customer_orders', 'rush_option')) {
+        if (schema_has_column('customer_orders', 'rush_option')) {
             $ordersQuery->orderByRaw(
                 "CASE customer_orders.rush_option WHEN 'same_day' THEN 0 WHEN 'rush' THEN 1 WHEN 'express' THEN 2 ELSE 3 END"
             );
@@ -223,7 +223,7 @@ class BusinessController extends Controller
 
         foreach ($orderItems as $item) {
             $item->customizations = collect();
-            if (Schema::hasTable('order_item_customizations') && Schema::hasTable('customization_options')) {
+            if (schema_has_table('order_item_customizations') && schema_has_table('customization_options')) {
                 $item->customizations = DB::table('order_item_customizations')
                     ->join('customization_options', 'order_item_customizations.option_id', '=', 'customization_options.option_id')
                     ->where('order_item_customizations.order_item_id', $item->item_id)
@@ -233,7 +233,7 @@ class BusinessController extends Controller
         }
 
         $statusHistory = collect();
-        if (Schema::hasTable('order_status_history') && Schema::hasTable('statuses')) {
+        if (schema_has_table('order_status_history') && schema_has_table('statuses')) {
             $statusHistory = DB::table('order_status_history')
                 ->join('statuses', 'order_status_history.status_id', '=', 'statuses.status_id')
                 ->leftJoin('users', 'order_status_history.user_id', '=', 'users.user_id')
@@ -244,7 +244,7 @@ class BusinessController extends Controller
         }
 
         $designFiles = collect();
-        if (Schema::hasTable('order_design_files')) {
+        if (schema_has_table('order_design_files')) {
             $designFiles = DB::table('order_design_files')
                 ->leftJoin('users as uploader', 'order_design_files.uploaded_by', '=', 'uploader.user_id')
                 ->leftJoin('users as approver', 'order_design_files.approved_by', '=', 'approver.user_id')
@@ -259,7 +259,7 @@ class BusinessController extends Controller
         }
 
         $latestExtensionRequest = null;
-        if (Schema::hasTable('order_extension_requests')) {
+        if (schema_has_table('order_extension_requests')) {
             $latestExtensionRequest = DB::table('order_extension_requests')
                 ->where('purchase_order_id', $id)
                 ->orderBy('created_at', 'desc')
@@ -267,7 +267,7 @@ class BusinessController extends Controller
         }
 
         $currentStatusName = 'Pending';
-        if (Schema::hasTable('order_status_history') && Schema::hasTable('statuses')) {
+        if (schema_has_table('order_status_history') && schema_has_table('statuses')) {
             $currentStatusName = DB::table('order_status_history')
                 ->join('statuses', 'order_status_history.status_id', '=', 'statuses.status_id')
                 ->where('order_status_history.purchase_order_id', $id)
@@ -276,7 +276,7 @@ class BusinessController extends Controller
         }
 
         $statusIds = [];
-        if (Schema::hasTable('statuses')) {
+        if (schema_has_table('statuses')) {
             $statusIds = DB::table('statuses')
                 ->select('status_id', 'status_name')
                 ->get()
@@ -310,14 +310,14 @@ class BusinessController extends Controller
 
         $payment = null;
         $isPaid = false;
-        if (Schema::hasTable('payments')) {
+        if (schema_has_table('payments')) {
             $payment = DB::table('payments')->where('purchase_order_id', $id)->first();
             if ($payment) {
                 $amountPaid = (float) ($payment->amount_paid ?? 0);
                 $amountDue = (float) ($payment->amount_due ?? 0);
                 $isPaid = !empty($payment->is_verified) && ($amountPaid + 0.00001 >= $amountDue);
             }
-        } elseif (Schema::hasColumn('customer_orders', 'payment_status')) {
+        } elseif (schema_has_column('customer_orders', 'payment_status')) {
             $isPaid = (($order->payment_status ?? null) === 'paid');
         }
 
@@ -347,7 +347,7 @@ class BusinessController extends Controller
         }
 
         $currentStatusName = null;
-        if (Schema::hasTable('order_status_history') && Schema::hasTable('statuses')) {
+        if (schema_has_table('order_status_history') && schema_has_table('statuses')) {
             $currentStatusName = DB::table('order_status_history')
                 ->join('statuses', 'order_status_history.status_id', '=', 'statuses.status_id')
                 ->where('order_status_history.purchase_order_id', $id)
@@ -375,7 +375,7 @@ class BusinessController extends Controller
             return redirect()->back()->with('error', 'Status "Confirmed" is not configured.');
         }
 
-        if (Schema::hasTable('order_status_history')) {
+        if (schema_has_table('order_status_history')) {
             DB::table('order_status_history')->insert([
                 'approval_id' => (string) Str::uuid(),
                 'purchase_order_id' => $id,
@@ -396,7 +396,7 @@ class BusinessController extends Controller
                 'updated_at' => now(),
             ]);
 
-        if (Schema::hasTable('order_notifications')) {
+        if (schema_has_table('order_notifications')) {
             DB::table('order_notifications')->insert([
                 'notification_id' => (string) Str::uuid(),
                 'purchase_order_id' => $id,
@@ -436,7 +436,7 @@ class BusinessController extends Controller
         }
 
         $currentStatusName = null;
-        if (Schema::hasTable('order_status_history') && Schema::hasTable('statuses')) {
+        if (schema_has_table('order_status_history') && schema_has_table('statuses')) {
             $currentStatusName = DB::table('order_status_history')
                 ->join('statuses', 'order_status_history.status_id', '=', 'statuses.status_id')
                 ->where('order_status_history.purchase_order_id', $id)
@@ -460,7 +460,7 @@ class BusinessController extends Controller
             return redirect()->back()->with('error', 'This status change is not allowed from the current status.');
         }
 
-        if (Schema::hasTable('order_status_history')) {
+        if (schema_has_table('order_status_history')) {
             DB::table('order_status_history')->insert([
                 'approval_id' => (string) Str::uuid(),
                 'purchase_order_id' => $id,
@@ -481,7 +481,7 @@ class BusinessController extends Controller
                 'updated_at' => now(),
             ]);
 
-        if (Schema::hasTable('order_notifications')) {
+        if (schema_has_table('order_notifications')) {
             DB::table('order_notifications')->insert([
                 'notification_id' => (string) Str::uuid(),
                 'purchase_order_id' => $id,
@@ -513,14 +513,14 @@ class BusinessController extends Controller
         $isPaid = false;
         $payment = null;
 
-        if (Schema::hasTable('payments')) {
+        if (schema_has_table('payments')) {
             $payment = DB::table('payments')->where('purchase_order_id', $id)->first();
             if ($payment) {
                 $amountPaid = (float) ($payment->amount_paid ?? 0);
                 $amountDue = (float) ($payment->amount_due ?? 0);
                 $isPaid = !empty($payment->is_verified) && ($amountPaid + 0.00001 >= $amountDue);
             }
-        } elseif (Schema::hasColumn('customer_orders', 'payment_status')) {
+        } elseif (schema_has_column('customer_orders', 'payment_status')) {
             $isPaid = (($order->payment_status ?? null) === 'paid');
         }
 
@@ -528,7 +528,7 @@ class BusinessController extends Controller
             return redirect()->back()->with('success', 'Payment is already confirmed.');
         }
 
-        if (Schema::hasTable('payments')) {
+        if (schema_has_table('payments')) {
             if (! $payment) {
                 DB::table('payments')->insert([
                     'payment_id' => (string) Str::uuid(),
@@ -556,7 +556,7 @@ class BusinessController extends Controller
                         'updated_at' => now(),
                     ]);
             }
-        } elseif (Schema::hasColumn('customer_orders', 'payment_status')) {
+        } elseif (schema_has_column('customer_orders', 'payment_status')) {
             DB::table('customer_orders')
                 ->where('purchase_order_id', $id)
                 ->where('enterprise_id', $enterprise->enterprise_id)
@@ -566,7 +566,7 @@ class BusinessController extends Controller
                 ]);
         }
 
-        if (Schema::hasTable('order_notifications')) {
+        if (schema_has_table('order_notifications')) {
             DB::table('order_notifications')->insert([
                 'notification_id' => (string) Str::uuid(),
                 'purchase_order_id' => $id,
@@ -651,20 +651,20 @@ class BusinessController extends Controller
             'updated_at' => $now,
         ];
 
-        if (Schema::hasColumn('services', 'fulfillment_type')) {
+        if (schema_has_column('services', 'fulfillment_type')) {
             $insert['fulfillment_type'] = $request->input('fulfillment_type');
         }
-        if (Schema::hasColumn('services', 'allowed_payment_methods')) {
+        if (schema_has_column('services', 'allowed_payment_methods')) {
             $insert['allowed_payment_methods'] = json_encode($request->input('allowed_payment_methods', []));
         }
-        if (Schema::hasColumn('services', 'supports_rush')) {
+        if (schema_has_column('services', 'supports_rush')) {
             $insert['supports_rush'] = $request->boolean('supports_rush');
         }
 
         DB::table('services')->insert($insert);
 
         // Optional: store service images if supported
-        if ($request->hasFile('images') && Schema::hasTable('service_images')) {
+        if ($request->hasFile('images') && schema_has_table('service_images')) {
             $disk = config('filesystems.default', 'public');
             $images = (array) $request->file('images');
             $isFirst = true;
@@ -748,10 +748,10 @@ class BusinessController extends Controller
         }
         $data['checkout_rush_options'] = json_encode($rushOptions);
 
-        if (Schema::hasColumn('enterprises', 'gcash_enabled')) {
+        if (schema_has_column('enterprises', 'gcash_enabled')) {
             $data['gcash_enabled'] = $request->boolean('gcash_enabled');
         }
-        if (Schema::hasColumn('enterprises', 'gcash_instructions')) {
+        if (schema_has_column('enterprises', 'gcash_instructions')) {
             $data['gcash_instructions'] = $request->input('gcash_instructions');
         }
 
@@ -790,7 +790,7 @@ class BusinessController extends Controller
         $service->base_price = $request->base_price;
         $service->is_active = $request->has('is_active');
         $service->fulfillment_type = $request->fulfillment_type;
-        if (Schema::hasColumn('services', 'allowed_payment_methods')) {
+        if (schema_has_column('services', 'allowed_payment_methods')) {
             $service->allowed_payment_methods = $request->input('allowed_payment_methods', []);
         }
         $service->supports_rush = $request->has('supports_rush');
@@ -919,7 +919,7 @@ class BusinessController extends Controller
             abort(404);
         }
 
-        if (! Schema::hasTable('customization_options')) {
+        if (! schema_has_table('customization_options')) {
             return redirect()->back()->with('error', 'Customization options are not available. Please run migrations.');
         }
 
@@ -940,7 +940,7 @@ class BusinessController extends Controller
             'updated_at' => now(),
         ];
 
-        if (Schema::hasColumn('customization_options', 'is_default')) {
+        if (schema_has_column('customization_options', 'is_default')) {
             $insert['is_default'] = $request->boolean('is_default');
         }
 
@@ -962,7 +962,7 @@ class BusinessController extends Controller
             abort(404);
         }
 
-        if (! Schema::hasTable('customization_options')) {
+        if (! schema_has_table('customization_options')) {
             return redirect()->back()->with('error', 'Customization options are not available. Please run migrations.');
         }
 
@@ -980,7 +980,7 @@ class BusinessController extends Controller
             'updated_at' => now(),
         ];
 
-        if (Schema::hasColumn('customization_options', 'is_default')) {
+        if (schema_has_column('customization_options', 'is_default')) {
             $update['is_default'] = $request->boolean('is_default');
         }
 
@@ -1009,7 +1009,7 @@ class BusinessController extends Controller
             abort(404);
         }
 
-        if (! Schema::hasTable('customization_options')) {
+        if (! schema_has_table('customization_options')) {
             return redirect()->back()->with('error', 'Customization options are not available. Please run migrations.');
         }
 
@@ -1049,22 +1049,22 @@ class BusinessController extends Controller
 
         $update = ['updated_at' => now()];
 
-        if (Schema::hasColumn('services', 'supports_custom_size')) {
+        if (schema_has_column('services', 'supports_custom_size')) {
             $update['supports_custom_size'] = $request->boolean('supports_custom_size');
         }
-        if (Schema::hasColumn('services', 'custom_size_unit')) {
+        if (schema_has_column('services', 'custom_size_unit')) {
             $update['custom_size_unit'] = $request->filled('custom_size_unit') ? strtolower($request->string('custom_size_unit')->toString()) : null;
         }
-        if (Schema::hasColumn('services', 'custom_size_min_width')) {
+        if (schema_has_column('services', 'custom_size_min_width')) {
             $update['custom_size_min_width'] = $request->filled('custom_size_min_width') ? (float) $request->input('custom_size_min_width') : null;
         }
-        if (Schema::hasColumn('services', 'custom_size_max_width')) {
+        if (schema_has_column('services', 'custom_size_max_width')) {
             $update['custom_size_max_width'] = $request->filled('custom_size_max_width') ? (float) $request->input('custom_size_max_width') : null;
         }
-        if (Schema::hasColumn('services', 'custom_size_min_height')) {
+        if (schema_has_column('services', 'custom_size_min_height')) {
             $update['custom_size_min_height'] = $request->filled('custom_size_min_height') ? (float) $request->input('custom_size_min_height') : null;
         }
-        if (Schema::hasColumn('services', 'custom_size_max_height')) {
+        if (schema_has_column('services', 'custom_size_max_height')) {
             $update['custom_size_max_height'] = $request->filled('custom_size_max_height') ? (float) $request->input('custom_size_max_height') : null;
         }
 
@@ -1089,7 +1089,7 @@ class BusinessController extends Controller
             abort(404);
         }
 
-        if (! Schema::hasTable('service_custom_fields')) {
+        if (! schema_has_table('service_custom_fields')) {
             return redirect()->back()->with('error', 'Custom fields are not available. Please run migrations.');
         }
 
@@ -1127,7 +1127,7 @@ class BusinessController extends Controller
             abort(404);
         }
 
-        if (! Schema::hasTable('service_custom_fields')) {
+        if (! schema_has_table('service_custom_fields')) {
             return redirect()->back()->with('error', 'Custom fields are not available. Please run migrations.');
         }
 
@@ -1169,7 +1169,7 @@ class BusinessController extends Controller
             abort(404);
         }
 
-        if (! Schema::hasTable('service_custom_fields')) {
+        if (! schema_has_table('service_custom_fields')) {
             return redirect()->back()->with('error', 'Custom fields are not available. Please run migrations.');
         }
 

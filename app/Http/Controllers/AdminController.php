@@ -200,7 +200,7 @@ class AdminController extends Controller
     public function users()
     {
         try {
-            $hasUserIsActive = Schema::hasColumn('users', 'is_active');
+            $hasUserIsActive = schema_has_column('users', 'is_active');
 
             $users = DB::table('users')
                 ->leftJoin('login', 'users.user_id', '=', 'login.user_id')
@@ -266,7 +266,7 @@ class AdminController extends Controller
                 'updated_at' => now(),
             ];
 
-            if (Schema::hasColumn('users', 'is_active')) {
+            if (schema_has_column('users', 'is_active')) {
                 $userData['is_active'] = true;
             }
 
@@ -314,7 +314,7 @@ class AdminController extends Controller
 
     public function userDetails(Request $request, $id)
     {
-        $hasUserIsActive = Schema::hasColumn('users', 'is_active');
+        $hasUserIsActive = schema_has_column('users', 'is_active');
 
         $select = [
             'users.*',
@@ -326,13 +326,13 @@ class AdminController extends Controller
             DB::raw('COALESCE(login.username, users.name) as username'),
         ];
 
-        if (Schema::hasColumn('enterprises', 'is_verified')) {
+        if (schema_has_column('enterprises', 'is_verified')) {
             $select[] = DB::raw('COALESCE(owned_enterprises.is_verified, staff_enterprises.is_verified) as enterprise_is_verified');
         }
-        if (Schema::hasColumn('enterprises', 'verification_document_path')) {
+        if (schema_has_column('enterprises', 'verification_document_path')) {
             $select[] = DB::raw('COALESCE(owned_enterprises.verification_document_path, staff_enterprises.verification_document_path) as enterprise_verification_document_path');
         }
-        if (Schema::hasColumn('enterprises', 'verification_submitted_at')) {
+        if (schema_has_column('enterprises', 'verification_submitted_at')) {
             $select[] = DB::raw('COALESCE(owned_enterprises.verification_submitted_at, staff_enterprises.verification_submitted_at) as enterprise_verification_submitted_at');
         }
 
@@ -383,7 +383,7 @@ class AdminController extends Controller
             abort(404);
         }
 
-        if (! Schema::hasColumn('enterprises', 'is_verified')) {
+        if (! schema_has_column('enterprises', 'is_verified')) {
             if ($request->expectsJson() || $request->ajax()) {
                 return response()->json([
                     'success' => false,
@@ -399,10 +399,10 @@ class AdminController extends Controller
             'updated_at' => now(),
         ];
 
-        if (Schema::hasColumn('enterprises', 'verified_at')) {
+        if (schema_has_column('enterprises', 'verified_at')) {
             $update['verified_at'] = now();
         }
-        if (Schema::hasColumn('enterprises', 'verified_by_user_id')) {
+        if (schema_has_column('enterprises', 'verified_by_user_id')) {
             $update['verified_by_user_id'] = session('user_id');
         }
 
@@ -422,7 +422,7 @@ class AdminController extends Controller
 
     public function toggleUserActive($id)
     {
-        if (!Schema::hasColumn('users', 'is_active')) {
+        if (!schema_has_column('users', 'is_active')) {
             if (request()->expectsJson() || request()->ajax()) {
                 return response()->json([
                     'success' => false,
@@ -467,7 +467,7 @@ class AdminController extends Controller
 
     public function disableUserEmail2fa(Request $request, $id)
     {
-        if (!Schema::hasColumn('users', 'two_factor_enabled')) {
+        if (!schema_has_column('users', 'two_factor_enabled')) {
             if ($request->expectsJson() || $request->ajax()) {
                 return response()->json([
                     'success' => false,
@@ -532,19 +532,19 @@ class AdminController extends Controller
             'updated_at' => now(),
         ];
 
-        if (Schema::hasColumn('users', 'two_factor_email_enabled')) {
+        if (schema_has_column('users', 'two_factor_email_enabled')) {
             $update['two_factor_email_enabled'] = false;
         }
-        if (Schema::hasColumn('users', 'two_factor_sms_enabled')) {
+        if (schema_has_column('users', 'two_factor_sms_enabled')) {
             $update['two_factor_sms_enabled'] = false;
         }
-        if (Schema::hasColumn('users', 'two_factor_totp_enabled')) {
+        if (schema_has_column('users', 'two_factor_totp_enabled')) {
             $update['two_factor_totp_enabled'] = false;
         }
-        if (Schema::hasColumn('users', 'two_factor_enabled_at')) {
+        if (schema_has_column('users', 'two_factor_enabled_at')) {
             $update['two_factor_enabled_at'] = null;
         }
-        if (Schema::hasColumn('users', 'two_factor_secret')) {
+        if (schema_has_column('users', 'two_factor_secret')) {
             $update['two_factor_secret'] = null;
         }
 
@@ -630,36 +630,36 @@ class AdminController extends Controller
         try {
             DB::beginTransaction();
 
-            if (Schema::hasTable('roles')) {
+            if (schema_has_table('roles')) {
                 DB::table('roles')->where('user_id', $id)->delete();
             }
-            if (Schema::hasTable('login')) {
+            if (schema_has_table('login')) {
                 DB::table('login')->where('user_id', $id)->delete();
             }
-            if (Schema::hasTable('social_logins')) {
+            if (schema_has_table('social_logins')) {
                 DB::table('social_logins')->where('user_id', $id)->delete();
             }
-            if (Schema::hasTable('staff')) {
+            if (schema_has_table('staff')) {
                 DB::table('staff')->where('user_id', $id)->delete();
             }
-            if (Schema::hasTable('customer_orders')) {
-                if (Schema::hasColumn('customer_orders', 'customer_id')) {
+            if (schema_has_table('customer_orders')) {
+                if (schema_has_column('customer_orders', 'customer_id')) {
                     DB::table('customer_orders')->where('customer_id', $id)->delete();
                 }
-                if (Schema::hasColumn('customer_orders', 'customer_account_id')) {
+                if (schema_has_column('customer_orders', 'customer_account_id')) {
                     DB::table('customer_orders')->where('customer_account_id', $id)->delete();
                 }
-                if (Schema::hasColumn('customer_orders', 'user_id')) {
+                if (schema_has_column('customer_orders', 'user_id')) {
                     DB::table('customer_orders')->where('user_id', $id)->delete();
                 }
             }
-            if (Schema::hasTable('saved_services')) {
+            if (schema_has_table('saved_services')) {
                 DB::table('saved_services')->where('user_id', $id)->delete();
             }
-            if (Schema::hasTable('design_assets')) {
+            if (schema_has_table('design_assets')) {
                 DB::table('design_assets')->where('user_id', $id)->delete();
             }
-            if (Schema::hasTable('ai_image_generations')) {
+            if (schema_has_table('ai_image_generations')) {
                 DB::table('ai_image_generations')->where('user_id', $id)->delete();
             }
 
@@ -725,7 +725,7 @@ class AdminController extends Controller
                 ->orderBy('enterprises.created_at', 'desc')
                 ->paginate(20);
 
-            $activeEnterprisesCount = Schema::hasColumn('enterprises', 'is_active')
+            $activeEnterprisesCount = schema_has_column('enterprises', 'is_active')
                 ? DB::table('enterprises')->where('is_active', true)->count()
                 : DB::table('enterprises')->count();
 
@@ -1012,7 +1012,7 @@ class AdminController extends Controller
             ['status' => $newStatus?->status_name ?? null, 'remarks' => $request->remarks ?? null]
         );
 
-        if (Schema::hasColumn('customer_orders', 'status_id')) {
+        if (schema_has_column('customer_orders', 'status_id')) {
             DB::table('customer_orders')
                 ->where('purchase_order_id', $id)
                 ->update([
@@ -1021,7 +1021,7 @@ class AdminController extends Controller
                 ]);
         }
 
-        if (Schema::hasTable('order_notifications')) {
+        if (schema_has_table('order_notifications')) {
             $oldStatusName = $oldStatus?->status_name ?? 'Unknown';
             $newStatusName = $newStatus?->status_name ?? 'Unknown';
 
@@ -1138,7 +1138,7 @@ class AdminController extends Controller
 
     public function toggleServiceActive($id)
     {
-        if (!Schema::hasColumn('services', 'is_active')) {
+        if (!schema_has_column('services', 'is_active')) {
             return redirect()->back()->with('error', 'Service active status is not supported by the current schema.');
         }
 
@@ -1161,7 +1161,7 @@ class AdminController extends Controller
 
     public function toggleEnterpriseActive($id)
     {
-        if (!Schema::hasColumn('enterprises', 'is_active')) {
+        if (!schema_has_column('enterprises', 'is_active')) {
             if (request()->expectsJson() || request()->ajax()) {
                 return response()->json([
                     'success' => false,
@@ -1256,7 +1256,7 @@ class AdminController extends Controller
 
     public function userReports(Request $request)
     {
-        if (! Schema::hasTable('user_reports')) {
+        if (! schema_has_table('user_reports')) {
             $reports = new \Illuminate\Pagination\LengthAwarePaginator([], 0, 25);
             return view('admin.user-reports', compact('reports'));
         }
@@ -1284,7 +1284,7 @@ class AdminController extends Controller
 
     public function resolveUserReport(Request $request, string $id)
     {
-        if (! Schema::hasTable('user_reports')) {
+        if (! schema_has_table('user_reports')) {
             return redirect()->back()->with('error', 'Reports table is not available.');
         }
 
@@ -1308,7 +1308,7 @@ class AdminController extends Controller
 
     public function systemFeedback(Request $request)
     {
-        if (! Schema::hasTable('system_feedback')) {
+        if (! schema_has_table('system_feedback')) {
             $feedback = new \Illuminate\Pagination\LengthAwarePaginator([], 0, 25);
             return view('admin.system-feedback', compact('feedback'));
         }
@@ -1333,7 +1333,7 @@ class AdminController extends Controller
 
     public function markSystemFeedbackReviewed(Request $request, string $id)
     {
-        if (! Schema::hasTable('system_feedback')) {
+        if (! schema_has_table('system_feedback')) {
             return redirect()->back()->with('error', 'System feedback table is not available.');
         }
 
@@ -1357,7 +1357,7 @@ class AdminController extends Controller
 
     public function markSystemFeedbackAddressed(Request $request, string $id)
     {
-        if (! Schema::hasTable('system_feedback')) {
+        if (! schema_has_table('system_feedback')) {
             return redirect()->back()->with('error', 'System feedback table is not available.');
         }
 
@@ -1449,7 +1449,7 @@ class AdminController extends Controller
     public function getEnterpriseStats()
     {
         try {
-            $activeEnterprisesCount = Schema::hasColumn('enterprises', 'is_active')
+            $activeEnterprisesCount = schema_has_column('enterprises', 'is_active')
                 ? DB::table('enterprises')->where('is_active', true)->count()
                 : DB::table('enterprises')->count();
 

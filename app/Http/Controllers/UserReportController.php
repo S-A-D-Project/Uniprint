@@ -16,7 +16,7 @@ class UserReportController extends Controller
             return redirect()->route('login');
         }
 
-        if (! Schema::hasTable('user_reports')) {
+        if (! schema_has_table('user_reports')) {
             return redirect()->back()->with('error', 'Reporting is not available. Please run migrations and try again.');
         }
 
@@ -36,7 +36,7 @@ class UserReportController extends Controller
             if (! $enterpriseId) {
                 return redirect()->back()->with('error', 'Invalid report target.');
             }
-            if (Schema::hasTable('enterprises') && ! DB::table('enterprises')->where('enterprise_id', $enterpriseId)->exists()) {
+            if (schema_has_table('enterprises') && ! DB::table('enterprises')->where('enterprise_id', $enterpriseId)->exists()) {
                 return redirect()->back()->with('error', 'Enterprise not found.');
             }
             $serviceId = '';
@@ -46,7 +46,7 @@ class UserReportController extends Controller
             if (! $serviceId) {
                 return redirect()->back()->with('error', 'Invalid report target.');
             }
-            if (Schema::hasTable('services') && ! DB::table('services')->where('service_id', $serviceId)->exists()) {
+            if (schema_has_table('services') && ! DB::table('services')->where('service_id', $serviceId)->exists()) {
                 return redirect()->back()->with('error', 'Service not found.');
             }
             $enterpriseId = '';

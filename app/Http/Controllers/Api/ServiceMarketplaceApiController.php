@@ -20,11 +20,11 @@ class ServiceMarketplaceApiController extends Controller
 
     private function applyEnterpriseVisibilityConstraints($query): void
     {
-        if (Schema::hasColumn('enterprises', 'is_active')) {
+        if (schema_has_column('enterprises', 'is_active')) {
             $query->where('e.is_active', true);
         }
 
-        if (Schema::hasColumn('enterprises', 'is_verified')) {
+        if (schema_has_column('enterprises', 'is_verified')) {
             $query->where('e.is_verified', true);
         }
     }
@@ -55,7 +55,7 @@ class ServiceMarketplaceApiController extends Controller
             ]));
 
             $cached = Cache::remember($cacheKey, 60, function () use ($request, $limit, $page) {
-                $reviewsTableExists = Schema::hasTable('reviews');
+                $reviewsTableExists = schema_has_table('reviews');
 
                 $query = DB::table('services as s')
                     ->join('enterprises as e', 's.enterprise_id', '=', 'e.enterprise_id')
@@ -81,10 +81,10 @@ class ServiceMarketplaceApiController extends Controller
                     's.base_price as original_price',
                     'e.name as provider_name',
                     'e.address as location',
-                    Schema::hasColumn('services', 'fulfillment_type')
+                    schema_has_column('services', 'fulfillment_type')
                         ? 's.fulfillment_type as service_type'
                         : DB::raw("'pickup' as service_type"),
-                    Schema::hasColumn('services', 'image_path')
+                    schema_has_column('services', 'image_path')
                         ? 's.image_path'
                         : DB::raw('NULL as image_path'),
                 ];
@@ -247,7 +247,7 @@ class ServiceMarketplaceApiController extends Controller
             }
 
             // Check if reviews table exists
-            $reviewsTableExists = Schema::hasTable('reviews');
+            $reviewsTableExists = schema_has_table('reviews');
             
             $query = DB::table('services as s')
                 ->join('enterprises as e', 's.enterprise_id', '=', 'e.enterprise_id');
@@ -270,10 +270,10 @@ class ServiceMarketplaceApiController extends Controller
                 'e.address as location',
                 'e.address as address',
                 'e.contact_number as phone',
-                Schema::hasColumn('enterprises', 'email')
+                schema_has_column('enterprises', 'email')
                     ? 'e.email as email'
                     : DB::raw('NULL as email'),
-                Schema::hasColumn('services', 'image_path')
+                schema_has_column('services', 'image_path')
                     ? 's.image_path'
                     : DB::raw('NULL as image_path')
             ];
@@ -282,10 +282,10 @@ class ServiceMarketplaceApiController extends Controller
                 $selectFields[] = DB::raw('COALESCE(AVG(r.rating), 0) as rating');
                 $selectFields[] = DB::raw('COUNT(r.review_id) as review_count');
                 $groupBy = ['s.service_id', 's.service_name', 's.description', 's.base_price', 'e.name', 'e.address', 'e.contact_number'];
-                if (Schema::hasColumn('enterprises', 'email')) {
+                if (schema_has_column('enterprises', 'email')) {
                     $groupBy[] = 'e.email';
                 }
-                if (Schema::hasColumn('services', 'image_path')) {
+                if (schema_has_column('services', 'image_path')) {
                     $groupBy[] = 's.image_path';
                 }
                 $query->groupBy($groupBy);
@@ -305,10 +305,10 @@ class ServiceMarketplaceApiController extends Controller
             // Get related services
             $relatedServices = DB::table('services as s')
                 ->join('enterprises as e', 's.enterprise_id', '=', 'e.enterprise_id')
-                ->when(Schema::hasColumn('enterprises', 'is_active'), function ($q) {
+                ->when(schema_has_column('enterprises', 'is_active'), function ($q) {
                     $q->where('e.is_active', true);
                 })
-                ->when(Schema::hasColumn('enterprises', 'is_verified'), function ($q) {
+                ->when(schema_has_column('enterprises', 'is_verified'), function ($q) {
                     $q->where('e.is_verified', true);
                 })
                 ->where('s.is_active', true)
@@ -320,7 +320,7 @@ class ServiceMarketplaceApiController extends Controller
                     's.service_name as title',
                     's.base_price as price',
                     'e.name as provider_name',
-                    Schema::hasColumn('services', 'image_path')
+                    schema_has_column('services', 'image_path')
                         ? 's.image_path'
                         : DB::raw('NULL as image_path')
                 ])
@@ -501,16 +501,16 @@ class ServiceMarketplaceApiController extends Controller
                     ->join('enterprises as e', 's.enterprise_id', '=', 'e.enterprise_id')
                     ->where('s.is_active', true);
 
-                if (Schema::hasColumn('enterprises', 'is_active')) {
+                if (schema_has_column('enterprises', 'is_active')) {
                     $allCountQuery->where('e.is_active', true);
                 }
-                if (Schema::hasColumn('enterprises', 'is_verified')) {
+                if (schema_has_column('enterprises', 'is_verified')) {
                     $allCountQuery->where('e.is_verified', true);
                 }
 
                 $allCount = $allCountQuery->count();
 
-                if (!Schema::hasColumn('enterprises', 'category')) {
+                if (!schema_has_column('enterprises', 'category')) {
                     return [
                         ['id' => 'all', 'name' => 'All Services', 'icon' => 'grid', 'count' => (int) $allCount],
                     ];
@@ -519,7 +519,7 @@ class ServiceMarketplaceApiController extends Controller
                 $byCategory = DB::table('enterprises as e')
                     ->join('services as s', 'e.enterprise_id', '=', 's.enterprise_id')
                     ->where('e.is_active', true)
-                    ->when(Schema::hasColumn('enterprises', 'is_verified'), function ($q) {
+                    ->when(schema_has_column('enterprises', 'is_verified'), function ($q) {
                         $q->where('e.is_verified', true);
                     })
                     ->where('s.is_active', true)
@@ -564,9 +564,9 @@ class ServiceMarketplaceApiController extends Controller
     {
         $category = $request->get('category', 'all');
         if (!empty($category) && $category !== 'all') {
-            if (Schema::hasColumn('enterprises', 'category')) {
+            if (schema_has_column('enterprises', 'category')) {
                 $query->where('e.category', $category);
-            } elseif (Schema::hasColumn('services', 'category')) {
+            } elseif (schema_has_column('services', 'category')) {
                 $query->where('s.category', $category);
             }
         }
@@ -633,13 +633,13 @@ class ServiceMarketplaceApiController extends Controller
 
         // Rating filter
         $rating = $request->get('rating', '');
-        if (!empty($rating) && Schema::hasTable('reviews')) {
+        if (!empty($rating) && schema_has_table('reviews')) {
             $minRating = (float) str_replace('+', '', $rating);
             $query->whereRaw('COALESCE(ra.rating, 0) >= ?', [$minRating]);
         }
 
         $fulfillmentType = (string) $request->get('fulfillment_type', '');
-        if ($fulfillmentType !== '' && Schema::hasColumn('services', 'fulfillment_type')) {
+        if ($fulfillmentType !== '' && schema_has_column('services', 'fulfillment_type')) {
             if ($fulfillmentType === 'pickup') {
                 $query->whereIn('s.fulfillment_type', ['pickup', 'both']);
             } elseif ($fulfillmentType === 'delivery') {
@@ -671,10 +671,10 @@ class ServiceMarketplaceApiController extends Controller
                 )
                 ->groupBy('e.enterprise_id', 'e.name');
 
-            if (Schema::hasColumn('enterprises', 'is_active')) {
+            if (schema_has_column('enterprises', 'is_active')) {
                 $q->where('e.is_active', true);
             }
-            if (Schema::hasColumn('enterprises', 'is_verified')) {
+            if (schema_has_column('enterprises', 'is_verified')) {
                 $q->where('e.is_verified', true);
             }
 
@@ -726,10 +726,10 @@ class ServiceMarketplaceApiController extends Controller
                 ->distinct()
                 ->limit(500);
 
-            if (Schema::hasColumn('enterprises', 'is_active')) {
+            if (schema_has_column('enterprises', 'is_active')) {
                 $q->where('e.is_active', true);
             }
-            if (Schema::hasColumn('enterprises', 'is_verified')) {
+            if (schema_has_column('enterprises', 'is_verified')) {
                 $q->where('e.is_verified', true);
             }
 
@@ -785,7 +785,7 @@ class ServiceMarketplaceApiController extends Controller
      */
     private function applySorting($query, $sortBy)
     {
-        $reviewsTableExists = Schema::hasTable('reviews');
+        $reviewsTableExists = schema_has_table('reviews');
         
         switch($sortBy) {
             case 'popular':

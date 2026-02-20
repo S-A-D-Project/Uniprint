@@ -78,11 +78,6 @@ class User extends Authenticatable
         return $this->hasMany(CustomerOrder::class, 'customer_account_id', 'user_id');
     }
 
-    public function aiImageGenerations()
-    {
-        return $this->hasMany(AiImageGeneration::class, 'user_id', 'user_id');
-    }
-
     // Helper methods
     public function isAdmin()
     {

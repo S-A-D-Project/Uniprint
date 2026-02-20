@@ -22,8 +22,7 @@
 .up-modal-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.6);
 }
 
 .up-modal-dialog {
@@ -129,7 +128,7 @@
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
   transform: translateY(0);
   opacity: 1;
-  transition: opacity 0.25s ease, transform 0.25s ease;
+  transition: opacity 0.1s ease, transform 0.1s ease;
   font-size: 14px;
 }
 
@@ -147,14 +146,17 @@
   position: fixed;
   inset: 0;
   z-index: 10000;
-  display: none;
+  visibility: hidden;
+  opacity: 0;
   align-items: center;
   justify-content: center;
-  background: rgba(15, 23, 42, 0.55);
-  backdrop-filter: blur(2px);
+  background: rgba(15, 23, 42, 0.65);
+  transition: opacity 0.1s ease;
 }
 
 .up-loading-overlay--show {
+  visibility: visible;
+  opacity: 1;
   display: flex;
 }
 
@@ -175,7 +177,7 @@
   border-top-color: var(--up-primary);
   border-radius: 9999px;
   margin: 0 auto 12px;
-  animation: up-spin 0.9s linear infinite;
+  animation: up-spin 0.6s linear infinite;
 }
 
 .up-loading-title {
@@ -196,7 +198,7 @@
   border: 2px solid rgba(255, 255, 255, 0.35);
   border-top-color: rgba(255, 255, 255, 0.95);
   border-radius: 9999px;
-  animation: up-spin 0.9s linear infinite;
+  animation: up-spin 0.6s linear infinite;
 }
 
 .up-no-scroll {

@@ -17,25 +17,25 @@ class EnsureBusinessVerified
             return redirect()->route('login');
         }
 
-        if (! Schema::hasTable('enterprises')) {
+        if (! schema_has_table('enterprises')) {
             return $next($request);
         }
 
-        $hasIsVerifiedColumn = Schema::hasColumn('enterprises', 'is_verified');
+        $hasIsVerifiedColumn = schema_has_column('enterprises', 'is_verified');
         $selectColumns = ['enterprise_id'];
         if ($hasIsVerifiedColumn) {
             $selectColumns[] = 'is_verified';
         }
 
         $enterprise = null;
-        if (Schema::hasColumn('enterprises', 'owner_user_id')) {
+        if (schema_has_column('enterprises', 'owner_user_id')) {
             $enterprise = DB::table('enterprises')
                 ->where('owner_user_id', $userId)
                 ->select($selectColumns)
                 ->first();
         }
 
-        if (! $enterprise && Schema::hasTable('staff')) {
+        if (! $enterprise && schema_has_table('staff')) {
             $enterpriseId = DB::table('staff')->where('user_id', $userId)->value('enterprise_id');
             if ($enterpriseId) {
                 $enterprise = DB::table('enterprises')

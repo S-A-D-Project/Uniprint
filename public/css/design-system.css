@@ -8,7 +8,7 @@
 .shadow-card-hover{box-shadow:0 10px 15px -3px rgb(0 0 0 / .1),0 4px 6px -4px rgb(0 0 0 / .1)}
 .shadow-glow{box-shadow:0 0 40px hsl(263 70% 50% / .3)}
 
-.transition-smooth{transition:all .3s cubic-bezier(.4,0,.2,1)}
+.transition-smooth{transition:all .15s ease}
 
 .bg-clip-text{-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
 

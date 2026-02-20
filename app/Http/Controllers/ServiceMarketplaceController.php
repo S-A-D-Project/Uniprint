@@ -39,13 +39,13 @@ class ServiceMarketplaceController extends Controller
                 ->join('enterprises as e', 's.enterprise_id', '=', 'e.enterprise_id')
                 ->where('s.is_active', true)
                 ->where('e.is_active', true);
-            if (Schema::hasColumn('enterprises', 'is_verified')) {
+            if (schema_has_column('enterprises', 'is_verified')) {
                 $totalServicesQuery->where('e.is_verified', true);
             }
             $totalServices = $totalServicesQuery->count();
 
             $totalProvidersQuery = DB::table('enterprises')->where('is_active', true);
-            if (Schema::hasColumn('enterprises', 'is_verified')) {
+            if (schema_has_column('enterprises', 'is_verified')) {
                 $totalProvidersQuery->where('is_verified', true);
             }
             $totalProviders = $totalProvidersQuery->count();
@@ -55,7 +55,7 @@ class ServiceMarketplaceController extends Controller
                 ->join('enterprises as e', 's.enterprise_id', '=', 'e.enterprise_id')
                 ->where('s.is_active', true)
                 ->where('e.is_active', true)
-                ->when(Schema::hasColumn('enterprises', 'is_verified'), function ($q) {
+                ->when(schema_has_column('enterprises', 'is_verified'), function ($q) {
                     $q->where('e.is_verified', true);
                 })
                 ->select([

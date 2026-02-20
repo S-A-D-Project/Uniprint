@@ -71,7 +71,7 @@ class CustomerController extends Controller
             'decision' => 'required|in:accept,decline',
         ]);
 
-        if (!Schema::hasTable('order_extension_requests')) {
+        if (!schema_has_table('order_extension_requests')) {
             return redirect()->back()->with('error', 'Extension requests are not available. Please run migrations.');
         }
 
@@ -102,10 +102,10 @@ class CustomerController extends Controller
 
         // Determine business recipient (owner preferred; fallback to staff)
         $businessRecipientId = null;
-        if (Schema::hasColumn('enterprises', 'owner_user_id')) {
+        if (schema_has_column('enterprises', 'owner_user_id')) {
             $businessRecipientId = DB::table('enterprises')->where('enterprise_id', $order->enterprise_id)->value('owner_user_id');
         }
-        if (!$businessRecipientId && Schema::hasTable('staff')) {
+        if (!$businessRecipientId && schema_has_table('staff')) {
             $businessRecipientId = DB::table('staff')
                 ->where('enterprise_id', $order->enterprise_id)
                 ->orderByRaw("CASE WHEN position = 'Owner' THEN 0 ELSE 1 END")
@@ -124,11 +124,11 @@ class CustomerController extends Controller
 
             if ($decision === 'accept') {
                 $dueExpr = 'date_requested';
-                if (Schema::hasColumn('customer_orders', 'pickup_date')) {
+                if (schema_has_column('customer_orders', 'pickup_date')) {
                     $dueExpr = 'pickup_date';
-                } elseif (Schema::hasColumn('customer_orders', 'requested_fulfillment_date')) {
+                } elseif (schema_has_column('customer_orders', 'requested_fulfillment_date')) {
                     $dueExpr = 'requested_fulfillment_date';
-                } elseif (Schema::hasColumn('customer_orders', 'delivery_date')) {
+                } elseif (schema_has_column('customer_orders', 'delivery_date')) {
                     $dueExpr = 'delivery_date';
                 }
 
@@ -151,7 +151,7 @@ class CustomerController extends Controller
             // Notification insertion is handled after transaction to allow correct recipient resolution.
         });
 
-        if ($businessRecipientId && Schema::hasTable('order_notifications')) {
+        if ($businessRecipientId && schema_has_table('order_notifications')) {
             DB::table('order_notifications')->insert([
                 'notification_id' => (string) Str::uuid(),
                 'purchase_order_id' => $orderId,
@@ -265,7 +265,7 @@ class CustomerController extends Controller
 
         $extensionRequests = collect();
         $pendingExtensionRequest = null;
-        if (Schema::hasTable('order_extension_requests')) {
+        if (schema_has_table('order_extension_requests')) {
             $extensionRequests = DB::table('order_extension_requests')
                 ->where('purchase_order_id', $id)
                 ->where('customer_id', $userId)
@@ -279,8 +279,8 @@ class CustomerController extends Controller
             ->join('services', 'order_items.service_id', '=', 'services.service_id')
             ->where('order_items.purchase_order_id', $id);
 
-        $hasRequiresFileUploadColumn = \Illuminate\Support\Facades\Schema::hasColumn('services', 'requires_file_upload');
-        $hasFileUploadEnabledColumn = \Illuminate\Support\Facades\Schema::hasColumn('services', 'file_upload_enabled');
+        $hasRequiresFileUploadColumn = \Illuminate\Support\Facades\schema_has_column('services', 'requires_file_upload');
+        $hasFileUploadEnabledColumn = \Illuminate\Support\Facades\schema_has_column('services', 'file_upload_enabled');
 
         if ($hasRequiresFileUploadColumn && $hasFileUploadEnabledColumn) {
             $orderItems = $itemsQuery->select('order_items.*', 'services.service_name', 'services.description as service_description', 'services.requires_file_upload', 'services.file_upload_enabled')->get();
@@ -356,7 +356,7 @@ class CustomerController extends Controller
             ->get();
 
         $reviewsByServiceId = collect();
-        if (Schema::hasTable('reviews')) {
+        if (schema_has_table('reviews')) {
             $serviceIds = $orderItems->pluck('service_id')->filter()->unique()->values()->all();
             if (!empty($serviceIds)) {
                 $reviewsByServiceId = DB::table('reviews')
@@ -384,7 +384,7 @@ class CustomerController extends Controller
             return redirect()->route('login');
         }
 
-        if (!Schema::hasTable('reviews')) {
+        if (!schema_has_table('reviews')) {
             return redirect()->back()->with('error', 'Reviews are not available. Please run migrations and try again.');
         }
 
@@ -455,7 +455,7 @@ class CustomerController extends Controller
             DB::table('reviews')->insert($payload);
         }
 
-        if ($reviewId && $request->hasFile('review_files') && Schema::hasTable('review_files')) {
+        if ($reviewId && $request->hasFile('review_files') && schema_has_table('review_files')) {
             foreach ((array) $request->file('review_files') as $file) {
                 if (!$file) {
                     continue;
@@ -513,7 +513,7 @@ class CustomerController extends Controller
             ->get();
 
         $reviewsByServiceId = collect();
-        if (Schema::hasTable('reviews')) {
+        if (schema_has_table('reviews')) {
             $serviceIds = $orderItems->pluck('service_id')->filter()->unique()->values()->all();
             if (!empty($serviceIds)) {
                 $reviewsByServiceId = DB::table('reviews')
@@ -525,7 +525,7 @@ class CustomerController extends Controller
         }
 
         $reviewFilesByReviewId = [];
-        if (Schema::hasTable('review_files') && $reviewsByServiceId->isNotEmpty()) {
+        if (schema_has_table('review_files') && $reviewsByServiceId->isNotEmpty()) {
             $reviewIds = $reviewsByServiceId->pluck('review_id')->filter()->unique()->values()->all();
             if (!empty($reviewIds)) {
                 $files = DB::table('review_files')
@@ -608,10 +608,10 @@ class CustomerController extends Controller
 
         // Notify enterprise owner (owner_user_id preferred, fallback to first staff user)
         $recipientId = null;
-        if (\Illuminate\Support\Facades\Schema::hasColumn('enterprises', 'owner_user_id')) {
+        if (\Illuminate\Support\Facades\schema_has_column('enterprises', 'owner_user_id')) {
             $recipientId = DB::table('enterprises')->where('enterprise_id', $order->enterprise_id)->value('owner_user_id');
         }
-        if (! $recipientId && \Illuminate\Support\Facades\Schema::hasTable('staff')) {
+        if (! $recipientId && \Illuminate\Support\Facades\schema_has_table('staff')) {
             $recipientId = DB::table('staff')
                 ->where('enterprise_id', $order->enterprise_id)
                 ->orderByRaw("CASE WHEN position = 'Owner' THEN 0 ELSE 1 END")
@@ -682,10 +682,10 @@ class CustomerController extends Controller
 
         // Notify enterprise owner (owner_user_id preferred, fallback to first staff user)
         $recipientId = null;
-        if (\Illuminate\Support\Facades\Schema::hasColumn('enterprises', 'owner_user_id')) {
+        if (\Illuminate\Support\Facades\schema_has_column('enterprises', 'owner_user_id')) {
             $recipientId = DB::table('enterprises')->where('enterprise_id', $order->enterprise_id)->value('owner_user_id');
         }
-        if (! $recipientId && \Illuminate\Support\Facades\Schema::hasTable('staff')) {
+        if (! $recipientId && \Illuminate\Support\Facades\schema_has_table('staff')) {
             $recipientId = DB::table('staff')
                 ->where('enterprise_id', $order->enterprise_id)
                 ->orderByRaw("CASE WHEN position = 'Owner' THEN 0 ELSE 1 END")
@@ -729,8 +729,8 @@ class CustomerController extends Controller
             abort(404);
         }
 
-        $hasFileUploadEnabledColumn = \Illuminate\Support\Facades\Schema::hasColumn('services', 'file_upload_enabled');
-        $hasRequiresFileUploadColumn = \Illuminate\Support\Facades\Schema::hasColumn('services', 'requires_file_upload');
+        $hasFileUploadEnabledColumn = \Illuminate\Support\Facades\schema_has_column('services', 'file_upload_enabled');
+        $hasRequiresFileUploadColumn = \Illuminate\Support\Facades\schema_has_column('services', 'requires_file_upload');
 
         if ($hasFileUploadEnabledColumn || $hasRequiresFileUploadColumn) {
             $query = DB::table('order_items')
@@ -919,7 +919,7 @@ class CustomerController extends Controller
     {
         $enterpriseQuery = Enterprise::where('enterprise_id', $id)
             ->where('is_active', true);
-        if (Schema::hasColumn('enterprises', 'is_verified')) {
+        if (schema_has_column('enterprises', 'is_verified')) {
             $enterpriseQuery->where('is_verified', true);
         }
         $enterprise = $enterpriseQuery->firstOrFail();
@@ -938,7 +938,7 @@ class CustomerController extends Controller
             ->where('is_active', true)
             ->with(['enterprise', 'customizationOptions', 'customFields']);
 
-        if (Schema::hasColumn('enterprises', 'is_verified')) {
+        if (schema_has_column('enterprises', 'is_verified')) {
             $serviceQuery->whereHas('enterprise', function ($q) {
                 $q->where('is_active', true)->where('is_verified', true);
             });
@@ -953,7 +953,7 @@ class CustomerController extends Controller
         $customizationGroups = $service->customizationOptions->groupBy('option_type');
 
         $reviews = collect();
-        if (Schema::hasTable('reviews')) {
+        if (schema_has_table('reviews')) {
             $reviews = DB::table('reviews')
                 ->leftJoin('users', 'reviews.customer_id', '=', 'users.user_id')
                 ->where('reviews.service_id', $id)
@@ -1001,7 +1001,7 @@ class CustomerController extends Controller
     {
         $user = Auth::user();
 
-        if (! Schema::hasTable('design_assets')) {
+        if (! schema_has_table('design_assets')) {
             $assets = new LengthAwarePaginator(
                 [],
                 0,

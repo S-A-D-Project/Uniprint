@@ -391,21 +391,21 @@ class AuthController extends Controller
                     $hasEnterprise = false;
                     $isVerified = true;
 
-                    if (\Illuminate\Support\Facades\Schema::hasColumn('enterprises', 'owner_user_id')) {
+                    if (\Illuminate\Support\Facades\schema_has_column('enterprises', 'owner_user_id')) {
                         $enterpriseQuery = DB::table('enterprises')->where('owner_user_id', $userId);
                         $hasEnterprise = $enterpriseQuery->exists();
 
-                        if ($hasEnterprise && \Illuminate\Support\Facades\Schema::hasColumn('enterprises', 'is_verified')) {
+                        if ($hasEnterprise && \Illuminate\Support\Facades\schema_has_column('enterprises', 'is_verified')) {
                             $isVerified = (bool) $enterpriseQuery->value('is_verified');
                         }
                     }
 
-                    if (! $hasEnterprise && \Illuminate\Support\Facades\Schema::hasTable('staff')) {
+                    if (! $hasEnterprise && \Illuminate\Support\Facades\schema_has_table('staff')) {
                         // Backward-compatibility for legacy data
                         $enterpriseId = DB::table('staff')->where('user_id', $userId)->value('enterprise_id');
                         $hasEnterprise = ! empty($enterpriseId);
 
-                        if ($hasEnterprise && \Illuminate\Support\Facades\Schema::hasColumn('enterprises', 'is_verified')) {
+                        if ($hasEnterprise && \Illuminate\Support\Facades\schema_has_column('enterprises', 'is_verified')) {
                             $isVerified = (bool) DB::table('enterprises')->where('enterprise_id', $enterpriseId)->value('is_verified');
                         }
                     }
@@ -413,7 +413,7 @@ class AuthController extends Controller
                         return redirect()->route('business.onboarding');
                     }
 
-                    if (\Illuminate\Support\Facades\Schema::hasColumn('enterprises', 'is_verified') && ! $isVerified) {
+                    if (\Illuminate\Support\Facades\schema_has_column('enterprises', 'is_verified') && ! $isVerified) {
                         return redirect()->route('business.pending');
                     }
                     return redirect()->route('business.dashboard');

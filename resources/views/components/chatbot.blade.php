@@ -254,7 +254,7 @@ class Chatbot {
         
         // Design-related responses
         if (lowerMessage.includes('design') || lowerMessage.includes('custom') || lowerMessage.includes('artwork')) {
-            return "We offer AI-powered design tools to help you create professional designs. You can also upload your own files or work with our design partners. Popular formats include PDF, PNG, and AI files.";
+            return "Upload your own designs or work with our design partners. Popular formats include PDF, PNG, and AI files.";
         }
         
         // Account-related responses

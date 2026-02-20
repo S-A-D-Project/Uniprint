@@ -129,7 +129,7 @@ class OrderProcessingService
                 }
 
                 $enterpriseTempDesignFiles = collect();
-                if (!$direct && Schema::hasTable('saved_service_design_files') && !empty($savedServiceIds)) {
+                if (!$direct && schema_has_table('saved_service_design_files') && !empty($savedServiceIds)) {
                     $enterpriseTempDesignFiles = $tempDesignFiles->whereIn('saved_service_id', $savedServiceIds);
                 }
 
@@ -144,7 +144,7 @@ class OrderProcessingService
                     ->values();
 
                 $customizationOptionsById = collect();
-                if (Schema::hasTable('customization_options') && $allCustomizationIds->isNotEmpty()) {
+                if (schema_has_table('customization_options') && $allCustomizationIds->isNotEmpty()) {
                     $customizationOptionsById = DB::table('customization_options')
                         ->whereIn('option_id', $allCustomizationIds)
                         ->get()
@@ -158,12 +158,12 @@ class OrderProcessingService
                     }
 
                     // Enforce rush eligibility
-                    if ($rushOption !== 'standard' && Schema::hasColumn('services', 'supports_rush') && empty($serviceData?->supports_rush)) {
+                    if ($rushOption !== 'standard' && schema_has_column('services', 'supports_rush') && empty($serviceData?->supports_rush)) {
                         throw new OrderProcessingException('One or more services in your order do not support rush pickup options for enterprise ' . $enterpriseId, 422);
                     }
 
                     // Downpayment rules
-                    if (Schema::hasColumn('services', 'requires_downpayment') && Schema::hasColumn('services', 'downpayment_percent')) {
+                    if (schema_has_column('services', 'requires_downpayment') && schema_has_column('services', 'downpayment_percent')) {
                         if (!empty($serviceData?->requires_downpayment)) {
                             $dp = (float) ($serviceData?->downpayment_percent ?? 0);
                             $downpaymentRequiredPercent = max($downpaymentRequiredPercent, $dp);
@@ -175,7 +175,7 @@ class OrderProcessingService
                     }
 
                     // Fulfillment constraints
-                    if ($fulfillmentMethod && Schema::hasColumn('services', 'fulfillment_type') && !empty($serviceData->fulfillment_type)) {
+                    if ($fulfillmentMethod && schema_has_column('services', 'fulfillment_type') && !empty($serviceData->fulfillment_type)) {
                         if ($serviceData->fulfillment_type === 'pickup' && $fulfillmentMethod !== 'pickup') {
                             throw new OrderProcessingException('One or more services are pickup-only.', 422);
                         }
@@ -185,7 +185,7 @@ class OrderProcessingService
                     }
 
                     // Allowed payment methods per service
-                    if ($paymentMethod && Schema::hasColumn('services', 'allowed_payment_methods') && !empty($serviceData->allowed_payment_methods)) {
+                    if ($paymentMethod && schema_has_column('services', 'allowed_payment_methods') && !empty($serviceData->allowed_payment_methods)) {
                         $decoded = json_decode($serviceData->allowed_payment_methods, true);
                         if (is_array($decoded) && !empty($decoded) && !in_array($paymentMethod, $decoded, true)) {
                             throw new OrderProcessingException('Selected payment method is not accepted by one or more services.', 422);
@@ -193,13 +193,13 @@ class OrderProcessingService
                     }
 
                     // File upload requirements
-                    if (Schema::hasColumn('services', 'requires_file_upload') && !empty($serviceData?->requires_file_upload)) {
+                    if (schema_has_column('services', 'requires_file_upload') && !empty($serviceData?->requires_file_upload)) {
                         if ($direct) {
                             if (count($directDesignFiles) === 0) {
                                 throw new OrderProcessingException('This service requires design files. Please upload the required files before checkout.', 422);
                             }
                         } else {
-                            if (Schema::hasTable('saved_service_design_files') && $enterpriseTempDesignFiles->where('saved_service_id', $savedService->saved_service_id)->count() === 0) {
+                            if (schema_has_table('saved_service_design_files') && $enterpriseTempDesignFiles->where('saved_service_id', $savedService->saved_service_id)->count() === 0) {
                                 throw new OrderProcessingException('One or more services require design files. Please upload the required files before checkout.', 422);
                             }
                         }
@@ -234,7 +234,7 @@ class OrderProcessingService
                         'updated_at' => now(),
                     ];
 
-                    if (Schema::hasColumn('order_items', 'custom_fields')) {
+                    if (schema_has_column('order_items', 'custom_fields')) {
                         $customFieldsValue = $savedService->custom_fields ?? null;
                         if (is_array($customFieldsValue)) {
                             $customFieldsValue = empty($customFieldsValue) ? null : json_encode($customFieldsValue);
@@ -289,19 +289,19 @@ class OrderProcessingService
                     'updated_at' => now(),
                 ];
 
-                if (Schema::hasColumn('customer_orders', 'downpayment_required_percent')) {
+                if (schema_has_column('customer_orders', 'downpayment_required_percent')) {
                     $orderData['downpayment_required_percent'] = $downpaymentRequiredPercent;
                 }
-                if (Schema::hasColumn('customer_orders', 'downpayment_required_amount')) {
+                if (schema_has_column('customer_orders', 'downpayment_required_amount')) {
                     $orderData['downpayment_required_amount'] = $downpaymentRequiredAmount;
                 }
-                if (Schema::hasColumn('customer_orders', 'downpayment_due_at')) {
+                if (schema_has_column('customer_orders', 'downpayment_due_at')) {
                     $orderData['downpayment_due_at'] = $downpaymentDueAt;
                 }
-                if (Schema::hasColumn('customer_orders', 'fulfillment_method')) {
+                if (schema_has_column('customer_orders', 'fulfillment_method')) {
                     $orderData['fulfillment_method'] = $fulfillmentMethod;
                 }
-                if (Schema::hasColumn('customer_orders', 'requested_fulfillment_date')) {
+                if (schema_has_column('customer_orders', 'requested_fulfillment_date')) {
                     $orderData['requested_fulfillment_date'] = $requestedFulfillmentDate;
                 }
 
@@ -310,7 +310,7 @@ class OrderProcessingService
                 foreach ($orderItems as $orderItem) {
                     DB::table('order_items')->insert($orderItem['item']);
 
-                    if (Schema::hasTable('order_item_customizations')) {
+                    if (schema_has_table('order_item_customizations')) {
                         foreach ((array) $orderItem['customization_ids'] as $optionId) {
                             $opt = $customizationOptionsById->get($optionId);
                             if (!$opt) {
@@ -340,7 +340,7 @@ class OrderProcessingService
                     'updated_at' => now(),
                 ]);
 
-                if (Schema::hasTable('payments')) {
+                if (schema_has_table('payments')) {
                     try {
                         DB::table('payments')->insert([
                             'payment_id' => (string) Str::uuid(),
@@ -460,15 +460,15 @@ class OrderProcessingService
         $downpaymentDueAt = null;
 
         if (
-            Schema::hasColumn('customer_orders', 'downpayment_required_percent')
-            && Schema::hasColumn('customer_orders', 'downpayment_required_amount')
-            && Schema::hasColumn('customer_orders', 'downpayment_due_at')
+            schema_has_column('customer_orders', 'downpayment_required_percent')
+            && schema_has_column('customer_orders', 'downpayment_required_amount')
+            && schema_has_column('customer_orders', 'downpayment_due_at')
             && $downpaymentRequiredPercent > 0
         ) {
             $downpaymentRequiredAmount = $total * ($downpaymentRequiredPercent / 100);
 
             $dueHours = 24;
-            if (Schema::hasTable('system_settings')) {
+            if (schema_has_table('system_settings')) {
                 $raw = DB::table('system_settings')->where('key', 'order_downpayment_due_hours')->value('value');
                 if (is_numeric($raw)) {
                     $dueHours = (int) $raw;
@@ -488,7 +488,7 @@ class OrderProcessingService
     {
         $disk = config('filesystems.default', 'public');
 
-        if (!Schema::hasTable('order_design_files')) {
+        if (!schema_has_table('order_design_files')) {
             return;
         }
 
@@ -531,7 +531,7 @@ class OrderProcessingService
             return;
         }
 
-        if (!Schema::hasTable('saved_service_design_files') || empty($savedServiceIds)) {
+        if (!schema_has_table('saved_service_design_files') || empty($savedServiceIds)) {
             return;
         }
 

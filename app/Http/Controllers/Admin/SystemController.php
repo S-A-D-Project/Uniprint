@@ -21,7 +21,7 @@ class SystemController extends Controller
         $backups = $this->getBackupsList();
 
         $autoCompleteHours = 72;
-        if (Schema::hasTable('system_settings')) {
+        if (schema_has_table('system_settings')) {
             $raw = DB::table('system_settings')->where('key', 'order_auto_complete_hours')->value('value');
             if (is_numeric($raw)) {
                 $autoCompleteHours = (int) $raw;
@@ -29,7 +29,7 @@ class SystemController extends Controller
         }
 
         $taxRatePercent = 12.0;
-        if (Schema::hasTable('system_settings')) {
+        if (schema_has_table('system_settings')) {
             $rawTax = DB::table('system_settings')->where('key', 'tax_rate')->value('value');
             if (is_numeric($rawTax)) {
                 $rate = (float) $rawTax;
@@ -48,7 +48,7 @@ class SystemController extends Controller
         }
 
         $overdueCancelDays = 14;
-        if (Schema::hasTable('system_settings')) {
+        if (schema_has_table('system_settings')) {
             $rawOverdue = DB::table('system_settings')->where('key', 'order_overdue_cancel_days')->value('value');
             if (is_numeric($rawOverdue)) {
                 $overdueCancelDays = (int) $rawOverdue;
@@ -70,7 +70,7 @@ class SystemController extends Controller
             'order_auto_complete_hours' => 'required|integer|min:1|max:720',
         ]);
 
-        if (! Schema::hasTable('system_settings')) {
+        if (! schema_has_table('system_settings')) {
             return redirect()->back()->with('error', 'System settings table is not available. Please run migrations.');
         }
 
@@ -92,7 +92,7 @@ class SystemController extends Controller
             'tax_rate' => 'required|numeric|min:0|max:100',
         ]);
 
-        if (! Schema::hasTable('system_settings')) {
+        if (! schema_has_table('system_settings')) {
             return redirect()->back()->with('error', 'System settings table is not available. Please run migrations.');
         }
 
@@ -116,7 +116,7 @@ class SystemController extends Controller
             'order_overdue_cancel_days' => 'required|integer|min:1|max:365',
         ]);
 
-        if (! Schema::hasTable('system_settings')) {
+        if (! schema_has_table('system_settings')) {
             return redirect()->back()->with('error', 'System settings table is not available. Please run migrations.');
         }
 
@@ -140,7 +140,7 @@ class SystemController extends Controller
             'brand_logo' => 'nullable|image|max:2048',
         ]);
 
-        if (! Schema::hasTable('system_settings')) {
+        if (! schema_has_table('system_settings')) {
             return redirect()->back()->with('error', 'System settings table is not available. Please run migrations.');
         }
 

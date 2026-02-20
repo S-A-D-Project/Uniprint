@@ -11,18 +11,18 @@ class BusinessVerificationController extends Controller
 {
     private function getUserEnterprise(string $userId)
     {
-        if (!Schema::hasTable('enterprises')) {
+        if (!schema_has_table('enterprises')) {
             return null;
         }
 
         $enterprise = null;
-        if (Schema::hasColumn('enterprises', 'owner_user_id')) {
+        if (schema_has_column('enterprises', 'owner_user_id')) {
             $enterprise = DB::table('enterprises')
                 ->where('owner_user_id', $userId)
                 ->first();
         }
 
-        if (!$enterprise && Schema::hasTable('staff')) {
+        if (!$enterprise && schema_has_table('staff')) {
             $enterpriseId = DB::table('staff')->where('user_id', $userId)->value('enterprise_id');
             if ($enterpriseId) {
                 $enterprise = DB::table('enterprises')->where('enterprise_id', $enterpriseId)->first();
@@ -59,7 +59,7 @@ class BusinessVerificationController extends Controller
             return redirect()->route('business.onboarding');
         }
 
-        if (!Schema::hasColumn('enterprises', 'verification_document_path') || !Schema::hasColumn('enterprises', 'verification_submitted_at')) {
+        if (!schema_has_column('enterprises', 'verification_document_path') || !schema_has_column('enterprises', 'verification_submitted_at')) {
             return redirect()->back()->with('error', 'Business verification proof is not available. Please run migrations and try again.');
         }
 
@@ -67,7 +67,7 @@ class BusinessVerificationController extends Controller
             'verification_document' => 'required|file|max:5120|mimes:jpg,jpeg,png,pdf',
         ];
 
-        if (Schema::hasColumn('enterprises', 'verification_notes')) {
+        if (schema_has_column('enterprises', 'verification_notes')) {
             $rules['verification_notes'] = 'nullable|string|max:2000';
         }
 
@@ -82,19 +82,19 @@ class BusinessVerificationController extends Controller
             'updated_at' => now(),
         ];
 
-        if (Schema::hasColumn('enterprises', 'verification_notes')) {
+        if (schema_has_column('enterprises', 'verification_notes')) {
             $update['verification_notes'] = $request->input('verification_notes');
         }
 
-        if (Schema::hasColumn('enterprises', 'is_verified')) {
+        if (schema_has_column('enterprises', 'is_verified')) {
             $update['is_verified'] = false;
         }
 
-        if (Schema::hasColumn('enterprises', 'verified_at')) {
+        if (schema_has_column('enterprises', 'verified_at')) {
             $update['verified_at'] = null;
         }
 
-        if (Schema::hasColumn('enterprises', 'verified_by_user_id')) {
+        if (schema_has_column('enterprises', 'verified_by_user_id')) {
             $update['verified_by_user_id'] = null;
         }
 

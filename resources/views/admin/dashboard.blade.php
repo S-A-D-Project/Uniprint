@@ -365,9 +365,13 @@ class AdminDashboard {
         try {
             // Show loading state
             if (refreshBtn) {
-                refreshBtn.disabled = true;
-                refreshBtn.innerHTML = '<i data-lucide="loader-2" class="h-4 w-4 animate-spin mr-2"></i>Refreshing...';
-                lucide.createIcons();
+                if (window.UniPrintUI && typeof UniPrintUI.setButtonLoading === 'function') {
+                    UniPrintUI.setButtonLoading(refreshBtn, true, { text: 'Refreshing...' });
+                } else {
+                    refreshBtn.disabled = true;
+                    refreshBtn.innerHTML = '<i data-lucide="loader-2" class="h-4 w-4 animate-spin mr-2"></i>Refreshing...';
+                    lucide.createIcons();
+                }
             }
 
             // Fetch fresh data
@@ -399,9 +403,13 @@ class AdminDashboard {
         } finally {
             // Restore button state
             if (refreshBtn) {
-                refreshBtn.disabled = false;
-                refreshBtn.innerHTML = originalText;
-                lucide.createIcons();
+                if (window.UniPrintUI && typeof UniPrintUI.setButtonLoading === 'function') {
+                    UniPrintUI.setButtonLoading(refreshBtn, false);
+                } else {
+                    refreshBtn.disabled = false;
+                    refreshBtn.innerHTML = originalText;
+                    lucide.createIcons();
+                }
             }
         }
     }

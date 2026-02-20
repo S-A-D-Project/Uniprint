@@ -16,7 +16,7 @@
             <div class="mb-8">
                 <h1 class="mb-4">Printing Shops in Baguio</h1>
                 <p class="text-lg text-muted-foreground mb-6">
-                    Find the perfect printing shop for your needs with AI-enhanced ordering
+                    Find the perfect printing shop for your needs
                 </p>
 
                 <form method="GET" action="{{ route('enterprises.index') }}" class="grid grid-cols-1 md:grid-cols-12 gap-4">

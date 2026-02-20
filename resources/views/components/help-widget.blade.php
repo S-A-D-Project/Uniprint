@@ -16,18 +16,6 @@
         
         <div class="space-y-3">
             <!-- Quick Links -->
-            <a href="{{ route('ai-design.index') }}" class="block p-3 rounded-lg hover:bg-secondary transition-smooth">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                        <i data-lucide="sparkles" class="h-5 w-5 text-primary"></i>
-                    </div>
-                    <div>
-                        <p class="font-medium">AI Design Tool</p>
-                        <p class="text-xs text-muted-foreground">Create custom designs</p>
-                    </div>
-                </div>
-            </a>
-            
             <a href="{{ route('customer.orders') }}" class="block p-3 rounded-lg hover:bg-secondary transition-smooth">
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 rounded-lg bg-success/10 flex items-center justify-center">

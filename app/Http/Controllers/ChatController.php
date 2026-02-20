@@ -36,13 +36,13 @@ class ChatController extends Controller
 
         $businessUserId = null;
 
-        if (Schema::hasColumn('enterprises', 'owner_user_id')) {
+        if (schema_has_column('enterprises', 'owner_user_id')) {
             $businessUserId = DB::table('enterprises')
                 ->where('enterprise_id', $enterpriseId)
                 ->value('owner_user_id');
         }
 
-        if (! $businessUserId && Schema::hasTable('staff')) {
+        if (! $businessUserId && schema_has_table('staff')) {
             $businessUserId = DB::table('staff')
                 ->where('enterprise_id', $enterpriseId)
                 ->orderByRaw("CASE WHEN position = 'Owner' THEN 0 ELSE 1 END")
@@ -134,13 +134,13 @@ class ChatController extends Controller
 
         $businessUserId = null;
 
-        if (\Illuminate\Support\Facades\Schema::hasColumn('enterprises', 'owner_user_id')) {
+        if (\Illuminate\Support\Facades\schema_has_column('enterprises', 'owner_user_id')) {
             $businessUserId = DB::table('enterprises')
                 ->where('enterprise_id', $enterpriseId)
                 ->value('owner_user_id');
         }
 
-        if (! $businessUserId && \Illuminate\Support\Facades\Schema::hasTable('staff')) {
+        if (! $businessUserId && \Illuminate\Support\Facades\schema_has_table('staff')) {
             $businessUserId = DB::table('staff')
                 ->where('enterprise_id', $enterpriseId)
                 ->orderByRaw("CASE WHEN position = 'Owner' THEN 0 ELSE 1 END")

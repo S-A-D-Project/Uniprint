@@ -16,7 +16,7 @@ class SystemFeedbackController extends Controller
             return redirect()->route('login');
         }
 
-        if (! Schema::hasTable('system_feedback')) {
+        if (! schema_has_table('system_feedback')) {
             return redirect()->back()->with('error', 'Feedback is not available. Please run migrations and try again.');
         }
 
