@@ -11,18 +11,14 @@
 
                     if ($headerRoleType === 'business_user') {
                         $uid = $u->user_id;
-                        if (schema_has_column('enterprises', 'owner_user_id') && schema_has_column('enterprises', 'is_verified')) {
-                            $enterpriseData = app('App\Services\TursoHttpService')->select('enterprises', ['owner_user_id' => $uid]);
-                            if (!empty($enterpriseData)) {
-                                $isBusinessVerified = (bool) ($enterpriseData[0]['is_verified'] ?? true);
-                            } elseif (schema_has_table('staff')) {
-                                $staffData = app('App\Services\TursoHttpService')->select('staff', ['user_id' => $uid]);
-                                if (!empty($staffData)) {
-                                    $enterpriseId = $staffData[0]['enterprise_id'];
-                                    $enterpriseData = app('App\Services\TursoHttpService')->select('enterprises', ['enterprise_id' => $enterpriseId]);
-                                    if (!empty($enterpriseData)) {
-                                        $isBusinessVerified = (bool) ($enterpriseData[0]['is_verified'] ?? true);
-                                    }
+                        if (\Illuminate\Support\Facades\Schema::hasColumn('enterprises', 'owner_user_id') && \Illuminate\Support\Facades\Schema::hasColumn('enterprises', 'is_verified')) {
+                            $enterpriseQuery = \Illuminate\Support\Facades\DB::table('enterprises')->where('owner_user_id', $uid);
+                            if ($enterpriseQuery->exists()) {
+                                $isBusinessVerified = (bool) $enterpriseQuery->value('is_verified');
+                            } elseif (\Illuminate\Support\Facades\Schema::hasTable('staff')) {
+                                $enterpriseId = \Illuminate\Support\Facades\DB::table('staff')->where('user_id', $uid)->value('enterprise_id');
+                                if ($enterpriseId) {
+                                    $isBusinessVerified = (bool) \Illuminate\Support\Facades\DB::table('enterprises')->where('enterprise_id', $enterpriseId)->value('is_verified');
                                 }
                             }
                         }
@@ -40,13 +36,10 @@
 
             if (! $headerRoleType && session('user_id')) {
                 try {
-                    $roleData = app('App\Services\TursoHttpService')->query('
-                        SELECT rt.user_role_type 
-                        FROM roles r 
-                        JOIN role_types rt ON r.role_type_id = rt.role_type_id 
-                        WHERE r.user_id = ?
-                    ', [session('user_id')]);
-                    $headerRoleType = $roleData[0]['user_role_type'] ?? null;
+                    $headerRoleType = \Illuminate\Support\Facades\DB::table('roles')
+                        ->join('role_types', 'roles.role_type_id', '=', 'role_types.role_type_id')
+                        ->where('roles.user_id', session('user_id'))
+                        ->value('role_types.user_role_type');
                 } catch (\Throwable $e) {
                     $headerRoleType = null;
                 }
@@ -123,15 +116,12 @@
                                 Printing Shops
                             </a>
                             @if(session('user_id') && $headerRoleType === 'customer')
-                            <a href="{{ route('customer.orders') }}" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent transition-smooth">
-                                <i data-lucide="package" class="h-5 w-5"></i>
-                                My Orders
-                            </a>
                             @if($showBusinessVerifyCta)
                                 <a href="{{ route('business.verification') }}" class="flex items-center gap-3 px-3 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-smooth">
                                     <i data-lucide="badge-check" class="h-5 w-5"></i>
                                     Verify now
                                 </a>
+                            @endif
                             @endif
                             @if(session('user_id'))
                                 @if($headerRoleType === 'customer')
@@ -166,7 +156,6 @@
                                     Sign In
                                 </a>
                             @endif
-                        @endif
                         </nav>
                     </div>
                 </div>
@@ -186,8 +175,7 @@
                         <i data-lucide="heart" class="h-5 w-5"></i>
                         <span class="hidden md:inline text-sm font-medium">Saved Services</span>
                         @php
-                            $savedServicesData = app('App\Services\TursoHttpService')->select('saved_services', ['user_id' => session('user_id')]);
-                            $savedServicesCount = count($savedServicesData);
+                            $savedServicesCount = \App\Models\SavedService::where('user_id', session('user_id'))->count();
                         @endphp
                         @if($savedServicesCount > 0)
                             <span class="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center saved-services-count">
@@ -218,12 +206,18 @@
 
                     $unreadNotificationsCount = 0;
                     if ($roleType === 'admin') {
-                        $unreadNotificationsCount = schema_has_table('notifications')
-                            ? count(app('App\Services\TursoHttpService')->select('notifications', ['user_id' => session('user_id'), 'is_read' => 0]))
+                        $unreadNotificationsCount = \Illuminate\Support\Facades\Schema::hasTable('notifications')
+                            ? \Illuminate\Support\Facades\DB::table('notifications')
+                                ->where('user_id', session('user_id'))
+                                ->where('is_read', false)
+                                ->count()
                             : 0;
                     } else {
-                        $unreadNotificationsCount = schema_has_table('order_notifications')
-                            ? count(app('App\Services\TursoHttpService')->select('order_notifications', ['recipient_id' => session('user_id'), 'is_read' => 0]))
+                        $unreadNotificationsCount = \Illuminate\Support\Facades\Schema::hasTable('order_notifications')
+                            ? \Illuminate\Support\Facades\DB::table('order_notifications')
+                                ->where('recipient_id', session('user_id'))
+                                ->where('is_read', false)
+                                ->count()
                             : 0;
                     }
                 @endphp
@@ -310,10 +304,9 @@
                 <div class="relative" x-data="{ open: false }">
                     <button @click="open = !open" class="inline-flex items-center gap-2 px-3 py-2 rounded-md hover:bg-accent transition-smooth">
                         @php
-                            $userData = app('App\Services\TursoHttpService')->select('users', ['user_id' => session('user_id')]);
-                            $user = !empty($userData) ? $userData[0] : null;
-                            $fullName = $user ? $user['name'] : 'User';
-                            $initials = $user ? strtoupper(substr($user['name'], 0, 2)) : 'U';
+                            $user = DB::table('users')->where('user_id', session('user_id'))->first();
+                            $fullName = $user ? $user->name : 'User';
+                            $initials = $user ? strtoupper(substr($user->name, 0, 2)) : 'U';
                         @endphp
                         <!-- Avatar with Initials -->
                         <div class="w-8 h-8 gradient-primary rounded-full flex items-center justify-center text-white text-sm font-bold">

@@ -2,9 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\TursoHttpService;
+use App\Models\Enterprise;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 
@@ -17,31 +18,43 @@ use Illuminate\Support\Facades\Schema;
  */
 class HomeController extends Controller
 {
-    private TursoHttpService $turso;
-
-    public function __construct(TursoHttpService $turso)
-    {
-        $this->turso = $turso;
-    }
-
     private function landingData(): array
     {
         return Cache::remember('home.landing_data', 300, function () {
             $stats = [
-                'total_enterprises' => count($this->turso->select('enterprises')),
-                'total_services' => count($this->turso->select('services')),
-                'categories' => count($this->turso->query('SELECT DISTINCT category FROM services')),
+                'total_enterprises' => DB::table('enterprises')->count(),
+                'total_services' => DB::table('services')->count(),
+                'categories' => DB::table('services')->distinct()->count('category'),
             ];
 
-            $enterprises = $this->turso->query('
-                SELECT e.*, COUNT(s.service_id) as services_count 
-                FROM enterprises e 
-                LEFT JOIN services s ON e.enterprise_id = s.enterprise_id 
-                WHERE e.is_active = 1 
-                GROUP BY e.enterprise_id 
-                ORDER BY services_count DESC 
-                LIMIT 6
-            ');
+            $enterprises = DB::table('enterprises')
+                ->leftJoin('services', 'enterprises.enterprise_id', '=', 'services.enterprise_id')
+                ->select(
+                    'enterprises.enterprise_id',
+                    DB::raw('enterprises.name as enterprise_name'),
+                    'enterprises.category',
+                    DB::raw('enterprises.address as address_text'),
+                    'enterprises.is_active',
+                    'enterprises.created_at',
+                    'enterprises.updated_at',
+                    DB::raw('COUNT(services.service_id) as services_count')
+                )
+                ->where('enterprises.is_active', true)
+                ->when(schema_has_column('enterprises', 'is_verified'), function ($q) {
+                    $q->where('enterprises.is_verified', true);
+                })
+                ->groupBy(
+                    'enterprises.enterprise_id',
+                    'enterprises.name',
+                    'enterprises.category',
+                    'enterprises.address',
+                    'enterprises.is_active',
+                    'enterprises.created_at',
+                    'enterprises.updated_at'
+                )
+                ->orderBy('services_count', 'desc')
+                ->limit(6)
+                ->get();
 
             $recent_orders = null;
 
@@ -60,40 +73,33 @@ class HomeController extends Controller
             $userId = session('user_id');
 
             try {
-                $role = $this->turso->query('
-                    SELECT rt.user_role_type 
-                    FROM roles r 
-                    JOIN role_types rt ON r.role_type_id = rt.role_type_id 
-                    WHERE r.user_id = ?
-                ', [$userId]);
-                
-                $roleType = $role[0]['user_role_type'] ?? null;
+                $role = DB::table('roles')
+                    ->join('role_types', 'roles.role_type_id', '=', 'role_types.role_type_id')
+                    ->where('roles.user_id', $userId)
+                    ->first();
+
+                $roleType = $role?->user_role_type;
 
                 if ($roleType === 'admin') {
                     return redirect()->route('admin.dashboard');
                 }
 
                 if ($roleType === 'business_user') {
-                    $hasEnterprise = !empty($this->turso->select('enterprises', ['owner_user_id' => $userId]));
+                    $hasEnterprise = DB::table('enterprises')->where('owner_user_id', $userId)->exists();
                     if (! $hasEnterprise) {
-                        $hasEnterprise = !empty($this->turso->select('staff', ['user_id' => $userId]));
+                        $hasEnterprise = DB::table('staff')->where('user_id', $userId)->exists();
                     }
                     if (! $hasEnterprise) {
                         return redirect()->route('business.onboarding');
                     }
 
                     $isVerified = true;
-                    $enterprise = $this->turso->select('enterprises', ['owner_user_id' => $userId]);
-                    if (!empty($enterprise) && true) { // Simplified for now
-                        $isVerified = (bool) ($enterprise[0]['is_verified'] ?? true);
-                    } elseif (!empty($this->turso->select('staff', ['user_id' => $userId]))) {
-                        $staff = $this->turso->select('staff', ['user_id' => $userId]);
-                        if (!empty($staff)) {
-                            $enterpriseId = $staff[0]['enterprise_id'];
-                            $enterprise = $this->turso->select('enterprises', ['enterprise_id' => $enterpriseId]);
-                            if (!empty($enterprise)) {
-                                $isVerified = (bool) ($enterprise[0]['is_verified'] ?? true);
-                            }
+                    if (DB::table('enterprises')->where('owner_user_id', $userId)->exists() && \Illuminate\Support\Facades\schema_has_column('enterprises', 'is_verified')) {
+                        $isVerified = (bool) DB::table('enterprises')->where('owner_user_id', $userId)->value('is_verified');
+                    } elseif (\Illuminate\Support\Facades\schema_has_table('staff') && \Illuminate\Support\Facades\schema_has_column('enterprises', 'is_verified')) {
+                        $enterpriseId = DB::table('staff')->where('user_id', $userId)->value('enterprise_id');
+                        if ($enterpriseId) {
+                            $isVerified = (bool) DB::table('enterprises')->where('enterprise_id', $enterpriseId)->value('is_verified');
                         }
                     }
 
@@ -158,32 +164,69 @@ class HomeController extends Controller
      */
     public function enterprises()
     {
-        $sql = "SELECT * FROM enterprises WHERE is_active = 1";
-        $params = [];
-        
+        $query = \App\Models\Enterprise::query()
+            ->where('is_active', true);
+
+        if (schema_has_column('enterprises', 'is_verified')) {
+            $query->where('is_verified', true);
+        }
+
+        $driver = DB::connection()->getDriverName();
+
         if (request()->filled('category')) {
-            $sql .= " AND category = ?";
-            $params[] = request('category');
+            $query->where('category', request('category'));
         }
-        
+
         if (request()->filled('search')) {
-            $sql .= " AND name LIKE ?";
-            $params[] = '%' . request('search') . '%';
+            $needle = '%' . request('search') . '%';
+            if ($driver === 'pgsql') {
+                $query->where('name', 'ILIKE', $needle);
+            } else {
+                $query->where('name', 'LIKE', $needle);
+            }
         }
-        
-        $sql .= " ORDER BY created_at DESC";
-        
-        $enterprises = $this->turso->query($sql, $params);
-        
-        // Get categories
-        $categories = $this->turso->query('
-            SELECT DISTINCT category 
-            FROM enterprises 
-            WHERE is_active = 1 AND category IS NOT NULL AND category != ""
-            ORDER BY category
-        ');
-        
-        $categories = array_column($categories, 'category');
+
+        $enterprises = $query
+            ->orderBy('name')
+            ->paginate(12);
+
+        if (schema_has_table('reviews')) {
+            $enterpriseIds = $enterprises->pluck('enterprise_id')->filter()->values()->all();
+            if (!empty($enterpriseIds)) {
+                $ratings = DB::table('reviews')
+                    ->join('services', 'reviews.service_id', '=', 'services.service_id')
+                    ->whereIn('services.enterprise_id', $enterpriseIds)
+                    ->select(
+                        'services.enterprise_id',
+                        DB::raw('AVG(reviews.rating) as rating'),
+                        DB::raw('COUNT(*) as review_count')
+                    )
+                    ->groupBy('services.enterprise_id')
+                    ->get()
+                    ->keyBy('enterprise_id');
+
+                $enterprises->setCollection(
+                    $enterprises->getCollection()->map(function ($enterprise) use ($ratings) {
+                        $row = $ratings->get($enterprise->enterprise_id);
+                        $enterprise->rating = $row ? round((float) $row->rating, 1) : 0.0;
+                        $enterprise->review_count = $row ? (int) $row->review_count : 0;
+                        return $enterprise;
+                    })
+                );
+            }
+        }
+
+        $categories = \App\Models\Enterprise::query()
+            ->where('is_active', true)
+            ->when(schema_has_column('enterprises', 'is_verified'), function ($q) {
+                $q->where('is_verified', true);
+            })
+            ->whereNotNull('category')
+            ->where('category', '!=', '')
+            ->distinct()
+            ->pluck('category')
+            ->sort()
+            ->values();
 
         return view('public.enterprises.index', compact('enterprises', 'categories'));
     }
@@ -196,47 +239,52 @@ class HomeController extends Controller
      */
     public function browseEnterprises(Request $request)
     {
-        $sql = "SELECT e.*, COUNT(s.service_id) as services_count 
-                FROM enterprises e 
-                LEFT JOIN services s ON e.enterprise_id = s.enterprise_id 
-                WHERE e.is_active = 1";
-        $params = [];
-        
+        $query = Enterprise::where('is_active', true)
+            ->withCount('services');
+
+        if (schema_has_column('enterprises', 'is_verified')) {
+            $query->where('is_verified', true);
+        }
+
+        $driver = DB::connection()->getDriverName();
+
+        // Filter by category
         if ($request->filled('category')) {
-            $sql .= " AND e.category = ?";
-            $params[] = $request->category;
+            $query->where('category', $request->category);
         }
-        
+
+        // Search by name (column is 'name')
         if ($request->filled('search')) {
-            $sql .= " AND e.name LIKE ?";
-            $params[] = '%' . $request->search . '%';
+            $needle = '%' . $request->search . '%';
+            if ($driver === 'pgsql') {
+                $query->where('name', 'ILIKE', $needle);
+            } else {
+                $query->where('name', 'LIKE', $needle);
+            }
         }
-        
-        $sql .= " GROUP BY e.enterprise_id";
-        
+
         // Sort
         $sortBy = $request->input('sort', 'name');
         switch ($sortBy) {
             case 'name':
-                $sql .= " ORDER BY e.name";
+                $query->orderBy('name');
                 break;
             case 'services':
-                $sql .= " ORDER BY services_count DESC";
+                $query->orderBy('services_count', 'desc');
                 break;
             default:
-                $sql .= " ORDER BY e.name";
+                $query->orderBy('name');
         }
+
+        $enterprises = $query->paginate(12);
         
-        $enterprises = $this->turso->query($sql, $params);
-        
-        $categories = $this->turso->query('
-            SELECT DISTINCT category 
-            FROM enterprises 
-            WHERE is_active = 1 AND category IS NOT NULL AND category != ""
-            ORDER BY category
-        ');
-        
-        $categories = array_column($categories, 'category');
+        $categories = Enterprise::where('is_active', true)
+            ->when(schema_has_column('enterprises', 'is_verified'), function ($q) {
+                $q->where('is_verified', true);
+            })
+            ->distinct()
+            ->pluck('category')
+            ->sort();
 
         return view('home.browse', compact('enterprises', 'categories'));
     }
@@ -249,28 +297,31 @@ class HomeController extends Controller
      */
     public function showEnterprise($id)
     {
-        $enterprise = $this->turso->select('enterprises', ['enterprise_id' => $id, 'is_active' => 1]);
-        
-        if (empty($enterprise)) {
-            abort(404);
+        $enterpriseQuery = \App\Models\Enterprise::where('enterprise_id', $id)
+            ->where('is_active', true);
+        if (schema_has_column('enterprises', 'is_verified')) {
+            $enterpriseQuery->where('is_verified', true);
+        }
+        $enterprise = $enterpriseQuery->firstOrFail();
+
+        if (schema_has_table('reviews')) {
+            $row = DB::table('reviews')
+                ->join('services', 'reviews.service_id', '=', 'services.service_id')
+                ->where('services.enterprise_id', $enterprise->enterprise_id)
+                ->select(
+                    DB::raw('AVG(reviews.rating) as rating'),
+                    DB::raw('COUNT(*) as review_count')
+                )
+                ->first();
+
+            $enterprise->rating = $row ? round((float) ($row->rating ?? 0), 1) : 0.0;
+            $enterprise->review_count = $row ? (int) ($row->review_count ?? 0) : 0;
         }
         
-        $enterprise = $enterprise[0];
-        
-        // Get rating if reviews table exists
-        $rating = $this->turso->query('
-            SELECT AVG(r.rating) as rating, COUNT(*) as review_count 
-            FROM reviews r 
-            JOIN services s ON r.service_id = s.service_id 
-            WHERE s.enterprise_id = ?
-        ', [$id]);
-        
-        if (!empty($rating)) {
-            $enterprise['rating'] = round((float) ($rating[0]['rating'] ?? 0), 1);
-            $enterprise['review_count'] = (int) ($rating[0]['review_count'] ?? 0);
-        }
-        
-        $services = $this->turso->select('services', ['enterprise_id' => $id, 'is_active' => 1]);
+        $services = \App\Models\Service::where('enterprise_id', $id)
+            ->where('is_active', true)
+            ->with('customizationOptions')
+            ->get();
 
         return view('public.enterprises.show', compact('enterprise', 'services'));
     }
@@ -283,27 +334,26 @@ class HomeController extends Controller
      */
     public function showService($id)
     {
-        $service = $this->turso->select('services', ['service_id' => $id, 'is_active' => 1]);
-        
-        if (empty($service)) {
-            abort(404);
-        }
-        
-        $service = $service[0];
-        
-        // Get enterprise info
-        $enterprise = $this->turso->select('enterprises', ['enterprise_id' => $service['enterprise_id'], 'is_active' => 1]);
-        if (empty($enterprise)) {
-            abort(404);
-        }
-        
-        $service['enterprise'] = $enterprise[0];
-        
-        // Get customization options
-        $customizationOptions = $this->turso->select('service_customization_options', ['service_id' => $id]);
-        $service['customization_options'] = $customizationOptions;
+        $serviceQuery = \App\Models\Service::where('service_id', $id)
+            ->where('is_active', true)
+            ->with(['enterprise', 'customizationOptions']);
 
-        return view('public.services.show', compact('service'));
+        if (schema_has_column('enterprises', 'is_verified')) {
+            $serviceQuery->whereHas('enterprise', function ($q) {
+                $q->where('is_active', true)->where('is_verified', true);
+            });
+        } else {
+            $serviceQuery->whereHas('enterprise', function ($q) {
+                $q->where('is_active', true);
+            });
+        }
+
+        $service = $serviceQuery->firstOrFail();
+
+        // Group customization options by type
+        $customizationGroups = $service->customizationOptions->groupBy('option_type');
+
+        return view('public.services.show', compact('service', 'customizationGroups'));
     }
 
 }

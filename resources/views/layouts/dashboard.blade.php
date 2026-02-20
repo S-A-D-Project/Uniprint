@@ -149,18 +149,19 @@
             $layoutDashboardRoleType = Auth::user()->getUserRoleType();
             $unreadChatCount = 0;
             try {
-                if (schema_has_table('conversations') && schema_has_table('chat_messages')) {
+                if (\Illuminate\Support\Facades\Schema::hasTable('conversations') && \Illuminate\Support\Facades\Schema::hasTable('chat_messages')) {
                     $uid = Auth::user()->user_id;
-                    $conversationData = app('App\Services\TursoHttpService')->query('
-                        SELECT conversation_id FROM conversations 
-                        WHERE customer_id = ? OR business_id = ?
-                    ', [$uid, $uid]);
+                    $conversationIds = \Illuminate\Support\Facades\DB::table('conversations')
+                        ->where('customer_id', $uid)
+                        ->orWhere('business_id', $uid)
+                        ->pluck('conversation_id');
 
-                    if (!empty($conversationData)) {
-                        $conversationIds = array_column($conversationData, 'conversation_id');
-                        $placeholders = implode(',', array_fill(0, count($conversationIds), '?'));
-                        $unreadChatData = app('App\Services\TursoHttpService')->query("SELECT COUNT(*) as count FROM chat_messages WHERE conversation_id IN ($placeholders) AND sender_id != ? AND is_read = 0", array_merge($conversationIds, [$uid]));
-                        $unreadChatCount = (int) ($unreadChatData[0]['count'] ?? 0);
+                    if ($conversationIds->isNotEmpty()) {
+                        $unreadChatCount = (int) \Illuminate\Support\Facades\DB::table('chat_messages')
+                            ->whereIn('conversation_id', $conversationIds)
+                            ->where('sender_id', '!=', $uid)
+                            ->where('is_read', false)
+                            ->count();
                     }
                 }
             } catch (\Exception $e) {

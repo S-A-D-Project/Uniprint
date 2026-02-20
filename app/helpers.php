@@ -116,21 +116,15 @@ if (!function_exists('system_setting')) {
     function system_setting(string $key, $default = null)
     {
         try {
-            if (!schema_has_table('system_settings')) {
+            if (!\Illuminate\Support\Facades\Schema::hasTable('system_settings')) {
                 return $default;
             }
 
             $cacheKey = 'system_setting.' . $key;
 
             return \Illuminate\Support\Facades\Cache::remember($cacheKey, 300, function () use ($key, $default) {
-                try {
-                    $turso = app('App\Services\TursoHttpService');
-                    $data = $turso->select('system_settings', ['key' => $key]);
-                    $value = !empty($data) ? $data[0]['value'] : null;
-                    return $value !== null ? $value : $default;
-                } catch (\Throwable $e) {
-                    return $default;
-                }
+                $value = \Illuminate\Support\Facades\DB::table('system_settings')->where('key', $key)->value('value');
+                return $value !== null ? $value : $default;
             });
         } catch (\Throwable $e) {
             return $default;

@@ -49,7 +49,7 @@
 
                 <div class="flex gap-10 pt-2">
                     <div>
-                        <div class="text-2xl font-bold text-primary">{{ $stats['total_enterprises'] ?? count($enterprises) }}+</div>
+                        <div class="text-2xl font-bold text-primary">{{ $stats['total_enterprises'] ?? $enterprises->count() }}+</div>
                         <div class="text-xs text-muted-foreground">Printing Shops</div>
                     </div>
                     <div>
@@ -222,24 +222,24 @@
                     <div class="flex items-start justify-between gap-3 mb-4">
                         <div>
                             <div class="text-sm text-muted-foreground">Printing Services</div>
-                            <div class="text-lg font-semibold">{{ $enterprise['enterprise_name'] ?? $enterprise['name'] ?? 'Unknown' }}</div>
+                            <div class="text-lg font-semibold">{{ $enterprise->enterprise_name }}</div>
                         </div>
-                        <span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-secondary text-secondary-foreground rounded-md">{{ $enterprise['category'] ?? 'General' }}</span>
+                        <span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-secondary text-secondary-foreground rounded-md">{{ $enterprise->category }}</span>
                     </div>
 
-                    @if(!empty($enterprise['address_text']))
+                    @if($enterprise->address_text)
                         <div class="flex items-start gap-2 text-sm text-muted-foreground mb-2">
                             <i data-lucide="map-pin" class="h-4 w-4 mt-0.5"></i>
-                            <span>{{ Str::limit($enterprise['address_text'], 55) }}</span>
+                            <span>{{ Str::limit($enterprise->address_text, 55) }}</span>
                         </div>
                     @endif
 
                     <div class="flex items-center gap-2 text-sm text-muted-foreground mb-5">
                         <i data-lucide="package" class="h-4 w-4"></i>
-                        <span>{{ $enterprise['services_count'] ?? 0 }} Services Available</span>
+                        <span>{{ $enterprise->services_count }} Services Available</span>
                     </div>
 
-                    <a href="{{ route('enterprises.show', $enterprise['enterprise_id'] ?? $enterprise['id'] ?? '') }}" class="w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground font-medium rounded-md hover:bg-primary/90 transition-colors">
+                    <a href="{{ route('enterprises.show', $enterprise->enterprise_id) }}" class="w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground font-medium rounded-md hover:bg-primary/90 transition-colors">
                         View Services
                         <i data-lucide="arrow-right" class="h-4 w-4"></i>
                     </a>
@@ -253,7 +253,7 @@
             @endforelse
         </div>
 
-        @if(count($enterprises) > 0)
+        @if($enterprises->count() > 0)
             <div class="text-center mt-10">
                 <a href="{{ route('enterprises.index') }}" class="inline-flex items-center justify-center gap-2 px-6 py-3 bg-primary text-primary-foreground font-semibold rounded-lg hover:bg-primary/90 transition-colors">
                     View All Businesses
