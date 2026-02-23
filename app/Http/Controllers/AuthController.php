@@ -141,7 +141,9 @@ class AuthController extends Controller
                 if (in_array($roleType, ['business_user', 'customer'], true)) {
                     try {
                         $eloquentUser = \App\Models\User::find($user->user_id);
-                        if ($eloquentUser && !empty($eloquentUser->two_factor_enabled)) {
+                        // Check both two_factor_enabled (legacy) and two_factor_email_enabled (new system)
+                        $has2faEnabled = !empty($eloquentUser->two_factor_enabled) || !empty($eloquentUser->two_factor_email_enabled);
+                        if ($eloquentUser && $has2faEnabled) {
                             $mailer = (string) config('mail.default');
                             if (in_array($mailer, ['log', 'array'], true)) {
                                 return redirect()->route('two-factor.verify')
@@ -340,7 +342,9 @@ class AuthController extends Controller
         if (in_array($roleType, ['business_user', 'customer'], true)) {
             try {
                 $eloquentUser = \App\Models\User::find($userId);
-                if ($eloquentUser && !empty($eloquentUser->two_factor_enabled)) {
+                // Check both two_factor_enabled (legacy) and two_factor_email_enabled (new system)
+                $has2faEnabled = !empty($eloquentUser->two_factor_enabled) || !empty($eloquentUser->two_factor_email_enabled);
+                if ($eloquentUser && $has2faEnabled) {
                     $mailer = (string) config('mail.default');
                     if (in_array($mailer, ['log', 'array'], true)) {
                         return redirect()->route('two-factor.verify')

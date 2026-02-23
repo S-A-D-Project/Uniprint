@@ -173,8 +173,6 @@
         @yield('content')
     </main>
 
-    @include('partials.footer')
-
     @auth
         @php
             $layoutRoleType2 = Auth::user()->getUserRoleType();

@@ -162,12 +162,17 @@ $breadcrumbs = [
 
     <!-- Users Tab Content -->
     <div id="users-content" class="p-6">
+        <div class="flex justify-end mb-4">
+            <button onclick="toggleShowAll('users')" id="users-show-all-btn" class="px-4 py-2 text-sm font-medium bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-smooth">
+                <i data-lucide="eye" class="h-4 w-4 inline mr-1"></i>Show All
+            </button>
+        </div>
         <div class="overflow-x-auto">
             @if(isset($users) && count($users) > 0)
-                <table class="w-full">
+                <table class="w-full" id="users-table">
                     <thead class="bg-secondary/50">
                         <tr class="text-left text-sm text-muted-foreground">
-                            <th class="p-4">ID</th>
+                            <th class="p-4 hidden id-column">ID</th>
                             <th class="p-4">Username</th>
                             <th class="p-4">Email</th>
                             <th class="p-4">Role</th>
@@ -179,7 +184,7 @@ $breadcrumbs = [
                     <tbody class="divide-y divide-border">
                         @foreach($users->take(10) as $user)
                         <tr class="hover:bg-secondary/30 transition-smooth">
-                            <td class="p-4"><strong>{{ $user->user_id ?? 'N/A' }}</strong></td>
+                            <td class="p-4 hidden id-column"><strong>{{ $user->user_id ?? 'N/A' }}</strong></td>
                             <td class="p-4">
                                 <i class="bi bi-person-circle me-2"></i>
                                 {{ $user->username ?? $user->name ?? 'Unknown' }}
@@ -239,11 +244,17 @@ $breadcrumbs = [
 
     <!-- Orders Tab Content -->
     <div id="orders-content" class="p-6 hidden">
+        <div class="flex justify-end mb-4">
+            <button onclick="toggleShowAll('orders')" id="orders-show-all-btn" class="px-4 py-2 text-sm font-medium bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-smooth">
+                <i data-lucide="eye" class="h-4 w-4 inline mr-1"></i>Show All
+            </button>
+        </div>
         <div class="overflow-x-auto">
             @if(isset($orders) && count($orders) > 0)
-                <table class="w-full">
+                <table class="w-full" id="orders-table">
                     <thead class="bg-secondary/50">
                         <tr class="text-left text-sm text-muted-foreground">
+                            <th class="p-4 hidden id-column">Order ID</th>
                             <th class="p-4">Order #</th>
                             <th class="p-4">Customer</th>
                             <th class="p-4">Enterprise</th>
@@ -256,6 +267,7 @@ $breadcrumbs = [
                     <tbody class="divide-y divide-border">
                         @foreach($orders->take(10) as $order)
                         <tr class="hover:bg-secondary/30 transition-smooth">
+                            <td class="p-4 hidden id-column"><span class="font-mono text-xs text-muted-foreground">{{ $order->purchase_order_id ?? 'N/A' }}</span></td>
                             <td class="p-4">
                                 <span class="font-mono text-sm font-medium">#{{ $order->order_no ?? ($order->purchase_order_id ? substr($order->purchase_order_id, 0, 8) : 'N/A') }}</span>
                             </td>
@@ -505,6 +517,38 @@ function switchTab(tabName) {
         document.getElementById('orders-content').classList.remove('hidden');
         document.getElementById('orders-tab').classList.remove('bg-secondary', 'text-secondary-foreground', 'hover:bg-secondary/80');
         document.getElementById('orders-tab').classList.add('bg-primary', 'text-white');
+    }
+}
+
+// Toggle Show All functionality
+const showAllState = { users: false, orders: false };
+
+function toggleShowAll(type) {
+    showAllState[type] = !showAllState[type];
+    const isShowing = showAllState[type];
+    
+    // Get all ID columns in the table
+    const table = document.getElementById(type + '-table');
+    if (table) {
+        const idColumns = table.querySelectorAll('.id-column');
+        idColumns.forEach(col => {
+            if (isShowing) {
+                col.classList.remove('hidden');
+            } else {
+                col.classList.add('hidden');
+            }
+        });
+    }
+    
+    // Update button text and icon
+    const btn = document.getElementById(type + '-show-all-btn');
+    if (btn) {
+        if (isShowing) {
+            btn.innerHTML = '<i data-lucide="eye-off" class="h-4 w-4 inline mr-1"></i>Hide All';
+        } else {
+            btn.innerHTML = '<i data-lucide="eye" class="h-4 w-4 inline mr-1"></i>Show All';
+        }
+        lucide.createIcons();
     }
 }
 

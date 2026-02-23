@@ -1,14 +1,6 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Security Settings - UniPrint</title>
+@extends('layouts.public')
 
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body class="bg-light">
+@section('content')
 <div class="container py-5">
     <div class="row justify-content-center">
         <div class="col-12 col-md-8 col-lg-6">
@@ -52,46 +44,15 @@
 
                     <hr>
 
-                    @if(!empty($twoFactorEnabled))
-                        <form method="POST" action="{{ route('security.two-factor.disable') }}">
-                            @csrf
-                            <button type="submit" class="btn btn-danger">Disable Email 2FA</button>
-                        </form>
-                    @else
-                        <div class="d-flex flex-column gap-2">
-                            <form method="POST" action="{{ route('security.two-factor.enable') }}">
-                                @csrf
-                                <button type="submit" class="btn btn-primary">Enable Email 2FA</button>
-                            </form>
-
-                            @if(!empty($pendingEnable))
-                                <div class="alert alert-info mb-0">
-                                    A confirmation code was sent to your email. Enter it below to finish enabling 2FA.
-                                </div>
-
-                                <form method="POST" action="{{ route('security.two-factor.confirm') }}" class="mt-2">
-                                    @csrf
-                                    <div class="mb-3">
-                                        <label for="code" class="form-label">Confirmation code</label>
-                                        <input type="text" id="code" name="code" class="form-control" maxlength="6" inputmode="numeric" autocomplete="one-time-code" required>
-                                    </div>
-                                    <button type="submit" class="btn btn-success">Confirm & Enable</button>
-                                </form>
-
-                                <form method="POST" action="{{ route('security.two-factor.resend') }}" class="mt-2">
-                                    @csrf
-                                    <button type="submit" class="btn btn-outline-secondary">Resend code</button>
-                                </form>
-                            @endif
-                        </div>
-                    @endif
+                    {{-- Use the OTP Enable/Disable Modal Component --}}
+                    @php
+                        $currentUser = auth()->user();
+                    @endphp
+                    <x-otp-enable-modal :user="$currentUser" />
                 </div>
             </div>
 
         </div>
     </div>
 </div>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+@endsection

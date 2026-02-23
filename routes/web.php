@@ -14,6 +14,7 @@ use App\Http\Controllers\SavedServiceController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\TwoFactorController;
+use App\Http\Controllers\OtpController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\BusinessOnboardingController;
 use App\Http\Controllers\BusinessVerificationController;
@@ -49,6 +50,16 @@ Route::middleware(['throttle:60,1'])->group(function () {
     Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
     Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:5,1');
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+});
+
+// OTP Routes (public - for login/verification flows)
+Route::post('/otp/send', [OtpController::class, 'send'])->name('otp.send');
+Route::post('/otp/verify', [OtpController::class, 'verify'])->name('otp.verify');
+
+// OTP Routes (authenticated - for enabling/disabling 2FA)
+Route::middleware([\App\Http\Middleware\CheckAuth::class])->group(function () {
+    Route::post('/otp/disable', [OtpController::class, 'disable'])->name('otp.disable');
+    Route::post('/otp/resend', [OtpController::class, 'resend'])->name('otp.resend');
 });
 
 // Social Authentication routes (outside throttle to ensure availability)

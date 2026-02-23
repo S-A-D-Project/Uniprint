@@ -202,25 +202,82 @@ class AdminController extends Controller
         try {
             $hasUserIsActive = schema_has_column('users', 'is_active');
 
-            $users = DB::table('users')
-                ->leftJoin('login', 'users.user_id', '=', 'login.user_id')
-                ->leftJoin('roles', 'users.user_id', '=', 'roles.user_id')
-                ->leftJoin('role_types', 'roles.role_type_id', '=', 'role_types.role_type_id')
-                ->leftJoin('enterprises as owned_enterprises', 'users.user_id', '=', 'owned_enterprises.owner_user_id')
-                ->leftJoin('staff', 'users.user_id', '=', 'staff.user_id')
-                ->leftJoin('enterprises as staff_enterprises', 'staff.enterprise_id', '=', 'staff_enterprises.enterprise_id')
-                ->select(
-                    'users.*', 
-                    'role_types.user_role_type as role_type',
-                    DB::raw('COALESCE(owned_enterprises.name, staff_enterprises.name) as enterprise_name'),
-                    DB::raw(($hasUserIsActive ? 'COALESCE(users.is_active, true)' : 'true') . ' as is_active'),
-                    DB::raw('COALESCE(users.email, \'\') as email'),
-                    DB::raw('COALESCE(login.username, users.name) as username')
-                )
-                ->paginate(20);
+            // First, get user IDs with pagination
+            $userIdsQuery = DB::table('users')
+                ->select('users.user_id')
+                ->orderBy('users.created_at', 'desc');
+            
+            $total = $userIdsQuery->count();
+            $perPage = 20;
+            $currentPage = request()->get('page', 1);
+            $userIds = $userIdsQuery
+                ->forPage($currentPage, $perPage)
+                ->pluck('user_id');
+
+            if ($userIds->isEmpty()) {
+                $users = new \Illuminate\Pagination\LengthAwarePaginator([], $total, $perPage, $currentPage, [
+                    'path' => request()->url(),
+                    'query' => request()->query()
+                ]);
+            } else {
+                // Get basic user data
+                $userData = DB::table('users')
+                    ->leftJoin('login', 'users.user_id', '=', 'login.user_id')
+                    ->whereIn('users.user_id', $userIds)
+                    ->select(
+                        'users.*',
+                        DB::raw('COALESCE(login.username, users.name) as username')
+                    )
+                    ->get()
+                    ->keyBy('user_id');
+
+                // Get role types
+                $roleTypes = DB::table('roles')
+                    ->join('role_types', 'roles.role_type_id', '=', 'role_types.role_type_id')
+                    ->whereIn('roles.user_id', $userIds)
+                    ->select('roles.user_id', 'role_types.user_role_type as role_type')
+                    ->get()
+                    ->keyBy('user_id');
+
+                // Get enterprise info
+                $enterpriseInfo = DB::table('enterprises as owned_enterprises')
+                    ->leftJoin('staff', 'staff.enterprise_id', '=', 'owned_enterprises.enterprise_id')
+                    ->whereIn('owned_enterprises.owner_user_id', $userIds)
+                    ->orWhereIn('staff.user_id', $userIds)
+                    ->select(
+                        DB::raw('COALESCE(owned_enterprises.owner_user_id, staff.user_id) as user_id'),
+                        'owned_enterprises.name as enterprise_name'
+                    )
+                    ->get()
+                    ->keyBy('user_id');
+
+                // Combine all data
+                $orderedUsers = $userIds->map(function ($id) use ($userData, $roleTypes, $enterpriseInfo, $hasUserIsActive) {
+                    $user = $userData->get($id);
+                    if (!$user) return null;
+                    
+                    $user->role_type = $roleTypes->get($id)?->role_type ?? 'customer';
+                    $user->enterprise_name = $enterpriseInfo->get($id)?->enterprise_name ?? null;
+                    $user->is_active = $hasUserIsActive ? ($user->is_active ?? true) : true;
+                    $user->email = $user->email ?? '';
+                    
+                    return $user;
+                })->filter();
+
+                $users = new \Illuminate\Pagination\LengthAwarePaginator(
+                    $orderedUsers, 
+                    $total, 
+                    $perPage, 
+                    $currentPage,
+                    ['path' => request()->url(), 'query' => request()->query()]
+                );
+            }
         } catch (\Exception $e) {
             Log::error('Admin Users Query Error: ' . $e->getMessage());
-            $users = new \Illuminate\Pagination\LengthAwarePaginator([], 0, 20);
+            // Fallback to simple query without joins
+            $users = DB::table('users')
+                ->orderBy('created_at', 'desc')
+                ->paginate(20);
         }
         
         return view('admin.users', compact('users'));
@@ -316,40 +373,57 @@ class AdminController extends Controller
     {
         $hasUserIsActive = schema_has_column('users', 'is_active');
 
-        $select = [
-            'users.*',
-            'role_types.user_role_type as role_type',
-            DB::raw('COALESCE(owned_enterprises.enterprise_id, staff_enterprises.enterprise_id) as enterprise_id'),
-            DB::raw('COALESCE(owned_enterprises.name, staff_enterprises.name) as enterprise_name'),
-            DB::raw(($hasUserIsActive ? 'COALESCE(users.is_active, true)' : 'true') . ' as is_active'),
-            DB::raw('COALESCE(users.email, \'\') as email'),
-            DB::raw('COALESCE(login.username, users.name) as username'),
-        ];
-
-        if (schema_has_column('enterprises', 'is_verified')) {
-            $select[] = DB::raw('COALESCE(owned_enterprises.is_verified, staff_enterprises.is_verified) as enterprise_is_verified');
-        }
-        if (schema_has_column('enterprises', 'verification_document_path')) {
-            $select[] = DB::raw('COALESCE(owned_enterprises.verification_document_path, staff_enterprises.verification_document_path) as enterprise_verification_document_path');
-        }
-        if (schema_has_column('enterprises', 'verification_submitted_at')) {
-            $select[] = DB::raw('COALESCE(owned_enterprises.verification_submitted_at, staff_enterprises.verification_submitted_at) as enterprise_verification_submitted_at');
-        }
-
+        // First get the basic user info
         $user = DB::table('users')
             ->leftJoin('login', 'users.user_id', '=', 'login.user_id')
-            ->leftJoin('roles', 'users.user_id', '=', 'roles.user_id')
-            ->leftJoin('role_types', 'roles.role_type_id', '=', 'role_types.role_type_id')
-            ->leftJoin('enterprises as owned_enterprises', 'users.user_id', '=', 'owned_enterprises.owner_user_id')
-            ->leftJoin('staff', 'users.user_id', '=', 'staff.user_id')
-            ->leftJoin('enterprises as staff_enterprises', 'staff.enterprise_id', '=', 'staff_enterprises.enterprise_id')
             ->where('users.user_id', $id)
-            ->select($select)
+            ->select(
+                'users.*',
+                DB::raw('COALESCE(login.username, users.name) as username')
+            )
             ->first();
 
         if (!$user) {
             abort(404);
         }
+
+        // Get role type separately
+        $roleType = DB::table('roles')
+            ->join('role_types', 'roles.role_type_id', '=', 'role_types.role_type_id')
+            ->where('roles.user_id', $id)
+            ->value('role_types.user_role_type');
+        $user->role_type = $roleType;
+
+        // Get enterprise info separately
+        $enterpriseInfo = DB::table('enterprises as owned_enterprises')
+            ->leftJoin('staff', 'staff.enterprise_id', '=', 'owned_enterprises.enterprise_id')
+            ->where(function($q) use ($id) {
+                $q->where('owned_enterprises.owner_user_id', $id)
+                  ->orWhere('staff.user_id', $id);
+            })
+            ->select(
+                'owned_enterprises.enterprise_id',
+                'owned_enterprises.name as enterprise_name',
+                'owned_enterprises.is_verified',
+                'owned_enterprises.verification_document_path',
+                'owned_enterprises.verification_submitted_at'
+            )
+            ->first();
+        
+        if ($enterpriseInfo) {
+            $user->enterprise_id = $enterpriseInfo->enterprise_id;
+            $user->enterprise_name = $enterpriseInfo->enterprise_name;
+            $user->enterprise_is_verified = $enterpriseInfo->is_verified ?? null;
+            $user->enterprise_verification_document_path = $enterpriseInfo->verification_document_path ?? null;
+            $user->enterprise_verification_submitted_at = $enterpriseInfo->verification_submitted_at ?? null;
+        } else {
+            $user->enterprise_id = null;
+            $user->enterprise_name = null;
+        }
+
+        // Set is_active
+        $user->is_active = $hasUserIsActive ? ($user->is_active ?? true) : true;
+        $user->email = $user->email ?? '';
 
         try {
             $orderCount = DB::table('customer_orders')->where('customer_id', $id)->count();

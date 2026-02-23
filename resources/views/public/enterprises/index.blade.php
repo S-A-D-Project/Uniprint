@@ -59,7 +59,7 @@
 
             <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                 @forelse($enterprises as $enterprise)
-                    <div class="bg-card border border-border rounded-xl shadow-card hover:shadow-card-hover transition-smooth overflow-hidden group">
+                    <a href="{{ route('enterprises.show', $enterprise->enterprise_id) }}" class="block bg-card border border-border rounded-xl shadow-card hover:shadow-card-hover transition-smooth overflow-hidden group cursor-pointer">
                         <div class="h-48 gradient-hero"></div>
                         
                         <div class="p-6">
@@ -76,7 +76,7 @@
                                 </div>
                             </div>
 
-                            <div class="space-y-2 text-sm text-muted-foreground mb-4">
+                            <div class="space-y-2 text-sm text-muted-foreground">
                                 <div class="flex items-center gap-2">
                                     <i data-lucide="map-pin" class="h-4 w-4"></i>
                                     <span>{{ $enterprise->address }}</span>
@@ -90,12 +90,8 @@
                                     <span>{{ $enterprise->contact_number }}</span>
                                 </div>
                             </div>
-
-                            <a href="{{ route('enterprises.show', $enterprise->enterprise_id) }}" class="block w-full text-center px-4 py-2 bg-primary text-primary-foreground font-medium rounded-md hover:shadow-glow transition-smooth">
-                                View Services
-                            </a>
                         </div>
-                    </div>
+                    </a>
                 @empty
                     <div class="col-span-full text-center py-12">
                         <i data-lucide="inbox" class="h-16 w-16 mx-auto mb-4 text-muted-foreground"></i>

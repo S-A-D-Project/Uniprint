@@ -25,6 +25,9 @@ class User extends Authenticatable
         'username',
         'password_hash',
         'is_active',
+        'otp_code',
+        'otp_expires_at',
+        'otp_attempts',
     ];
 
     protected $hidden = [
@@ -39,6 +42,8 @@ class User extends Authenticatable
             'password_hash' => 'hashed',
             'two_factor_enabled' => 'boolean',
             'two_factor_expires_at' => 'datetime',
+            'otp_expires_at' => 'datetime',
+            'otp_attempts' => 'integer',
         ];
     }
 
@@ -92,5 +97,60 @@ class User extends Authenticatable
     public function isCustomer()
     {
         return $this->getUserRoleType() === 'customer';
+    }
+
+    // OTP Helper Methods
+    public function generateOtp(): string
+    {
+        $otp = (string) random_int(100000, 999999);
+        
+        $this->forceFill([
+            'otp_code' => $otp,
+            'otp_expires_at' => now()->addMinutes(10),
+            'otp_attempts' => 0,
+        ])->save();
+        
+        return $otp;
+    }
+
+    public function isValidOtp(string $otp): bool
+    {
+        if (empty($this->otp_code) || empty($this->otp_expires_at)) {
+            return false;
+        }
+
+        if (now()->greaterThan($this->otp_expires_at)) {
+            return false;
+        }
+
+        return hash_equals($this->otp_code, $otp);
+    }
+
+    public function hasValidOtp(): bool
+    {
+        if (empty($this->otp_code) || empty($this->otp_expires_at)) {
+            return false;
+        }
+
+        return now()->lessThan($this->otp_expires_at);
+    }
+
+    public function incrementOtpAttempts(): void
+    {
+        $this->increment('otp_attempts');
+    }
+
+    public function hasExceededOtpAttempts(int $maxAttempts = 3): bool
+    {
+        return $this->otp_attempts >= $maxAttempts;
+    }
+
+    public function clearOtp(): void
+    {
+        $this->forceFill([
+            'otp_code' => null,
+            'otp_expires_at' => null,
+            'otp_attempts' => 0,
+        ])->save();
     }
 }

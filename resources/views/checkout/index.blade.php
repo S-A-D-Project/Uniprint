@@ -235,26 +235,27 @@
                     </label>
                     @endif
 
-                    <x-ui.tooltip text="Online payments are not yet available. Please use Cash for now.">
-                        <div class="relative opacity-60 cursor-not-allowed" aria-disabled="true">
-                            <input type="radio" name="payment_method" value="paypal" class="sr-only" disabled>
-                            <div class="border-2 border-gray-200 rounded-lg p-4 text-center transition-all">
-                                <div class="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                                    <i data-lucide="wallet" class="h-6 w-6 text-yellow-700"></i>
-                                </div>
-                                <div class="flex items-center justify-center gap-2 mb-1">
-                                    <h4 class="font-semibold text-gray-900">PayPal</h4>
-                                    <span class="inline-flex items-center px-2 py-0.5 text-[11px] font-medium bg-secondary text-secondary-foreground rounded-full">Not yet available</span>
-                                </div>
-                                <p class="text-sm text-gray-600">Card / PayPal balance</p>
-                                <p class="text-xs text-gray-500 mt-2">Coming soon</p>
+                    <!-- PayPal Payment -->
+                    @if(in_array('paypal', $pm))
+                    <label class="relative cursor-pointer" id="paypal-radio-container">
+                        <input type="radio" name="payment_method" value="paypal" class="sr-only peer" id="paypal-radio">
+                        <div class="border-2 border-gray-200 rounded-lg p-4 text-center transition-all peer-checked:border-primary peer-checked:bg-primary/5 hover:border-gray-300">
+                            <div class="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                <i data-lucide="wallet" class="h-6 w-6 text-yellow-700"></i>
+                            </div>
+                            <h4 class="font-semibold text-gray-900 mb-1">PayPal</h4>
+                            <p class="text-sm text-gray-600">Card / PayPal balance</p>
+                            <div id="paypal-button-container" class="mt-3 hidden"></div>
+                            <div class="absolute top-3 right-3 w-5 h-5 border-2 border-gray-300 rounded-full peer-checked:border-primary peer-checked:bg-primary flex items-center justify-center">
+                                <div class="w-2 h-2 bg-white rounded-full opacity-0 peer-checked:opacity-100"></div>
                             </div>
                         </div>
-                    </x-ui.tooltip>
+                    </label>
+                    @endif
                 </div>
 
                 <div class="mt-4 text-xs text-muted-foreground">
-                    Online payments are shown for visibility, but are not yet available.
+                    Select your preferred payment method. PayPal will open in a secure window.
                 </div>
             </div>
 
@@ -585,6 +586,107 @@ document.addEventListener('DOMContentLoaded', function () {
     // Icons
     if (typeof lucide !== 'undefined') {
         lucide.createIcons();
+    }
+
+    // PayPal Integration
+    const paypalClientId = '{{ config('services.paypal.client_id') }}';
+    const paypalContainer = document.getElementById('paypal-button-container');
+    const paypalRadio = document.getElementById('paypal-radio');
+    
+    if (paypalContainer && paypalClientId && paypalClientId !== 'your_paypal_client_id_here') {
+        // Load PayPal SDK
+        const script = document.createElement('script');
+        script.src = `https://www.paypal.com/sdk/js?client-id=${paypalClientId}&currency=PHP&intent=capture`;
+        script.async = true;
+        script.onload = function() {
+            if (window.paypal) {
+                window.paypal.Buttons({
+                    style: {
+                        layout: 'vertical',
+                        color: 'gold',
+                        shape: 'rect',
+                        label: 'paypal'
+                    },
+                    createOrder: async function(data, actions) {
+                        const rushOption = document.querySelector('input[name="rush_option"]:checked')?.value || 'standard';
+                        
+                        try {
+                            const response = await fetch('{{ route("checkout.paypal.create") }}', {
+                                method: 'POST',
+                                headers: {
+                                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                                    'Content-Type': 'application/json',
+                                    'Accept': 'application/json'
+                                },
+                                body: JSON.stringify({ rush_option: rushOption })
+                            });
+                            
+                            const result = await response.json();
+                            if (result.success && result.id) {
+                                return result.id;
+                            }
+                            throw new Error(result.message || 'Failed to create PayPal order');
+                        } catch (err) {
+                            console.error('PayPal create order error:', err);
+                            alert('PayPal error: ' + err.message);
+                            throw err;
+                        }
+                    },
+                    onApprove: async function(data, actions) {
+                        try {
+                            const response = await fetch('{{ route("checkout.paypal.capture") }}', {
+                                method: 'POST',
+                                headers: {
+                                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                                    'Content-Type': 'application/json',
+                                    'Accept': 'application/json'
+                                },
+                                body: JSON.stringify({ order_id: data.orderID })
+                            });
+                            
+                            const result = await response.json();
+                            if (result.success) {
+                                // Submit the checkout form
+                                document.getElementById('checkout-form').submit();
+                            } else {
+                                throw new Error(result.message || 'Payment failed');
+                            }
+                        } catch (err) {
+                            console.error('PayPal capture error:', err);
+                            alert('Payment failed: ' + err.message);
+                        }
+                    },
+                    onError: function(err) {
+                        console.error('PayPal error:', err);
+                        alert('PayPal encountered an error. Please try again or use a different payment method.');
+                    }
+                }).render('#paypal-button-container');
+            }
+        };
+        script.onerror = function() {
+            console.error('Failed to load PayPal SDK');
+        };
+        document.head.appendChild(script);
+        
+        // Show PayPal button when PayPal is selected
+        if (paypalRadio) {
+            paypalRadio.addEventListener('change', function() {
+                if (this.checked) {
+                    paypalContainer.classList.remove('hidden');
+                    document.getElementById('place-order-btn').classList.add('hidden');
+                }
+            });
+            
+            // Handle other payment methods
+            document.querySelectorAll('input[name="payment_method"]').forEach(radio => {
+                if (radio.id !== 'paypal-radio') {
+                    radio.addEventListener('change', function() {
+                        paypalContainer.classList.add('hidden');
+                        document.getElementById('place-order-btn').classList.remove('hidden');
+                    });
+                }
+            });
+        }
     }
 });
 </script>

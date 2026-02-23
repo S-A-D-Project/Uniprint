@@ -109,20 +109,6 @@
         @yield('content')
     </main>
     
-    <!-- Footer -->
-    @include('partials.footer')
-    
-    <!-- Flash Messages -->
-    @if(session('success'))
-        <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 5000)" 
-             class="fixed bottom-4 right-4 z-50 p-4 bg-success text-success-foreground rounded-lg shadow-card-hover transition-smooth">
-            <div class="flex items-center gap-3">
-                <i data-lucide="check-circle" class="h-5 w-5"></i>
-                <span>{{ session('success') }}</span>
-            </div>
-        </div>
-    @endif
-    
     @if(session('error'))
         <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 5000)" 
              class="fixed bottom-4 right-4 z-50 p-4 bg-destructive text-destructive-foreground rounded-lg shadow-card-hover transition-smooth">

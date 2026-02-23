@@ -37,13 +37,16 @@ $breadcrumbs = [
         <x-admin.button size="sm" variant="ghost" icon="refresh-cw">
             Refresh
         </x-admin.button>
+        <button onclick="toggleShowAllUsers()" id="users-show-all-btn" class="px-3 py-1.5 text-sm font-medium bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-smooth">
+            <i data-lucide="eye" class="h-4 w-4 inline mr-1"></i>Show All
+        </button>
     </x-slot:actions>
     
     <div class="admin-table-responsive">
         <table class="admin-table">
             <thead>
                 <tr>
-                    <th>ID</th>
+                    <th class="id-column hidden">ID</th>
                     <th>Username</th>
                     <th>Email</th>
                     <th>Role</th>
@@ -56,7 +59,7 @@ $breadcrumbs = [
             <tbody>
                 @forelse($users as $user)
                 <tr>
-                    <td class="font-semibold">{{ $user->user_id ?? 'N/A' }}</td>
+                    <td class="font-semibold id-column hidden">{{ $user->user_id ?? 'N/A' }}</td>
                     <td>
                         <div class="flex items-center gap-2">
                             <i data-lucide="user" class="h-4 w-4 text-muted-foreground"></i>
@@ -348,5 +351,29 @@ $breadcrumbs = [
             }
         }, true);
     });
+
+    // Toggle Show All functionality for Users
+    let usersShowAll = false;
+    function toggleShowAllUsers() {
+        usersShowAll = !usersShowAll;
+        const idColumns = document.querySelectorAll('.id-column');
+        idColumns.forEach(col => {
+            if (usersShowAll) {
+                col.classList.remove('hidden');
+            } else {
+                col.classList.add('hidden');
+            }
+        });
+        
+        const btn = document.getElementById('users-show-all-btn');
+        if (btn) {
+            if (usersShowAll) {
+                btn.innerHTML = '<i data-lucide="eye-off" class="h-4 w-4 inline mr-1"></i>Hide All';
+            } else {
+                btn.innerHTML = '<i data-lucide="eye" class="h-4 w-4 inline mr-1"></i>Show All';
+            }
+            lucide.createIcons();
+        }
+    }
 </script>
 @endpush

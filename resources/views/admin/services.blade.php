@@ -142,5 +142,16 @@ function openAdminServiceFormModal(url) {
         bodyEl.innerHTML = '<div class="alert alert-danger">Failed to load content.</div>';
     });
 }
+
+function closeAdminServiceFormModal() {
+    const modalEl = document.getElementById('adminServiceFormModal');
+    let bsModal = window.modal_adminServiceFormModal;
+    if (!bsModal && typeof bootstrap !== 'undefined' && modalEl) {
+        bsModal = bootstrap.Modal.getInstance(modalEl);
+    }
+    if (bsModal) {
+        bsModal.hide();
+    }
+}
 </script>
 @endpush

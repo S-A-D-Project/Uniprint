@@ -760,12 +760,18 @@ class BusinessController extends Controller
         return redirect()->back()->with('success', 'Shop settings updated successfully.');
     }
 
-    public function editService($id)
+    public function editService(Request $request, $id)
     {
         $enterprise = $this->getUserEnterprise();
         $service = DB::table('services')->where('service_id', $id)->where('enterprise_id', $enterprise->enterprise_id)->first();
         if (!$service) abort(404);
         $serviceImages = DB::table('service_images')->where('service_id', $id)->orderBy('is_primary', 'desc')->get();
+        
+        // Return partial for AJAX/modal requests (no layout)
+        if ($request->ajax()) {
+            return view('business.services.form-modal', compact('service', 'serviceImages', 'enterprise'))->render();
+        }
+        
         return view('business.services.form', compact('service', 'serviceImages', 'enterprise'));
     }
 

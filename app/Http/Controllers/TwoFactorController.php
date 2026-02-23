@@ -37,10 +37,13 @@ class TwoFactorController extends Controller
 
         $user = Auth::user();
 
+        // Check both legacy and new OTP systems
+        $is2faEnabled = !empty($user->two_factor_enabled) || !empty($user->two_factor_email_enabled);
+        
         $pendingEnable = false;
         $expiresAt = $user->two_factor_expires_at ?? null;
         $code = (string) ($user->two_factor_code ?? '');
-        if (empty($user->two_factor_enabled) && $code !== '' && $expiresAt) {
+        if (!$is2faEnabled && $code !== '' && $expiresAt) {
             try {
                 $pendingEnable = Carbon::parse($expiresAt)->isFuture();
             } catch (\Throwable $e) {
@@ -49,7 +52,7 @@ class TwoFactorController extends Controller
         }
 
         return view('security.settings', [
-            'twoFactorEnabled' => !empty($user->two_factor_enabled),
+            'twoFactorEnabled' => $is2faEnabled,
             'pendingEnable' => $pendingEnable,
             'roleType' => $roleType,
         ]);
@@ -168,6 +171,7 @@ class TwoFactorController extends Controller
         try {
             DB::table('users')->where('user_id', $userId)->update([
                 'two_factor_enabled' => true,
+                'two_factor_email_enabled' => true,
                 'two_factor_code' => null,
                 'two_factor_expires_at' => null,
                 'updated_at' => now(),
@@ -202,6 +206,7 @@ class TwoFactorController extends Controller
         try {
             DB::table('users')->where('user_id', $userId)->update([
                 'two_factor_enabled' => false,
+                'two_factor_email_enabled' => false,
                 'two_factor_code' => null,
                 'two_factor_expires_at' => null,
                 'updated_at' => now(),
@@ -236,7 +241,10 @@ class TwoFactorController extends Controller
 
         $user = \App\Models\User::find($userId);
 
-        if (empty($user->two_factor_enabled)) {
+        // Check both legacy and new OTP systems
+        $is2faEnabled = !empty($user->two_factor_enabled) || !empty($user->two_factor_email_enabled);
+        
+        if (!$is2faEnabled) {
             return $this->redirectAfterVerify($roleType);
         }
 
@@ -295,7 +303,7 @@ class TwoFactorController extends Controller
             return redirect()->route('login');
         }
 
-        if (empty($user->two_factor_enabled)) {
+        if (empty($user->two_factor_enabled) && empty($user->two_factor_email_enabled)) {
             return $this->redirectAfterVerify($roleType);
         }
 
@@ -352,7 +360,7 @@ class TwoFactorController extends Controller
         }
 
         $user = \App\Models\User::find($userId);
-        if (empty($user->two_factor_enabled)) {
+        if (empty($user->two_factor_enabled) && empty($user->two_factor_email_enabled)) {
             return $this->redirectAfterVerify($roleType);
         }
 

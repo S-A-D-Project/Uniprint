@@ -520,8 +520,6 @@
                 <!-- Main Content -->
                 @yield('content')
             </main>
-            
-            @include('partials.footer')
         </div>
     </div>
     
