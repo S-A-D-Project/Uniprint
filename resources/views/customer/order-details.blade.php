@@ -269,10 +269,10 @@
                                         @endif
                                     </div>
                                     <div class="d-flex gap-2">
-                                        <a class="btn btn-sm btn-outline-primary" target="_blank" href="{{ asset('storage/' . $file->file_path) }}">
+                                        <a class="btn btn-sm btn-outline-primary" target="_blank" href="{{ config('filesystems.disks.s3.url') . '/' . $file->file_path }}">
                                             <i class="bi bi-download me-1"></i>Download
                                         </a>
-                                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="previewOrderDesignFile('{{ asset('storage/' . $file->file_path) }}', '{{ e($file->file_name) }}')">
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="previewOrderDesignFile('{{ config('filesystems.disks.s3.url') . '/' . $file->file_path }}', '{{ e($file->file_name) }}')">
                                             <i class="bi bi-eye me-1"></i>Preview
                                         </button>
                                         @if(empty($file->is_approved))

@@ -200,22 +200,25 @@ class CheckoutController extends Controller
             // Handle direct-uploaded files (stored under checkout_direct/{user})
             $directFiles = [];
             if ($uploadEnabled && $request->hasFile('design_files')) {
-                $disk = config('filesystems.default', 'public');
                 foreach ((array) $request->file('design_files') as $file) {
                     if (!$file) {
                         continue;
                     }
 
                     $fileName = time() . '_' . $file->getClientOriginalName();
-                    $filePath = $file->storeAs('design_files/checkout_direct/' . $userId, $fileName, $disk);
+                    try {
+                        $filePath = $file->storeAs('design_files/checkout_direct/' . $userId, $fileName, 's3');
 
-                    $directFiles[] = [
-                        'file_name' => $fileName,
-                        'file_path' => $filePath,
-                        'file_type' => $file->getClientOriginalExtension(),
-                        'file_size' => $file->getSize(),
-                        'design_notes' => $request->input('design_notes'),
-                    ];
+                        $directFiles[] = [
+                            'file_name' => $fileName,
+                            'file_path' => $filePath,
+                            'file_type' => $file->getClientOriginalExtension(),
+                            'file_size' => $file->getSize(),
+                            'design_notes' => $request->input('design_notes'),
+                        ];
+                    } catch (\Exception $e) {
+                        Log::error('Checkout design file upload failed: ' . $e->getMessage());
+                    }
                 }
             }
 

@@ -73,7 +73,7 @@
                                 <div><span class="font-medium">Submitted:</span> {{ \Illuminate\Support\Carbon::parse($enterprise->verification_submitted_at)->format('M d, Y h:i A') }}</div>
                                 <div>
                                     <span class="font-medium">Current file:</span>
-                                    <a class="underline hover:no-underline" href="{{ asset('storage/' . ltrim($enterprise->verification_document_path, '/')) }}" target="_blank" rel="noopener">View</a>
+                                    <a class="underline hover:no-underline" href="{{ config('filesystems.disks.s3.url') . '/' . ltrim($enterprise->verification_document_path, '/') }}" target="_blank" rel="noopener">View</a>
                                 </div>
                             </div>
                         @endif

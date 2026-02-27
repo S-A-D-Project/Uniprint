@@ -101,7 +101,7 @@
                         <!-- Service Image / Placeholder -->
                         @if(!empty($service->image_path))
                             <div class="w-full h-48 bg-secondary overflow-hidden">
-                                <img src="{{ asset('storage/' . $service->image_path) }}" alt="{{ $service->service_name ?? $service->product_name ?? 'Service' }}" class="w-full h-full object-cover" />
+                                <img src="{{ config('filesystems.disks.s3.url') . '/' . $service->image_path }}" alt="{{ $service->service_name ?? $service->product_name ?? 'Service' }}" class="w-full h-full object-cover" onerror="this.style.display='none'; this.parentElement.classList.add('gradient-accent'); this.parentElement.innerHTML='<i data-lucide=printer class=h-32 w-32 text-white></i>';" />
                             </div>
                         @else
                             <div class="w-full h-48 gradient-accent"></div>

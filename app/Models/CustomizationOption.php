@@ -18,6 +18,7 @@ class CustomizationOption extends Model
         'option_name',
         'option_type',
         'price_modifier',
+        'image_path',
     ];
 
     protected function casts(): array
@@ -26,6 +27,7 @@ class CustomizationOption extends Model
             'option_id' => 'string',
             'service_id' => 'string',
             'price_modifier' => 'decimal:2',
+            'image_path' => 'string',
         ];
     }
 

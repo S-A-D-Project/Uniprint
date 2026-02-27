@@ -363,6 +363,63 @@ if (app()->environment('local')) {
     });
 }
 
+// Debug routes - always available
+Route::get('/debug/s3-test', function() {
+    $disk = config('filesystems.default', 'public');
+    $config = config('filesystems.disks.' . $disk);
+    
+    $testContent = 'Test upload at ' . now();
+    $testPath = 'test/file-' . time() . '.txt';
+    
+    try {
+        \Storage::disk($disk)->put($testPath, $testContent);
+        $url = \Storage::disk($disk)->url($testPath);
+        
+        return response()->json([
+            'disk' => $disk,
+            'config' => $config,
+            'test_path' => $testPath,
+            'write_success' => true,
+            'url' => $url,
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'disk' => $disk,
+            'config' => $config,
+            'error' => $e->getMessage(),
+        ], 500);
+    }
+});
+
+Route::get('/debug/upload-form', function() {
+    return '<!DOCTYPE html>
+<html>
+<head><title>Upload Test</title></head>
+<body>
+<h1>Simple Upload Test</h1>
+<form method="POST" action="/debug/upload-test" enctype="multipart/form-data">
+    ' . csrf_field() . '
+    <input type="file" name="test_image" accept="image/*" required>
+    <button type="submit">Upload</button>
+</form>
+</body>
+</html>';
+});
+
+Route::post('/debug/upload-test', function(\Illuminate\Http\Request $request) {
+    if ($request->hasFile('test_image')) {
+        $disk = config('filesystems.default', 'public');
+        $path = $request->file('test_image')->store('test_uploads', $disk);
+        return response()->json([
+            'success' => true,
+            'path' => $path,
+            'disk' => $disk,
+            'url' => \Storage::disk($disk)->url($path),
+        ]);
+    }
+    return response()->json(['success' => false, 'error' => 'No file uploaded'], 400);
+});
+
 
 // Chat routes (authenticated users)
 Route::middleware([\App\Http\Middleware\CheckAuth::class])->group(function () {

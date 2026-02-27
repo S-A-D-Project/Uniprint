@@ -663,30 +663,34 @@ class BusinessController extends Controller
 
         DB::table('services')->insert($insert);
 
-        // Optional: store service images if supported
+        // Optional: store service images if supported - use default disk
         if ($request->hasFile('images') && schema_has_table('service_images')) {
-            $disk = config('filesystems.default', 'public');
             $images = (array) $request->file('images');
             $isFirst = true;
+            $disk = config('filesystems.default', 's3');
 
             foreach ($images as $img) {
                 if (! $img) {
                     continue;
                 }
 
-                $fileName = time() . '_' . $img->getClientOriginalName();
-                $path = $img->storeAs('service_images/' . $serviceId, $fileName, $disk);
+                try {
+                    $fileName = time() . '_' . $img->getClientOriginalName();
+                    $path = $img->storeAs('service_images/' . $serviceId, $fileName, $disk);
 
-                DB::table('service_images')->insert([
-                    'image_id' => (string) Str::uuid(),
-                    'service_id' => $serviceId,
-                    'image_path' => $path,
-                    'is_primary' => $isFirst,
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ]);
+                    DB::table('service_images')->insert([
+                        'image_id' => (string) Str::uuid(),
+                        'service_id' => $serviceId,
+                        'image_path' => $path,
+                        'is_primary' => $isFirst,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ]);
 
-                $isFirst = false;
+                    $isFirst = false;
+                } catch (\Exception $e) {
+                    \Log::error('Service image upload failed: ' . $e->getMessage());
+                }
             }
         }
 
@@ -720,8 +724,14 @@ class BusinessController extends Controller
         ]);
 
         if ($request->hasFile('shop_logo')) {
-            $path = $request->file('shop_logo')->store('shop_logos', 'public');
-            $data['shop_logo'] = $path;
+            try {
+                $disk = config('filesystems.default', 's3');
+                $path = $request->file('shop_logo')->store('shop_logos', $disk);
+                $data['shop_logo'] = $path;
+            } catch (\Exception $e) {
+                \Log::error('Shop logo upload failed: ' . $e->getMessage());
+                return redirect()->back()->with('error', 'Logo upload failed: ' . $e->getMessage())->withInput();
+            }
         }
 
         if ($request->has('is_active')) {
@@ -914,6 +924,9 @@ class BusinessController extends Controller
 
     public function storeCustomization(Request $request, string $serviceId)
     {
+        // Failsafe log - write directly to file
+        file_put_contents(storage_path('logs/customization.log'), date('Y-m-d H:i:s') . ' - storeCustomization called - ServiceID: ' . $serviceId . ' - Has Image: ' . ($request->hasFile('image') ? 'YES' : 'NO') . "\n", FILE_APPEND);
+        
         $enterprise = $this->getUserEnterprise();
 
         $service = DB::table('services')
@@ -934,7 +947,15 @@ class BusinessController extends Controller
             'option_type' => 'required|string|max:50',
             'price_modifier' => 'nullable|numeric',
             'is_default' => 'nullable|boolean',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120',
         ]);
+
+        $imagePath = null;
+        if ($request->hasFile('image')) {
+            $disk = config('filesystems.default', 'public');
+            $imagePath = $request->file('image')->store('customization_images', $disk);
+            // Note: Supabase S3 has read permission issues, so we skip existence check
+        }
 
         $insert = [
             'option_id' => (string) Str::uuid(),
@@ -942,6 +963,7 @@ class BusinessController extends Controller
             'option_name' => $request->string('option_name')->toString(),
             'option_type' => $request->string('option_type')->toString(),
             'price_modifier' => (float) $request->input('price_modifier', 0),
+            'image_path' => $imagePath,
             'created_at' => now(),
             'updated_at' => now(),
         ];
@@ -977,7 +999,14 @@ class BusinessController extends Controller
             'option_type' => 'required|string|max:50',
             'price_modifier' => 'nullable|numeric',
             'is_default' => 'nullable|boolean',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120',
         ]);
+
+        // Get existing option to check for old image
+        $existingOption = DB::table('customization_options')
+            ->where('option_id', $optionId)
+            ->where('service_id', $serviceId)
+            ->first();
 
         $update = [
             'option_name' => $request->string('option_name')->toString(),
@@ -985,6 +1014,17 @@ class BusinessController extends Controller
             'price_modifier' => (float) $request->input('price_modifier', 0),
             'updated_at' => now(),
         ];
+
+        // Handle image upload
+        if ($request->hasFile('image')) {
+            // Delete old image if exists
+            if ($existingOption && !empty($existingOption->image_path)) {
+                $disk = config('filesystems.default', 'public');
+                Storage::disk($disk)->delete($existingOption->image_path);
+            }
+            $disk = config('filesystems.default', 'public');
+            $update['image_path'] = $request->file('image')->store('customization_images', $disk);
+        }
 
         if (schema_has_column('customization_options', 'is_default')) {
             $update['is_default'] = $request->boolean('is_default');

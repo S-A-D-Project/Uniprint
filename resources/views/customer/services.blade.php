@@ -54,7 +54,7 @@
     <div class="col-md-6 col-lg-4">
         <div class="card h-100 border-0 shadow-sm" role="button" onclick="window.location.href='{{ route('customer.service.details', $service->service_id) }}'">
             @if(!empty($service->image_path))
-                <img src="{{ asset('storage/' . $service->image_path) }}" alt="{{ $service->service_name }}" class="card-img-top" style="height: 180px; object-fit: cover;">
+                <img src="{{ config('filesystems.disks.s3.url') . '/' . $service->image_path }}" alt="{{ $service->service_name }}" class="card-img-top" style="height: 180px; object-fit: cover;" onerror="this.style.display='none'">
             @endif
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start mb-3">

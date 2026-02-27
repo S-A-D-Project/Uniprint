@@ -43,7 +43,10 @@
                         <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
                             @foreach($serviceImages as $img)
                                 <div class="relative">
-                                    <img src="{{ \Illuminate\Support\Facades\Storage::url($img->image_path) }}" alt="Service image" class="w-full h-24 object-cover rounded-lg border border-border" />
+                                    <img src="{{ config('filesystems.disks.s3.url') . '/' . $img->image_path }}" alt="Service image" class="w-full h-24 object-cover rounded-lg border border-border" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                                <div class="hidden w-full h-24 bg-secondary rounded-lg items-center justify-center">
+                                    <i data-lucide="image-off" class="h-8 w-8 text-muted-foreground"></i>
+                                </div>
                                     @if(!empty($img->is_primary))
                                         <span class="absolute top-2 left-2 text-[10px] bg-primary text-primary-foreground px-2 py-1 rounded-md">Primary</span>
                                     @else
@@ -58,7 +61,7 @@
                         </div>
                     @elseif(!empty($service->image_path))
                         <div class="mb-3">
-                            <img src="{{ \Illuminate\Support\Facades\Storage::url($service->image_path) }}" alt="Service image" class="w-full max-w-md rounded-lg border border-border" />
+                            <img src="{{ config('filesystems.disks.s3.url') . '/' . $service->image_path }}" alt="Service image" class="w-full max-w-md rounded-lg border border-border" onerror="this.style.display='none'" />
                         </div>
                     @endif
                     <input type="file" name="images[]" accept="image/png,image/jpeg,image/webp" multiple

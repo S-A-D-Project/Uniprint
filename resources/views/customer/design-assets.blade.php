@@ -19,9 +19,11 @@
         <div class="card h-100">
             <div class="card-body">
                 <div class="text-center mb-3">
-                    <div class="bg-light rounded p-4">
-                        <i class="bi bi-file-earmark-image text-primary" style="font-size: 3rem;"></i>
-                    </div>
+                    @if($asset->thumbnail_path)
+                        <img src="{{ config('filesystems.disks.s3.url') . '/' . $asset->thumbnail_path }}" alt="{{ $asset->asset_name }}" class="w-full h-48 object-cover rounded-lg">
+                    @else
+                        <img src="{{ config('filesystems.disks.s3.url') . '/' . $asset->storage_path }}" alt="{{ $asset->asset_name }}" class="w-full h-48 object-cover rounded-lg">
+                    @endif
                 </div>
 
                 <h5 class="card-title text-center mb-2">{{ $asset->asset_name }}</h5>
@@ -160,7 +162,7 @@ async function previewAsset(assetId, assetName) {
                 <div class="mb-3">
                     <h5>${assetName}</h5>
                 </div>
-                <img src="${data.preview_url}" class="img-fluid rounded" alt="${assetName}" style="max-height: 400px;">
+                <img src="{{ config('filesystems.disks.s3.url') . '/' . $asset->storage_path }}" alt="${assetName}" class="img-fluid rounded" style="max-height: 400px;">
                 <div class="mt-3 text-muted">
                     <small>File size: ${data.file_size} | Dimensions: ${data.dimensions || 'N/A'}</small>
                 </div>

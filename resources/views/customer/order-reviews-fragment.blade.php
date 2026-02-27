@@ -59,7 +59,7 @@
                                 <ul class="small mb-0">
                                     @foreach(($reviewFilesByReviewId[$existingReview->review_id] ?? []) as $f)
                                         <li>
-                                            <a href="{{ asset('storage/' . ($f->file_path ?? '')) }}" target="_blank" rel="noopener">{{ $f->file_name ?? 'File' }}</a>
+                                            <a href="{{ config('filesystems.disks.s3.url') . '/' . ($f->file_path ?? '') }}" target="_blank" rel="noopener">{{ $f->file_name ?? 'File' }}</a>
                                         </li>
                                     @endforeach
                                 </ul>

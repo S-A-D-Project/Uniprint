@@ -104,12 +104,11 @@
                                 handleInput(e, index) {
                                     let val = e.target.value.replace(/\D/g, '');
                                     if (val) {
-                                        this.otpDigits[index] = val[0];
-                                        if (index < 5) {
-                                            this.$nextTick(() => this.$refs['otp' + (index + 1)].focus());
-                                        } else if (this.isComplete()) {
-                                            this.submitForm();
-                                        }
+                                        this.otpDigits[index] = val[val.length - 1];
+                                    }
+                                    // Always move to next field if we entered something and not at the end
+                                    if (this.otpDigits[index] && index < 5) {
+                                        this.$nextTick(() => this.$refs['otp' + (index + 1)].focus());
                                     }
                                 },
                                 

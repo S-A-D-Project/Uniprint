@@ -23,7 +23,9 @@
                 <div>
                     @if(!empty($service->image_path))
                         <div class="h-96 bg-secondary rounded-xl mb-4 overflow-hidden">
-                            <img src="{{ asset('storage/' . $service->image_path) }}" alt="{{ $service->service_name }}" class="w-full h-full object-cover" />
+                            @if(!empty($service->image_path))
+                                <img src="{{ config('filesystems.disks.s3.url') . '/' . $service->image_path }}" alt="{{ $service->service_name }}" class="w-full h-full object-cover" onerror="this.style.display='none'; this.parentElement.classList.add('gradient-accent'); this.parentElement.innerHTML='<i data-lucide=printer class=h-32 w-32 text-white></i>';" />
+                            @endif
                         </div>
                     @else
                         <div class="h-96 gradient-accent rounded-xl mb-4 flex items-center justify-center">

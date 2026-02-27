@@ -19,15 +19,19 @@
 
             <div class="grid lg:grid-cols-2 gap-8">
                 <div>
-                    @if(!empty($service->image_path))
-                        <div class="h-96 bg-secondary rounded-xl mb-4 overflow-hidden">
-                            <img src="{{ asset('storage/' . $service->image_path) }}" alt="{{ $service->service_name }}" class="w-full h-full object-cover" />
-                        </div>
-                    @else
-                        <div class="h-96 gradient-accent rounded-xl mb-4 flex items-center justify-center">
-                            <i data-lucide="printer" class="h-32 w-32 text-white"></i>
-                        </div>
-                    @endif
+                    <div id="serviceImageBox" class="h-96 rounded-xl mb-4 overflow-hidden relative">
+                        @if(!empty($service->image_path))
+                            <img id="mainServiceImage" src="{{ config('filesystems.disks.s3.url') . '/' . $service->image_path }}" alt="{{ $service->service_name }}" class="w-full h-full object-cover transition-opacity duration-300" onerror="this.style.display='none'; document.getElementById('fallbackServiceIcon').style.display='flex';" />
+                            <div id="fallbackServiceIcon" class="w-full h-full gradient-accent flex items-center justify-center hidden">
+                                <i data-lucide="printer" class="h-32 w-32 text-white"></i>
+                            </div>
+                        @else
+                            <div id="defaultServiceIcon" class="w-full h-full gradient-accent flex items-center justify-center">
+                                <i data-lucide="printer" class="h-32 w-32 text-white"></i>
+                            </div>
+                        @endif
+                        <img id="hoverPreviewImage" src="" alt="Option preview" class="absolute inset-0 w-full h-full object-cover opacity-0 transition-opacity duration-300 pointer-events-none" onerror="this.classList.add('hidden')" />
+                    </div>
 
                     <div class="space-y-4">
                         <div class="flex items-center justify-between gap-3">
@@ -113,7 +117,7 @@
                                                 @php
                                                     $isChecked = in_array($option->option_id, $oldSelected, true);
                                                 @endphp
-                                                <label class="cursor-pointer">
+                                                <label class="cursor-pointer" data-image-path="{{ $option->image_path ? config('filesystems.disks.s3.url') . '/' . $option->image_path : '' }}">
                                                     <input type="checkbox" name="customizations[]" value="{{ $option->option_id }}" class="sr-only peer" data-price="{{ $option->price_modifier }}" data-option-type="{{ $option->option_type }}" data-option-name="{{ $option->option_name }}" onchange="updatePrice()" {{ $isChecked ? 'checked' : '' }}>
                                                     <div class="border border-input rounded-md px-3 py-2 text-sm hover:bg-secondary transition-smooth peer-checked:border-primary peer-checked:bg-primary/5">
                                                         <div class="flex items-center justify-between gap-2">
@@ -396,6 +400,34 @@ function updatePrice() {
     if (el) el.textContent = total.toFixed(2);
 
     updateCustomSizeVisibility();
+    setupOptionHoverPreview();
+}
+
+function setupOptionHoverPreview() {
+    const imageBox = document.getElementById('serviceImageBox');
+    const mainImage = document.getElementById('mainServiceImage');
+    const defaultIcon = document.getElementById('defaultServiceIcon');
+    const hoverImage = document.getElementById('hoverPreviewImage');
+    
+    if (!imageBox || !hoverImage) return;
+
+    document.querySelectorAll('label[data-image-path]').forEach(label => {
+        const imagePath = label.dataset.imagePath;
+        if (!imagePath) return;
+
+        label.addEventListener('mouseenter', () => {
+            hoverImage.src = imagePath;
+            hoverImage.classList.remove('opacity-0');
+            if (mainImage) mainImage.classList.add('opacity-0');
+            if (defaultIcon) defaultIcon.classList.add('opacity-0');
+        });
+
+        label.addEventListener('mouseleave', () => {
+            hoverImage.classList.add('opacity-0');
+            if (mainImage) mainImage.classList.remove('opacity-0');
+            if (defaultIcon) defaultIcon.classList.remove('opacity-0');
+        });
+    });
 }
 
 function isCustomSizeSelected() {

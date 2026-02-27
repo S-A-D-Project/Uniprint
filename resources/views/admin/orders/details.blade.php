@@ -121,7 +121,13 @@ $breadcrumbs = [
                                         <span class="inline-block px-2 py-1 text-xs bg-warning/10 text-warning rounded-md">Pending</span>
                                     @endif
                                     @if(!empty($file->file_path))
-                                        <a href="{{ asset('storage/' . $file->file_path) }}" target="_blank" class="admin-btn admin-btn-outline admin-btn-sm">Download</a>
+                                        <img src="{{ config('filesystems.disks.s3.url') . '/' . $file->file_path }}" alt="Design file" class="w-full h-24 object-cover rounded-lg border border-border" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                                        <div class="hidden w-full h-24 bg-secondary rounded-lg items-center justify-center">
+                                            <i data-lucide="image-off" class="h-8 w-8 text-muted-foreground"></i>
+                                        </div>
+                                    @endif
+                                    @if(!empty($file->file_path))
+                                        <a href="{{ config('filesystems.disks.s3.url') . '/' . $file->file_path }}" target="_blank" class="admin-btn admin-btn-outline admin-btn-sm">Download</a>
                                     @endif
                                 </div>
                             </div>

@@ -187,6 +187,10 @@
                                             </x-ui.tooltip>
                                         @endif
                                         <x-ui.tooltip text="Download this file">
+                                            <img src="{{ config('filesystems.disks.s3.url') . '/' . $file->file_path }}" alt="Design file" class="w-full h-24 object-cover rounded-lg border border-border" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                                            <div class="hidden w-full h-24 bg-secondary rounded-lg items-center justify-center">
+                                                <i data-lucide="image-off" class="h-8 w-8 text-muted-foreground"></i>
+                                            </div>
                                             <a href="{{ asset('storage/' . $file->file_path) }}" target="_blank" 
                                                class="px-3 py-1 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90">
                                                 Download

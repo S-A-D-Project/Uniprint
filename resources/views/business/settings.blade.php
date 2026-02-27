@@ -138,7 +138,10 @@
                        class="w-full text-sm">
                 @if(!empty($enterprise->shop_logo))
                     <div class="mt-2">
-                        <img src="{{ asset('storage/' . $enterprise->shop_logo) }}" alt="Shop Logo" class="h-16 w-16 rounded-lg object-cover border border-border">
+                        <img src="{{ config('filesystems.disks.s3.url') . '/' . $enterprise->shop_logo }}" alt="Shop Logo" class="h-16 w-16 rounded-lg object-cover border border-border" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                        <div class="h-16 w-16 rounded-lg bg-secondary flex items-center justify-center hidden">
+                            <i data-lucide="image-off" class="h-6 w-6 text-muted-foreground"></i>
+                        </div>
                     </div>
                 @endif
             </div>

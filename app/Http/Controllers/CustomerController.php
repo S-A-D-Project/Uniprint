@@ -462,19 +462,22 @@ class CustomerController extends Controller
                 }
 
                 $fileName = time() . '_' . $file->getClientOriginalName();
-                $disk = config('filesystems.default', 'public');
-                $filePath = $file->storeAs('review_files/' . $reviewId, $fileName, $disk);
+                try {
+                    $filePath = $file->storeAs('review_files/' . $reviewId, $fileName, 's3');
 
-                DB::table('review_files')->insert([
-                    'file_id' => (string) Str::uuid(),
-                    'review_id' => $reviewId,
-                    'file_name' => $fileName,
-                    'file_path' => $filePath,
-                    'file_type' => $file->getClientOriginalExtension(),
-                    'file_size' => $file->getSize(),
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
+                    DB::table('review_files')->insert([
+                        'file_id' => (string) Str::uuid(),
+                        'review_id' => $reviewId,
+                        'file_name' => $fileName,
+                        'file_path' => $filePath,
+                        'file_type' => $file->getClientOriginalExtension(),
+                        'file_size' => $file->getSize(),
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                } catch (\Exception $e) {
+                    Log::error('Review file upload failed: ' . $e->getMessage());
+                }
             }
         }
 
@@ -770,8 +773,12 @@ class CustomerController extends Controller
         // Handle file upload
         $file = $request->file('design_file');
         $fileName = time() . '_' . $file->getClientOriginalName();
-        $disk = config('filesystems.default', 'public');
-        $filePath = $file->storeAs('design_files/' . $orderId, $fileName, $disk);
+        try {
+            $filePath = $file->storeAs('design_files/' . $orderId, $fileName, 's3');
+        } catch (\Exception $e) {
+            Log::error('Design file upload failed: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'File upload failed: ' . $e->getMessage());
+        }
 
         // Get file version (count existing files + 1)
         $version = DB::table('order_design_files')
@@ -847,18 +854,12 @@ class CustomerController extends Controller
         }
 
         // Delete file from storage
-        $disk = config('filesystems.default', 'public');
         try {
-            if (Storage::disk($disk)->exists($file->file_path)) {
-                Storage::disk($disk)->delete($file->file_path);
+            if (Storage::disk('s3')->exists($file->file_path)) {
+                Storage::disk('s3')->delete($file->file_path);
             }
         } catch (\Throwable $e) {
-            try {
-                if (Storage::disk('public')->exists($file->file_path)) {
-                    Storage::disk('public')->delete($file->file_path);
-                }
-            } catch (\Throwable $e2) {
-            }
+            Log::error('Failed to delete design file from S3: ' . $e->getMessage());
         }
 
         // Delete from database

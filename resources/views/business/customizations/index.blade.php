@@ -23,6 +23,9 @@
 
 @section('content')
 
+    {{-- Toast Notification Container --}}
+    <div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2"></div>
+
     <div class="grid lg:grid-cols-3 gap-6">
         <!-- Customizations List -->
         <div class="lg:col-span-2">
@@ -34,9 +37,9 @@
                 @endphp
                 
                 @if($grouped->isNotEmpty())
-                    <div class="space-y-6">
+                    <div class="space-y-6" id="customizationsList">
                         @foreach($grouped as $type => $options)
-                            <div>
+                            <div class="customization-group" data-type="{{ $type }}">
                                 <div class="flex items-center justify-between mb-3">
                                     <h3 class="font-semibold text-lg">{{ $type }}</h3>
                                     <button type="button"
@@ -50,26 +53,47 @@
                                 </div>
                                 <div class="space-y-2">
                                     @foreach($options as $option)
-                                        <div class="flex items-center justify-between p-3 border border-border rounded-lg hover:bg-secondary/30">
-                                            <div>
-                                                <p class="font-medium">{{ $option->option_name }}</p>
-                                                <p class="text-sm text-muted-foreground">
-                                                    Price modifier: 
-                                                    @if($option->price_modifier >= 0)
-                                                        <span class="text-primary">+₱{{ number_format($option->price_modifier, 2) }}</span>
-                                                    @else
-                                                        <span class="text-success">₱{{ number_format($option->price_modifier, 2) }}</span>
-                                                    @endif
-                                                </p>
+                                        <div class="flex items-center justify-between p-3 border border-border rounded-lg hover:bg-secondary/30 transition-all option-item" data-option-id="{{ $option->option_id }}">
+                                            <div class="flex items-center gap-3">
+                                                @if(!empty($option->image_path))
+                                                    @php
+                                                        $imageUrl = config('filesystems.disks.s3.url') . '/' . $option->image_path;
+                                                    @endphp
+                                                    <div class="relative">
+                                                        <img src="{{ $imageUrl }}" alt="{{ $option->option_name }}" class="h-10 w-10 rounded-lg object-cover border border-border" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                                        <div class="hidden h-10 w-10 rounded-lg bg-secondary items-center justify-center">
+                                                            <i data-lucide="image-off" class="h-5 w-5 text-muted-foreground"></i>
+                                                        </div>
+                                                        {{-- Edit indicator badge --}}
+                                                        <div class="absolute -top-1 -right-1 h-4 w-4 bg-primary rounded-full flex items-center justify-center opacity-0 transition-opacity edit-badge">
+                                                            <i data-lucide="check" class="h-3 w-3 text-primary-foreground"></i>
+                                                        </div>
+                                                    </div>
+                                                @else
+                                                    <div class="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center">
+                                                        <i data-lucide="image" class="h-5 w-5 text-muted-foreground"></i>
+                                                    </div>
+                                                @endif
+                                                <div>
+                                                    <p class="font-medium option-name">{{ $option->option_name }}</p>
+                                                    <p class="text-sm text-muted-foreground">
+                                                        Price modifier: 
+                                                        @if($option->price_modifier >= 0)
+                                                            <span class="text-primary price-modifier">+₱{{ number_format($option->price_modifier, 2) }}</span>
+                                                        @else
+                                                            <span class="text-success price-modifier">₱{{ number_format($option->price_modifier, 2) }}</span>
+                                                        @endif
+                                                    </p>
+                                                </div>
                                             </div>
                                             <div class="flex gap-2">
                                                 <x-ui.tooltip text="Edit this customization option">
-                                                    <button type="button" aria-label="Edit option" class="inline-flex items-center justify-center px-3 py-2 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 focus:outline-none focus:ring-2 focus:ring-ring" onclick="editCustomization('{{ $option->option_id }}', '{{ $option->option_type }}', '{{ $option->option_name }}', '{{ $option->price_modifier }}')">
+                                                    <button type="button" aria-label="Edit option" class="inline-flex items-center justify-center px-3 py-2 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 focus:outline-none focus:ring-2 focus:ring-ring transition-all edit-btn" onclick="editCustomization('{{ $option->option_id }}', '{{ $option->option_type }}', '{{ $option->option_name }}', '{{ $option->price_modifier }}', '{{ $option->image_path ?? '' }}')">
                                                         <i class="bi bi-pencil text-base"></i>
                                                     </button>
                                                 </x-ui.tooltip>
                                                 <x-ui.tooltip text="Delete this customization option">
-                                                    <button type="button" aria-label="Delete option" class="inline-flex items-center justify-center px-3 py-2 text-sm bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90 focus:outline-none focus:ring-2 focus:ring-ring" onclick="deleteCustomization('{{ $option->option_id }}', '{{ $option->option_name }}')">
+                                                    <button type="button" aria-label="Delete option" class="inline-flex items-center justify-center px-3 py-2 text-sm bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90 focus:outline-none focus:ring-2 focus:ring-ring transition-all delete-btn" onclick="deleteCustomization('{{ $option->option_id }}', '{{ $option->option_name }}')">
                                                         <i class="bi bi-trash text-base"></i>
                                                     </button>
                                                 </x-ui.tooltip>
@@ -270,7 +294,7 @@
 
 <!-- Add Customization Modal -->
 <x-ui.modal id="addCustomizationModal" title="Add Customization Option" size="md" centered>
-    <form id="addCustomizationForm" action="{{ route('business.customizations.store', $service->service_id) }}" method="POST">
+    <form id="addCustomizationForm" action="{{ route('business.customizations.store', $service->service_id) }}" method="POST" enctype="multipart/form-data">
         @csrf
         <div class="space-y-4">
             <div>
@@ -319,6 +343,13 @@
                        class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
                 <small class="text-muted-foreground">Use negative values for discounts (e.g., -5.00)</small>
             </div>
+
+            <div>
+                <label class="block text-sm font-medium mb-2">Option Image</label>
+                <input type="file" name="image" accept="image/*"
+                       class="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-primary file:text-primary-foreground hover:file:bg-primary/90">
+                <small class="text-muted-foreground">Upload an image to show when customers hover over this option (optional)</small>
+            </div>
         </div>
     </form>
     
@@ -366,7 +397,7 @@
 
 <!-- Edit Customization Modal -->
 <x-ui.modal id="editCustomizationModal" title="Edit Customization Option" size="md" centered>
-    <form id="editCustomizationForm" method="POST">
+    <form id="editCustomizationForm" method="POST" enctype="multipart/form-data">
         @csrf
         @method('PUT')
         <div class="space-y-4">
@@ -386,6 +417,17 @@
                 <label class="block text-sm font-medium mb-2">Price Modifier (₱) *</label>
                 <input type="number" name="price_modifier" id="edit_price_modifier" step="0.01" required
                        class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium mb-2">Option Image</label>
+                <input type="file" name="image" id="edit_image" accept="image/*"
+                       class="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-primary file:text-primary-foreground hover:file:bg-primary/90">
+                <div id="edit_current_image_container" class="mt-2 hidden">
+                    <p class="text-xs text-muted-foreground mb-1">Current image:</p>
+                    <img id="edit_current_image" src="" alt="Current option image" class="h-16 w-16 rounded-lg object-cover border border-border">
+                </div>
+                <small class="text-muted-foreground">Upload a new image to replace the current one (optional)</small>
             </div>
         </div>
     </form>
@@ -542,11 +584,25 @@ function openAddCustomizationForType(optionType) {
     }, 150);
 }
 
-function editCustomization(optionId, optionType, optionName, priceModifier) {
+function editCustomization(optionId, optionType, optionName, priceModifier, imagePath) {
     // Populate form fields
     document.getElementById('edit_option_type').value = optionType;
     document.getElementById('edit_option_name').value = optionName;
     document.getElementById('edit_price_modifier').value = priceModifier;
+    
+    // Handle current image display using S3 URL
+    const imageContainer = document.getElementById('edit_current_image_container');
+    const imageEl = document.getElementById('edit_current_image');
+    if (imagePath) {
+        const s3Url = '{{ config('filesystems.disks.s3.url') }}';
+        imageEl.src = imagePath.startsWith('http') ? imagePath : s3Url + '/' + imagePath;
+        imageContainer.classList.remove('hidden');
+    } else {
+        imageContainer.classList.add('hidden');
+    }
+    
+    // Clear the file input
+    document.getElementById('edit_image').value = '';
     
     // Set form action
     const form = document.getElementById('editCustomizationForm');
@@ -677,6 +733,14 @@ document.addEventListener('DOMContentLoaded', function () {
             syncAddOptionTypeHidden();
         });
     }
+    
+    // Show flash messages as toasts
+    @if(session('success'))
+        showToast('{{ session('success') }}', 'success');
+    @endif
+    @if(session('error'))
+        showToast('{{ session('error') }}', 'error');
+    @endif
 });
 </script>
 @endpush
